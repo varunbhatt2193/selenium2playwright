@@ -1,0 +1,394 @@
+<title>Selenium2Playwright Architecture</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #f6f8f6;
+    --surface: #ffffff;
+    --ink: #1c241f;
+    --muted: #5c6761;
+    --line: #d7ded8;
+    --accent: #0e7a6c;          /* teal — agent control flow / reflection loop */
+    --llm: #b8551f;             /* clay — Claude LLM calls */
+    --pass: #2e7d43;            /* green — deterministic validation */
+    --warn: #9a6207;            /* amber — honesty artifacts */
+    --accent-tint: rgba(14, 122, 108, 0.08);
+    --llm-tint: rgba(184, 85, 31, 0.09);
+    --pass-tint: rgba(46, 125, 67, 0.09);
+    --warn-tint: rgba(154, 98, 7, 0.10);
+    --band: rgba(14, 122, 108, 0.045);
+    --chipbg: rgba(28, 36, 31, 0.045);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #101613;
+      --surface: #161d19;
+      --ink: #e5ebe6;
+      --muted: #96a29a;
+      --line: #2b352e;
+      --accent: #43cfba;
+      --llm: #e28c55;
+      --pass: #62c47d;
+      --warn: #d8a944;
+      --accent-tint: rgba(67, 207, 186, 0.10);
+      --llm-tint: rgba(226, 140, 85, 0.12);
+      --pass-tint: rgba(98, 196, 125, 0.11);
+      --warn-tint: rgba(216, 169, 68, 0.12);
+      --band: rgba(67, 207, 186, 0.06);
+      --chipbg: rgba(229, 235, 230, 0.06);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #101613;
+    --surface: #161d19;
+    --ink: #e5ebe6;
+    --muted: #96a29a;
+    --line: #2b352e;
+    --accent: #43cfba;
+    --llm: #e28c55;
+    --pass: #62c47d;
+    --warn: #d8a944;
+    --accent-tint: rgba(67, 207, 186, 0.10);
+    --llm-tint: rgba(226, 140, 85, 0.12);
+    --pass-tint: rgba(98, 196, 125, 0.11);
+    --warn-tint: rgba(216, 169, 68, 0.12);
+    --band: rgba(67, 207, 186, 0.06);
+    --chipbg: rgba(229, 235, 230, 0.06);
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+    padding: 40px 20px 72px;
+  }
+  .wrap { max-width: 1060px; margin: 0 auto; }
+  .prose { max-width: 700px; }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 10px;
+  }
+  h1 {
+    font-family: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    font-weight: 700;
+    font-size: clamp(28px, 4.5vw, 38px);
+    line-height: 1.08;
+    letter-spacing: -0.015em;
+    margin: 0 0 12px;
+    text-wrap: balance;
+  }
+  .dek { color: var(--muted); margin: 0 0 34px; font-size: 16px; }
+  .dek strong { color: var(--ink); font-weight: 600; }
+
+  h2 {
+    font-family: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    font-weight: 600;
+    font-size: 20px;
+    letter-spacing: -0.01em;
+    margin: 46px 0 6px;
+  }
+  .sub { color: var(--muted); margin: 0 0 18px; max-width: 700px; }
+
+  figure {
+    margin: 0;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 22px 18px 8px;
+  }
+  .figscroll { overflow-x: auto; }
+  .figscroll svg { display: block; max-width: 100%; height: auto; }
+  #fig-main svg { min-width: 1020px; }
+  #fig-adlc svg { min-width: 860px; }
+  figcaption {
+    font-size: 13px;
+    color: var(--muted);
+    padding: 12px 6px 12px;
+    border-top: 1px solid var(--line);
+    margin-top: 14px;
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 18px;
+    margin: 14px 2px 0;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .sw { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+  .sw.llm   { background: var(--llm-tint);  border: 1.5px solid var(--llm); }
+  .sw.pass  { background: var(--pass-tint); border: 1.5px solid var(--pass); }
+  .sw.loop  { background: var(--accent-tint); border: 1.5px solid var(--accent); }
+  .sw.warn  { background: var(--warn-tint); border: 1.5px solid var(--warn); }
+  .sw.dash  { background: none; border: 1.5px dashed var(--muted); }
+
+  .decisions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 10px;
+    margin-top: 16px;
+  }
+  .decision {
+    background: var(--chipbg);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 14px;
+  }
+  .decision .k {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+  .decision .v { font-size: 13.5px; font-weight: 500; }
+
+  ol.compare { margin: 14px 0 0; padding-left: 22px; max-width: 720px; }
+  ol.compare li { margin-bottom: 10px; }
+  ol.compare b { font-weight: 600; }
+
+  .foot {
+    margin-top: 48px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+    font-size: 12.5px;
+    color: var(--muted);
+    font-family: "IBM Plex Mono", monospace;
+  }
+
+  svg text { font-family: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; }
+  svg .mono { font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace; }
+</style>
+
+<div class="wrap">
+  <p class="eyebrow">Selenium2Playwright · v1 · post-review</p>
+  <h1>Selenium2Playwright Architecture</h1>
+  <p class="dek prose">One LangGraph agent converts TypeScript Selenium to Playwright. The load-bearing idea: <strong>the LLM can't lie to the compiler</strong> — every conversion passes deterministic validation and a reflection loop before it ships, and everything the agent does is traced, evaluated, and monitored in LangSmith.</p>
+
+  <h2>Runtime architecture</h2>
+  <p class="sub">What happens when someone submits Selenium code — from either client, through the graph, into the observability plane.</p>
+
+  <figure id="fig-main">
+    <div class="figscroll">
+    <svg viewBox="0 0 1180 660" role="img" aria-label="Runtime architecture: playground and CLI clients call a LangGraph agent hosted on LangSmith Deployment. The graph runs intake, analyze, convert with Claude, deterministic validation, and a critic reflection loop back to convert, then assembles a report. Short-term checkpointer and long-term store memory sit inside the deployment. All runs emit traces to LangSmith for evals, monitoring, and a feedback flywheel. A dashed v2 box shows the same graph moving to Amazon Bedrock AgentCore.">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+        </marker>
+        <marker id="arrT" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/>
+        </marker>
+      </defs>
+
+      <!-- ============ Clients ============ -->
+      <g stroke="currentColor" fill="none" stroke-width="1.3">
+        <rect x="16" y="118" width="150" height="56" rx="10"/>
+        <rect x="16" y="206" width="150" height="76" rx="10"/>
+      </g>
+      <text x="91" y="140" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">CLI — s2p</text>
+      <text x="91" y="157" text-anchor="middle" font-size="9.5" fill="var(--muted)">file or suite folder</text>
+      <text x="91" y="230" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Playground</text>
+      <text x="91" y="247" text-anchor="middle" font-size="9.5" fill="var(--muted)">one-click samples</text>
+      <text x="91" y="261" text-anchor="middle" font-size="9.5" fill="var(--muted)">before/after diff</text>
+
+      <g stroke="currentColor" fill="none" stroke-width="1.3">
+        <path d="M166,146 L214,146" marker-end="url(#arr)"/>
+        <path d="M166,244 L184,244 L184,158 L214,158" marker-end="url(#arr)"/>
+      </g>
+      <text x="190" y="108" text-anchor="middle" font-size="9.5" class="mono" fill="var(--muted)">langgraph-sdk</text>
+
+      <!-- ============ Deployment boundary ============ -->
+      <rect x="200" y="56" width="690" height="390" rx="16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="7 5"/>
+      <text x="218" y="82" font-size="13" font-weight="600" fill="currentColor">LangSmith Deployment</text>
+      <text x="404" y="82" font-size="10" fill="var(--muted)">managed runtime · threads · persistence</text>
+
+      <!-- Pipeline row -->
+      <g stroke-width="1.3">
+        <rect x="220" y="108" width="112" height="58" rx="9" fill="none" stroke="currentColor"/>
+        <rect x="348" y="108" width="112" height="58" rx="9" fill="none" stroke="currentColor"/>
+        <rect x="476" y="108" width="118" height="58" rx="9" fill="var(--llm-tint)" stroke="var(--llm)"/>
+        <rect x="610" y="108" width="126" height="58" rx="9" fill="var(--pass-tint)" stroke="var(--pass)"/>
+        <rect x="752" y="108" width="122" height="58" rx="9" fill="var(--warn-tint)" stroke="var(--warn)"/>
+      </g>
+      <text x="276" y="127" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Intake</text>
+      <text x="276" y="143" text-anchor="middle" font-size="9.5" fill="var(--muted)">classify scope</text>
+      <text x="276" y="156" text-anchor="middle" font-size="9.5" fill="var(--muted)">detect framework</text>
+
+      <text x="404" y="127" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Analyze</text>
+      <text x="404" y="143" text-anchor="middle" font-size="9.5" fill="var(--muted)">deps · conventions</text>
+      <text x="404" y="156" text-anchor="middle" font-size="9.5" fill="var(--muted)">wave plan</text>
+
+      <text x="535" y="127" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Convert</text>
+      <text x="535" y="143" text-anchor="middle" font-size="9.5" fill="var(--muted)">Claude · playbook</text>
+      <text x="535" y="156" text-anchor="middle" font-size="9.5" fill="var(--muted)">cached prompt</text>
+
+      <text x="673" y="127" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Validate</text>
+      <text x="673" y="143" text-anchor="middle" font-size="9.5" fill="var(--muted)">tsc + stubs · ESLint</text>
+      <text x="673" y="156" text-anchor="middle" font-size="9.5" fill="var(--muted)">residue · risk scan</text>
+
+      <text x="813" y="127" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Assemble</text>
+      <text x="813" y="143" text-anchor="middle" font-size="9.5" fill="var(--muted)">parity ledger</text>
+      <text x="813" y="156" text-anchor="middle" font-size="9.5" fill="var(--muted)">report · config</text>
+
+      <g stroke="currentColor" fill="none" stroke-width="1.3">
+        <path d="M332,137 L346,137" marker-end="url(#arr)"/>
+        <path d="M460,137 L474,137" marker-end="url(#arr)"/>
+        <path d="M594,137 L608,137" marker-end="url(#arr)"/>
+        <path d="M736,137 L750,137" marker-end="url(#arr)"/>
+      </g>
+
+      <!-- Reflection loop -->
+      <rect x="520" y="238" width="150" height="54" rx="9" fill="var(--llm-tint)" stroke="var(--llm)" stroke-width="1.3"/>
+      <text x="595" y="259" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Critic</text>
+      <text x="595" y="276" text-anchor="middle" font-size="9.5" fill="var(--muted)">idiom review · verdict</text>
+
+      <g stroke="var(--accent)" fill="none" stroke-width="2">
+        <path d="M656,166 L656,234" marker-end="url(#arrT)"/>
+        <path d="M560,238 L560,170" marker-end="url(#arrT)"/>
+      </g>
+      <text x="668" y="206" font-size="10" font-weight="500" fill="var(--accent)">issues + critique</text>
+      <text x="548" y="206" text-anchor="end" font-size="10" font-weight="500" fill="var(--accent)">revise ≤3</text>
+
+      <!-- Suite mode strip -->
+      <rect x="220" y="312" width="560" height="34" rx="8" fill="none" stroke="var(--muted)" stroke-width="1" stroke-dasharray="4 4"/>
+      <text x="500" y="333" text-anchor="middle" font-size="10" class="mono" fill="var(--muted)">suite mode — wave 1: POMs (parallel subgraphs) → wave 2: tests · suite-wide tsc</text>
+
+      <!-- Memory -->
+      <g stroke-width="1.3" fill="var(--accent-tint)">
+        <rect x="236" y="376" width="250" height="52" rx="26" stroke="var(--accent)"/>
+        <rect x="540" y="376" width="300" height="52" rx="26" stroke="var(--accent)"/>
+      </g>
+      <text x="361" y="397" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">Checkpointer — thread state</text>
+      <text x="361" y="413" text-anchor="middle" font-size="9.5" fill="var(--muted)">short-term · resume &amp; iterate</text>
+      <text x="690" y="397" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">Store — long-term memory</text>
+      <text x="690" y="413" text-anchor="middle" font-size="9.5" fill="var(--muted)">conventions · semantic search + embeddings</text>
+
+      <g stroke="var(--accent)" fill="none" stroke-width="1.3">
+        <path d="M361,374 L361,352" marker-start="url(#arrT)" marker-end="url(#arrT)"/>
+        <path d="M690,374 L690,352" marker-start="url(#arrT)" marker-end="url(#arrT)"/>
+      </g>
+
+      <!-- v2 ghost -->
+      <rect x="920" y="120" width="240" height="96" rx="14" fill="none" stroke="var(--muted)" stroke-width="1.3" stroke-dasharray="6 5"/>
+      <text x="1040" y="150" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">v2 — AgentCore Runtime</text>
+      <text x="1040" y="170" text-anchor="middle" font-size="9.5" fill="var(--muted)">Amazon Bedrock · same graph</text>
+      <text x="1040" y="184" text-anchor="middle" font-size="9.5" fill="var(--muted)">same Claude family</text>
+      <path d="M890,168 L916,168" stroke="var(--muted)" stroke-width="1.3" stroke-dasharray="5 4" fill="none" marker-end="url(#arr)"/>
+
+      <!-- LangSmith band -->
+      <rect x="200" y="488" width="690" height="150" rx="16" fill="var(--band)" stroke="currentColor" stroke-width="1.1"/>
+      <text x="218" y="514" font-size="13" font-weight="600" fill="currentColor">LangSmith — observability &amp; evals</text>
+
+      <g stroke="currentColor" fill="none" stroke-width="1.2">
+        <rect x="220" y="530" width="180" height="72" rx="9"/>
+        <rect x="424" y="530" width="220" height="72" rx="9"/>
+        <rect x="668" y="530" width="204" height="72" rx="9"/>
+      </g>
+      <text x="310" y="551" text-anchor="middle" font-size="11.5" font-weight="600" fill="currentColor">Tracing</text>
+      <text x="310" y="568" text-anchor="middle" font-size="9.5" fill="var(--muted)">every node · every run</text>
+      <text x="310" y="582" text-anchor="middle" font-size="9.5" fill="var(--muted)">cost &amp; latency</text>
+
+      <text x="534" y="551" text-anchor="middle" font-size="11.5" font-weight="600" fill="currentColor">Datasets + offline evals</text>
+      <text x="534" y="568" text-anchor="middle" font-size="9.5" fill="var(--muted)">deterministic · judge · execution</text>
+      <text x="534" y="582" text-anchor="middle" font-size="9.5" fill="var(--muted)">CI regression gate</text>
+
+      <text x="770" y="551" text-anchor="middle" font-size="11.5" font-weight="600" fill="currentColor">Online evals + alert</text>
+      <text x="770" y="568" text-anchor="middle" font-size="9.5" fill="var(--muted)">sampled prod traffic</text>
+      <text x="770" y="582" text-anchor="middle" font-size="9.5" fill="var(--muted)">dashboards · 👎 triage</text>
+
+      <path d="M545,446 L545,484" stroke="currentColor" stroke-width="1.3" fill="none" marker-end="url(#arr)"/>
+      <text x="557" y="470" font-size="10" fill="var(--muted)">traces — every run</text>
+
+      <!-- Feedback + flywheel -->
+      <path d="M91,282 L91,564 L194,564" stroke="currentColor" stroke-width="1.3" fill="none" marker-end="url(#arr)"/>
+      <text x="104" y="556" font-size="10" fill="var(--muted)">👍/👎 feedback</text>
+
+      <path d="M700,604 L700,618 L560,618 L560,608" stroke="var(--accent)" stroke-width="1.6" stroke-dasharray="5 4" fill="none" marker-end="url(#arrT)"/>
+      <text x="632" y="632" text-anchor="middle" font-size="9.5" font-weight="500" fill="var(--accent)">new eval cases — the flywheel</text>
+    </svg>
+    </div>
+    <div class="legend">
+      <span><span class="sw llm"></span>Claude LLM call (claude-opus-5)</span>
+      <span><span class="sw pass"></span>deterministic gate — no LLM</span>
+      <span><span class="sw loop"></span>reflection loop / memory</span>
+      <span><span class="sw warn"></span>honesty artifacts (ledger, TODO-review)</span>
+      <span><span class="sw dash"></span>planned (v2) / boundary</span>
+    </div>
+    <figcaption>User code is never executed — Validate is static-only (compile in a stub sandbox, typed lint incl. no-floating-promises, Selenium-residue scan, semantic-risk detector). Execution-based evals run only on the curated sample suite in CI.</figcaption>
+  </figure>
+
+  <h2>The lifecycle wrapped around it</h2>
+  <p class="sub">The same system, seen as a process — the Agent Development Lifecycle the repo is built to demonstrate.</p>
+
+  <figure id="fig-adlc">
+    <div class="figscroll">
+    <svg viewBox="0 0 1130 165" role="img" aria-label="Agent development lifecycle: build with langgraph dev and Studio, evaluate with LangSmith experiments gated in CI, deploy on LangSmith Deployment, monitor with online evals and alerts, improve by growing the dataset and redeploying, looping back to build.">
+      <defs>
+        <marker id="arr2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+        </marker>
+      </defs>
+      <g stroke="currentColor" fill="none" stroke-width="1.3">
+        <rect x="20"  y="28" width="170" height="58" rx="9"/>
+        <rect x="250" y="28" width="170" height="58" rx="9"/>
+        <rect x="480" y="28" width="170" height="58" rx="9"/>
+        <rect x="710" y="28" width="170" height="58" rx="9"/>
+        <rect x="940" y="28" width="170" height="58" rx="9"/>
+        <path d="M190,57 L246,57" marker-end="url(#arr2)"/>
+        <path d="M420,57 L476,57" marker-end="url(#arr2)"/>
+        <path d="M650,57 L706,57" marker-end="url(#arr2)"/>
+        <path d="M880,57 L936,57" marker-end="url(#arr2)"/>
+        <path d="M1025,86 L1025,140 L105,140 L105,92" marker-end="url(#arr2)"/>
+      </g>
+      <text x="105" y="52" text-anchor="middle" font-size="13" font-weight="600" fill="currentColor">Build</text>
+      <text x="105" y="70" text-anchor="middle" font-size="9.5" fill="var(--muted)">langgraph dev · Studio</text>
+      <text x="335" y="52" text-anchor="middle" font-size="13" font-weight="600" fill="currentColor">Evaluate</text>
+      <text x="335" y="70" text-anchor="middle" font-size="9.5" fill="var(--muted)">experiments · CI gate</text>
+      <text x="565" y="52" text-anchor="middle" font-size="13" font-weight="600" fill="currentColor">Deploy</text>
+      <text x="565" y="70" text-anchor="middle" font-size="9.5" fill="var(--muted)">LangSmith Deployment</text>
+      <text x="795" y="52" text-anchor="middle" font-size="13" font-weight="600" fill="currentColor">Monitor</text>
+      <text x="795" y="70" text-anchor="middle" font-size="9.5" fill="var(--muted)">online evals · alert</text>
+      <text x="1025" y="52" text-anchor="middle" font-size="13" font-weight="600" fill="currentColor">Improve</text>
+      <text x="1025" y="70" text-anchor="middle" font-size="9.5" fill="var(--muted)">dataset grows · redeploy</text>
+
+      <text x="218" y="48" text-anchor="middle" font-size="9.5" fill="var(--muted)">experiments</text>
+      <text x="448" y="48" text-anchor="middle" font-size="9.5" fill="var(--muted)">green gate</text>
+      <text x="678" y="48" text-anchor="middle" font-size="9.5" fill="var(--muted)">traces</text>
+      <text x="908" y="48" text-anchor="middle" font-size="9.5" fill="var(--muted)">feedback</text>
+      <text x="565" y="133" text-anchor="middle" font-size="9.5" fill="var(--muted)">new eval cases · playbook fixes — continuous improvement</text>
+    </svg>
+    </div>
+    <figcaption>Every stage has a concrete tool and a concrete artifact — nothing in the lifecycle is aspirational.</figcaption>
+  </figure>
+
+  <h2>Locked decisions</h2>
+  <div class="decisions">
+    <div class="decision"><div class="k">Model</div><div class="v">claude-opus-5 · runtime-configurable → sonnet-5</div></div>
+    <div class="decision"><div class="k">Input scope</div><div class="v">selenium-webdriver · Mocha + chai golden path</div></div>
+    <div class="decision"><div class="k">Hosting</div><div class="v">v1 LangSmith Deployment → v2 Bedrock AgentCore</div></div>
+    <div class="decision"><div class="k">Quality claim</div><div class="v">measured eval scorecard — never “always/perfect”</div></div>
+    <div class="decision"><div class="k">Reflection</div><div class="v">validate → critic → revise, capped at 3</div></div>
+    <div class="decision"><div class="k">Safety</div><div class="v">user code never executed — static checks only</div></div>
+  </div>
+
+  <h2>Comparing against another architecture?</h2>
+  <p class="sub">Five things that separate a system design from a component inventory — judge both diagrams on these.</p>
+  <ol class="compare">
+    <li><b>Is the correction loop first-class?</b> A single “LLM converts code” box hides the mechanism that makes output trustworthy. Look for validate → critique → revise with a bound.</li>
+    <li><b>Are the validators deterministic and named?</b> Compiler, typed lint, residue scan — checks the model cannot talk its way past. “QA agent reviews output” is not a gate.</li>
+    <li><b>Do evals and monitoring appear in the runtime picture?</b> If observability is missing or bolted on as a footnote, the ADLC story collapses.</li>
+    <li><b>Is memory split and grounded?</b> Thread-scoped state vs. cross-thread store, each with a real substrate — not one “memory” cloud.</li>
+    <li><b>Is v2 a substrate swap?</b> The graph should move to AgentCore unchanged. If the v2 path requires redrawing the agent, the v1 design is coupled to its host.</li>
+  </ol>
+
+  <p class="foot">selenium2playwright · drawn 2026-09-02 · sources: plan.md + plan-review.md (three-expert review)</p>
+</div>
