@@ -1,0 +1,15 @@
+[project]
+name = "selenium2playwright"
+version = "0.1.0"
+description = "LangGraph agent that converts TypeScript Selenium suites to Playwright, with compiler-verified output"
+readme = "README.md"
+authors = [{ name = "Varun Bhatt", email = "bhattvarunk@gmail.com" }]
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+selenium2playwright = "selenium2playwright:main"
+
+[build-system]
+requires = ["uv_build>=0.12.1,<0.13.0"]
+build-backend = "uv_build"
