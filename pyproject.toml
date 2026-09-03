@@ -5,7 +5,9 @@ description = "LangGraph agent that converts TypeScript Selenium suites to Playw
 readme = "README.md"
 authors = [{ name = "Varun Bhatt", email = "bhattvarunk@gmail.com" }]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "python-dotenv>=1.2.3",
+]
 
 [project.scripts]
 selenium2playwright = "selenium2playwright:main"

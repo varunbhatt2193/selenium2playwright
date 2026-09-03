@@ -27,7 +27,7 @@ This is the execution sequence for the project in `plan.md`. Same architecture, 
 
 - [x] **0.1 Project skeleton + public repo.** *(done 2026-09-02 — commit 8a7964e)* Build: `uv init`, `pyproject.toml`, `.gitignore` (`.env`, `__pycache__`, `node_modules`), `git init`; create the **public** repo at `github.com/varunbhatt2193/selenium2playwright` and push. **WIP signaling** (recruiters watch this account): keep the repo *name* stable — launch-day links must never break — and carry the 🚧 in the repo description + README H1 ("🚧 Selenium2Playwright — work in progress, building in public"). README v0 = one-paragraph pitch + status line ("Phase 0 · M0 in progress") + a phase checklist mirroring this roadmap. Commit messages recruiter-readable from day 1.
   *Done when:* `uv run python -c "print('s2p')"` works and the repo is live with the WIP README pushed.
-- [ ] **0.2 Secrets.** Build: get Anthropic + LangSmith API keys, `.env`, load with `python-dotenv`, tiny script asserting the vars exist (print masked).
+- [x] **0.2 Secrets.** *(done 2026-09-02)* Build: get Anthropic + LangSmith API keys, `.env`, load with `python-dotenv`, tiny script asserting the vars exist (print masked).
   *Done when:* script passes and `git status` shows `.env` untracked.
 - [ ] **0.3 First model call.** Build: `langchain-anthropic`; `init_chat_model` → invoke one message: "convert this one Selenium line to Playwright" (~15 lines).
   *Learn:* chat model interface, message roles. *Done when:* a sensible response prints.

@@ -12,6 +12,7 @@ wheels/
 # Secrets — API keys live here, never in the repo
 .env
 .env.*
+!.env.example
 
 # Node toolchain (samples + validation sandbox, Phase 1+)
 node_modules/
