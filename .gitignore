@@ -17,6 +17,10 @@ wheels/
 # Node toolchain (samples + validation sandbox, Phase 1+)
 node_modules/
 
+# Local working docs — build-sequence notes, not part of the public face
+roadmap.md
+plan-review.md
+
 # macOS
 .DS_Store
 

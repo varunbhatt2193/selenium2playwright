@@ -3,7 +3,7 @@
 **An AI agent that converts TypeScript Selenium test suites to Playwright** — a single test, a page object, or the whole suite — built on LangGraph + Claude, with a self-correcting loop that validates its own output before you ever see it.
 
 > **Status: building in public.** Phase 0 of 12 (bootstrap) · Milestone M0 in progress.
-> Build sequence: [roadmap.md](roadmap.md) · Architecture & decisions: [plan.md](plan.md)
+> Architecture & decisions: [plan.md](plan.md)
 >
 > 🗺️ **[Interactive architecture diagram](https://claude.ai/code/artifact/877b27e1-3cc2-4f84-802f-091419bf27c1)** — the whole system on one page: the pipeline, the reflection loop, memory, evals, and the v2 AgentCore path. *(Source: [docs/architecture.html](docs/architecture.html))*
 
