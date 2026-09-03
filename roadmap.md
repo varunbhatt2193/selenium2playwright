@@ -29,7 +29,7 @@ This is the execution sequence for the project in `plan.md`. Same architecture, 
   *Done when:* `uv run python -c "print('s2p')"` works and the repo is live with the WIP README pushed.
 - [x] **0.2 Secrets.** *(done 2026-09-02)* Build: get Anthropic + LangSmith API keys, `.env`, load with `python-dotenv`, tiny script asserting the vars exist (print masked).
   *Done when:* script passes and `git status` shows `.env` untracked.
-- [ ] **0.3 First model call.** Build: `langchain-anthropic`; `init_chat_model` → invoke one message: "convert this one Selenium line to Playwright" (~15 lines).
+- [x] **0.3 First model call.** *(done 2026-09-02 — claude-sonnet-5 converted its first line; identity-linked key needs `anthropic-workspace-id` header; Claude 5 rejects `temperature`)* Build: `langchain-anthropic`; `init_chat_model` → invoke one message: "convert this one Selenium line to Playwright" (~15 lines).
   *Learn:* chat model interface, message roles. *Done when:* a sensible response prints.
 - [ ] **0.4 Tracing on.** Build: nothing — set `LANGSMITH_TRACING=true` + key, rerun 0.3.
   *Learn:* reading a trace (tokens, cost, latency). *Done when:* you can open your call's trace URL and explain each field.

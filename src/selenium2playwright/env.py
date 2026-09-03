@@ -21,6 +21,7 @@ load_dotenv(override=False)
 # var name -> expected prefix (catches "right var, wrong paste" mistakes)
 REQUIRED = {
     "ANTHROPIC_API_KEY": "sk-ant-",  # console.anthropic.com -> API Keys
+    "ANTHROPIC_WORKSPACE_ID": "wrkspc_",  # Settings -> Workspaces (an ID, not a secret)
     "LANGSMITH_API_KEY": "lsv2_",  # smith.langchain.com -> Settings -> API Keys
 }
 
