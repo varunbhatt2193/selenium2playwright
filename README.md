@@ -9,7 +9,21 @@
 
 ## The thesis
 
-Migrating a Selenium suite to Playwright is mechanical enough to automate, but risky enough that "an LLM rewrote it" isn't good enough. So this agent is built on one rule: **the model can't lie to the compiler.** Every conversion must pass deterministic gates — `tsc --noEmit`, typed ESLint, a Selenium-residue scan — and a critic loop repairs what fails. Whatever can't be verified ships as an explicit `TODO(review)`, never silently.
+Migrating a Selenium suite to Playwright is mechanical enough to automate, but risky enough that "an LLM rewrote it" isn't good enough. So this agent is built on one rule: **the model can't lie to the compiler.** Every conversion must pass deterministic gates — `tsc --noEmit`, typed ESLint, a Selenium-residue scan, and structure parity (the converted suite keeps the same test cases and assertion coverage as the original) — and a critic loop repairs what fails, re-running up to 3 times before anything reaches you. Whatever can't be verified ships as an explicit `TODO(review)`, never silently.
+
+## Why an agent — and not just Claude in a repo?
+
+Fair question: Claude in a chat can convert a Selenium file. The difference is what you can trust *unattended*:
+
+| | Claude in a chat / repo | This agent |
+|---|---|---|
+| **Verification** | you review everything by hand | output must pass compile, lint, residue and parity gates; a critic loop repairs failures (up to 3 passes) *before you see the code* |
+| **Parity** | test cases or assertions can silently vanish in translation | test count and assertion coverage are checked against the source suite — a mismatch triggers self-correction, never a silent drop |
+| **Quality** | depends on that day's prompt — vibes | scored on a fixed eval dataset (compile-pass %, residue rate, judge score) with a CI gate against regressions |
+| **Scale** | file-by-file babysitting | whole suites: page objects first, then tests, converted in parallel |
+| **Reusability** | requires prompting skill | CLI + playground — same result for anyone, including a CI pipeline |
+
+For a one-off file, Claude in a repo is genuinely fine. An agent earns its existence when the job is **repeated, large, or needs guarantees** — and closing the gap from "the model can do it in chat" to "a system you can trust unattended" is exactly the engineering this project demonstrates.
 
 ## What's coming
 

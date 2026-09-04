@@ -79,7 +79,7 @@ State (simplified): `scope, source_files, analysis, converted_files, validation,
 1. **Intake & classify** — detect scope (test / POM / suite) and framework; warn on out-of-scope flavors.
 2. **Analyze** — build the dependency graph (suite mode), detect conventions: naming, wait style, assertion library.
 3. **Convert** — one unit at a time; playbook + exemplars retrieved from long-term memory as few-shots. **POMs convert before tests**, so tests see the converted POM interfaces.
-4. **Validate** — deterministic tools: compile, lint, Selenium-residue scan, structure parity (every public method preserved).
+4. **Validate** — deterministic tools: compile, lint, Selenium-residue scan, structure parity (every public method preserved; same test-case count and assertion coverage as the source — any drop is a validation failure that feeds the refine loop).
 5. **Critic (reflection)** — LLM reviews for idiom: no `waitForTimeout`, web-first assertions, locator quality; returns a structured verdict.
 6. **Refine loop** — re-convert with validator errors + critique; max 3 iterations, then flag `needs-review` instead of looping forever.
 7. **Assemble & report** — write files, generate `playwright.config.ts`, per-file confidence + review notes.
@@ -100,7 +100,7 @@ Suite mode fans out per-file conversion in parallel with the **Send API**, respe
 **Dataset:** 25–40 curated Selenium→Playwright pairs — POMs, tests, edge cases (explicit waits, `Select`, iframes, alerts, action chains, `executeScript`), plus out-of-scope traps (WebdriverIO input).
 
 **Three evaluator layers:**
-1. **Deterministic** (cheap, objective): compiles, zero Selenium residue, structure parity, lint-clean.
+1. **Deterministic** (cheap, objective): compiles, zero Selenium residue, structure parity (methods + test count + assertion coverage vs. source), lint-clean.
 2. **LLM-as-judge** (`openevals`): semantic equivalence + idiomatic-Playwright rubric, scored 1–5.
 3. **Execution** (CI only, curated inputs only): the converted sample suite runs green via `npx playwright test` against the bundled demo app.
 
