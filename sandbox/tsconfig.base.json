@@ -1,0 +1,17 @@
+{
+  // Frozen compiler settings for validating generated Playwright code.
+  // Mirrors samples/tsconfig.json (the bar the golden meets) — pinned here so
+  // the samples workspace can evolve without silently moving the quality bar.
+  // Each validation run writes its own work/<run>/tsconfig.json that extends this.
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true
+  }
+}

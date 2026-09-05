@@ -1,0 +1,10 @@
+{
+  "name": "s2p-sandbox",
+  "private": true,
+  "description": "Validation sandbox: the compiler the agent's OUTPUT must satisfy. Deliberately contains NO selenium-webdriver, so any leftover Selenium import fails to compile instead of passing quietly.",
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "22.20.1",
+    "typescript": "5.9.3"
+  }
+}
