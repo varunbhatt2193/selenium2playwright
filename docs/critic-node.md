@@ -9,7 +9,8 @@ intake → convert → validate → critic → END
 ```
 
 Implementation, offline checks, and the learning review are complete.
-The critic reports fixes. Step 5.2 will feed those fixes into another conversion.
+This walkthrough records step 5.1. The current [step 5.2 loop](reflection-loop.md)
+feeds these fixes into another conversion, with a three-attempt cap and final assembly.
 
 ## The result shape: schemas.py
 
@@ -65,16 +66,16 @@ converted result and validation reports in state. Two failure cases matter:
   `critique_error` records why. The CLI still emits the code and validation
   scorecard, prints `Critic: UNAVAILABLE`, and returns exit 1.
 
-`build_graph` connects `validate → critic → END`. Refused inputs bypass both
-model calls. Each supported conversion has one conversion and one review node;
-there is no conversion/critique loop in this step.
+Step 5.1 connected `validate → critic → END`. Step 5.2 replaces that final edge
+with a conditional route to conversion or assembly. Refused inputs still bypass
+both model calls.
 
 ## Display and verification
 
 `report_critique` prints PASS or REVISE and each fix to stderr, after the validation
 scorecard. Critic token usage is labeled separately. Generated TypeScript still
-goes to stdout or `--out`. Exit 0 now requires both the gates and the critic to
-pass; exit 1 includes a revision request or unavailable review. Exit 2 continues
+goes to stdout or `--out`. Since step 5.2, exit 0 also requires an empty TODO ledger;
+exit 1 includes unresolved findings, TODOs, or unavailable tools/models. Exit 2 continues
 to mean refusal or invalid CLI arguments.
 
 ```sh

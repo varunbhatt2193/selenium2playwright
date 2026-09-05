@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -39,10 +39,15 @@ def load_playbook() -> str:
     return PLAYBOOK_PATH.read_text(encoding="utf-8")
 
 
-def build_prompt() -> ChatPromptTemplate:
+def build_prompt(revision: str = "") -> ChatPromptTemplate:
     """System = ROLE + playbook (static prefix); human = the file to convert (varies)."""
     system = SystemMessage(content=ROLE + load_playbook())
-    return ChatPromptTemplate.from_messages([system, ("human", HUMAN)])
+    messages = [system, ("human", HUMAN)]
+    if revision:
+        # A literal message keeps braces in previous TypeScript/JSON out of the
+        # template parser. The first conversion and one-shot script stay identical.
+        messages.append(HumanMessage(content=revision))
+    return ChatPromptTemplate.from_messages(messages)
 
 
 CRITIC_ROLE = """You are the SDET reviewer of a Selenium-to-Playwright conversion.

@@ -89,13 +89,14 @@ class CriticTests(unittest.TestCase):
             with self.subTest(verdict=verdict, fixes=fixes), self.assertRaises(ValidationError):
                 Critique(verdict=verdict, fixes=fixes)
 
-    def test_critic_revision_or_failure_preserves_code_and_fails_cli_without_looping(self):
+    def test_critic_revision_or_failure_preserves_code_and_fails_cli(self):
         code = (ROOT / "samples/playwright-golden/pages/LoginPage.ts").read_text()
         for review in (Critique(verdict="revise", fixes=["Review the locator against the source."]), None):
             stdout, stderr = io.StringIO(), io.StringIO()
             with self.subTest(review=review), self.reply(review), redirect_stdout(stdout), redirect_stderr(stderr), \
+                    patch.object(graph, "route_after_critic", return_value="assemble"), \
                     patch.object(graph, "convert", return_value={"status": "converted", "result": ConversionResult(code=code),
-                                                                 "usage": None}) as convert:
+                                                                 "usage": None, "iteration": 1}) as convert:
                 result = graph.main([self.state["source_path"]])
             self.assertEqual(result, 1)
             self.assertEqual(stdout.getvalue(), code)

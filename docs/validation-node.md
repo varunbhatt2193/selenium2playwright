@@ -9,7 +9,7 @@ intake → convert → validate → END
 
 Implementation, offline checks, and the learning review are complete.
 This walkthrough records step 4.5. The current graph also runs the
-[step 5.1 critic](critic-node.md) after validation; 5.2 will add the repair loop.
+[step 5.1 critic](critic-node.md) and [step 5.2 repair loop](reflection-loop.md).
 
 ## What changed, and why
 
@@ -68,8 +68,8 @@ Validation (report-only):
   PASS parity: 0 finding(s)
 ```
 
-Since step 5.1, exit 0 requires every gate and the critic to pass. Exit 1 also
-covers a critic revision request or unavailable review. Exit 2 means the input
+Since step 5.2, exit 0 requires every gate and the critic to pass with no open TODOs.
+Exit 1 means the final report needs review. Exit 2 means the input
 was refused or CLI arguments were invalid. Lint warnings are displayed
 without failing the gate. Code is still emitted on validation failure so it can
 be inspected. The CLI rejects `--out` paths that would replace the source or a

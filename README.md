@@ -2,7 +2,7 @@
 
 **An AI agent that converts TypeScript Selenium test suites to Playwright** — a single test, a page object, or the whole suite — built on LangGraph + Claude, with a self-correcting loop that validates its own output before you ever see it.
 
-> **Status: building in public.** Phase 5 of 12 in progress — **M2 in progress**. The graph now runs `intake → convert → validate → critic`. Four deterministic gates check the code, then a model review returns a structured pass/revise verdict and concrete fixes. Failed gates cannot be overridden by the critic. Code, validation findings, and the review are emitted together; the bounded repair loop comes next. See the [critic walkthrough](docs/critic-node.md) and [gap log + failure taxonomy](docs/gap-log.md).
+> **Status: building in public.** Phase 5 of 12 implemented — **bounded reflection is working**. The graph converts, validates, and reviews code, then repairs it using the actual findings, for at most three conversion attempts. Assembly always reports the outcome and retains the latest available draft. A live seeded demo repaired a missing `await` on attempt 2: all four gates and the critic passed, while two locator TODOs correctly kept the final status at `needs-review`. See the [reflection walkthrough and demo](docs/reflection-loop.md).
 > Architecture & decisions: [plan.md](plan.md)
 >
 > 🗺️ **[Interactive architecture diagram](https://claude.ai/code/artifact/877b27e1-3cc2-4f84-802f-091419bf27c1)** — the whole system on one page: the pipeline, the reflection loop, memory, evals, and the v2 AgentCore path. *(Source: [docs/architecture.html](docs/architecture.html))*
@@ -13,7 +13,7 @@ Migrating a Selenium suite to Playwright is mechanical enough to automate, but r
 
 ## The graph today
 
-Generated from the compiled graph with `build_graph().get_graph().draw_mermaid()`. Dotted edges are the conditional branch: `intake` classifies the file with plain heuristics and routes to `convert` or to an honest `refuse`. Converted files pass through `validate`, then `critic`. The critic reads the source, conversion, companions, and validation reports; this step reports a review without rewriting the code.
+Generated from the compiled graph with `build_graph().get_graph().draw_mermaid()`. Dotted edges choose the next node: intake converts or refuses; the critic requests another conversion or assembly. A failed conversion also goes to assembly, preserving any earlier draft. The three-attempt limit is enforced by the graph's routing.
 
 ```mermaid
 ---
@@ -28,20 +28,24 @@ graph TD;
 	refuse(refuse)
 	validate(validate)
 	critic(critic)
+	assemble(assemble)
 	__end__([<p>__end__</p>]):::last
 	__start__ --> intake;
-	convert --> validate;
+	convert -.-> assemble;
+	convert -.-> validate;
+	critic -.-> assemble;
+	critic -.-> convert;
 	intake -.-> convert;
 	intake -.-> refuse;
 	validate --> critic;
-	critic --> __end__;
+	assemble --> __end__;
 	refuse --> __end__;
 	classDef default fill:#f2f0ff,line-height:1.2
 	classDef first fill-opacity:0
 	classDef last fill:#bfb6fc
 ```
 
-Try it: `uv run python -m selenium2playwright.graph samples/selenium-suite/pages/LoginPage.ts` prints converted TypeScript to stdout and the scorecard/review to stderr. A supported conversion makes two model calls: conversion, then review. Exit codes: 0 = all gates and critic pass, 1 = failed validation, requested revision, or unavailable critic, 2 = unsupported input or invalid CLI arguments. See the [companion-file example](docs/validation-node.md#run-a-conversion) for converting a test against its page object.
+Try it: `uv run python -m selenium2playwright.graph samples/selenium-suite/pages/LoginPage.ts` prints the latest converted TypeScript to stdout and the final report to stderr. A run permits up to three conversion and three critic invocations. Exit codes: 0 = all gates and critic pass with no open TODOs, 1 = `needs-review`, 2 = unsupported input or invalid CLI arguments. See the [companion-file example](docs/validation-node.md#run-a-conversion) or run the [seeded reflection demo](docs/reflection-loop.md#live-demo).
 
 ## Why an agent — and not just Claude in a repo?
 

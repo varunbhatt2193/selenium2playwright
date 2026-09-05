@@ -108,3 +108,15 @@ class ValidationReport(BaseModel):
     def render(self) -> str:
         """Human/critic-readable block: summary line then one line per finding."""
         return "\n".join([self.summary, *(f.render() for f in self.findings)])
+
+
+class ConversionReport(BaseModel):
+    """Final artifact after success, the attempt limit, or an unavailable tool/model."""
+
+    status: Literal["passed", "needs-review"]
+    attempts: int
+    reason: str
+    result: ConversionResult | None  # None only when no conversion could be produced
+    validation: list[ValidationReport]
+    critique: Critique | None
+    errors: list[str] = Field(default_factory=list)
