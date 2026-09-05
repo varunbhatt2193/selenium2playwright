@@ -2,7 +2,7 @@
 
 **An AI agent that converts TypeScript Selenium test suites to Playwright** — a single test, a page object, or the whole suite — built on LangGraph + Claude, with a self-correcting loop that validates its own output before you ever see it.
 
-> **Status: building in public.** Phase 4 of 12 in progress — **M1 shipped**. Compile, residue, typed lint, and parity validators now work independently; connecting them to the graph is next. The current graph remains `intake → convert | refuse`, with structured output to disk and every node traced in LangSmith. The login sample converts to code that compiles and passes in a real browser; unsupported inputs get an honest refusal. See the [gap log + failure taxonomy](docs/gap-log.md) and [parity gate walkthrough](docs/parity-gate.md).
+> **Status: building in public.** Phase 4 of 12 implemented — **M2 in progress**. The graph now runs `intake → convert → validate`, checking compilation, Selenium residue, typed lint, and test/assertion parity. It prints a scorecard and preserves generated code even when checks fail; the critic and repair loop come next. Unsupported inputs still receive an honest refusal. See the [validation node walkthrough](docs/validation-node.md) and [gap log + failure taxonomy](docs/gap-log.md).
 > Architecture & decisions: [plan.md](plan.md)
 >
 > 🗺️ **[Interactive architecture diagram](https://claude.ai/code/artifact/877b27e1-3cc2-4f84-802f-091419bf27c1)** — the whole system on one page: the pipeline, the reflection loop, memory, evals, and the v2 AgentCore path. *(Source: [docs/architecture.html](docs/architecture.html))*
@@ -13,7 +13,7 @@ Migrating a Selenium suite to Playwright is mechanical enough to automate, but r
 
 ## The graph today
 
-Rendered by LangGraph itself from the compiled graph (`build_graph().get_graph().draw_mermaid()`), so this picture cannot drift from the code. Dotted edges are the conditional branch: `intake` classifies the file with plain heuristics and routes to `convert` or to an honest `refuse` — no model call is spent on a file we cannot convert.
+Generated from the compiled graph with `build_graph().get_graph().draw_mermaid()`. Dotted edges are the conditional branch: `intake` classifies the file with plain heuristics and routes to `convert` or to an honest `refuse`. Converted files then pass through `validate`; all four reports are retained in graph state for the scorecard and the future critic.
 
 ```mermaid
 ---
@@ -26,18 +26,20 @@ graph TD;
 	intake(intake)
 	convert(convert)
 	refuse(refuse)
+	validate(validate)
 	__end__([<p>__end__</p>]):::last
 	__start__ --> intake;
+	convert --> validate;
 	intake -.-> convert;
 	intake -.-> refuse;
-	convert --> __end__;
 	refuse --> __end__;
+	validate --> __end__;
 	classDef default fill:#f2f0ff,line-height:1.2
 	classDef first fill-opacity:0
 	classDef last fill:#bfb6fc
 ```
 
-Try it: `uv run python -m selenium2playwright.graph samples/selenium-suite/pages/LoginPage.ts` converts; point it at a WebdriverIO or Cypress file and it refuses with the reason and exit code 2.
+Try it: `uv run python -m selenium2playwright.graph samples/selenium-suite/pages/LoginPage.ts` prints converted TypeScript to stdout and the validation scorecard to stderr. Exit codes: 0 = all gates pass, 1 = validation findings, 2 = unsupported input or invalid CLI arguments. See the [companion-file example](docs/validation-node.md#run-a-conversion) for converting a test against its page object.
 
 ## Why an agent — and not just Claude in a repo?
 

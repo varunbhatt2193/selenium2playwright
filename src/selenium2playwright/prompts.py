@@ -45,17 +45,21 @@ def build_prompt() -> ChatPromptTemplate:
     return ChatPromptTemplate.from_messages([system, ("human", HUMAN)])
 
 
-def format_context(files: list[Path]) -> str:
+def format_context(files: list[Path], contents: dict[str, str] | None = None) -> str:
     """Already-converted companion files (e.g. the POM a test imports).
 
     Suite mode (Phase 9) converts page objects first, then tests — the test
     must call the *new* POM API, not guess it. This is that idea in miniature.
     Returns "" when there is nothing to add, so the human turn stays clean.
+    Optional contents is an intake snapshot keyed by absolute path, so validation
+    and the prompt can use identical bytes even if a file changes on disk later.
     """
     if not files:
         return ""
+    if contents is None:
+        contents = {str(f.resolve()): f.read_text(encoding="utf-8") for f in files}
     blocks = [
-        f'<converted_file path="{f}">\n{f.read_text(encoding="utf-8")}\n</converted_file>'
+        f'<converted_file path="{f}">\n{contents[str(f.resolve())]}\n</converted_file>'
         for f in files
     ]
     return (

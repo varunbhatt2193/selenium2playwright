@@ -3,7 +3,8 @@
 The compiler accepts a test whose assertion was deleted. This gate compares the
 original and converted files to make that loss visible before the critic runs.
 Implementation, automated checks, and the learning review are complete.
-Connecting the four gates to the graph is step 4.5.
+The graph now connects all four gates after conversion in
+[step 4.5](validation-node.md).
 
 ## Interface
 
