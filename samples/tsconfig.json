@@ -1,0 +1,33 @@
+{
+  // This exact config becomes the Phase 4 validation sandbox: the compiler
+  // settings the agent's OUTPUT must satisfy. Strictness here is the quality bar.
+  "compilerOptions": {
+    // Selenium suites in the wild are overwhelmingly CommonJS run on Node —
+    // matching that keeps our samples realistic.
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "ES2022",
+
+    // No "DOM" lib: Selenium (and later Playwright) test code runs in Node,
+    // not in the browser. If `executeScript` snippets ever need DOM types,
+    // that's a deliberate, visible change here.
+    "lib": ["ES2022"],
+
+    // The whole project thesis: the model can't lie to the compiler.
+    // strict = null-safety, implicit-any bans, strict function types.
+    "strict": true,
+
+    // Skip type-checking inside node_modules .d.ts files — we judge OUR code
+    // (and the agent's output), not our dependencies' internals.
+    "skipLibCheck": true,
+
+    // Lets CommonJS packages be imported with clean ES `import` syntax.
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+
+    // This workspace only type-checks; nothing is ever compiled to JS on disk.
+    "noEmit": true
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules"]
+}

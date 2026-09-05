@@ -16,6 +16,8 @@ wheels/
 
 # Node toolchain (samples + validation sandbox, Phase 1+)
 node_modules/
+test-results/
+playwright-report/
 
 # Local working docs — build-sequence notes, not part of the public face
 roadmap.md

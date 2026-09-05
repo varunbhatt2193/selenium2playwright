@@ -1,0 +1,21 @@
+{
+  "name": "selenium2playwright-samples",
+  "private": true,
+  "description": "Realistic Selenium WebDriver (TS) samples — demo inputs and eval fixtures for the conversion agent",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "mocha --require tsx/cjs 'selenium-suite/tests/**/*.spec.ts'"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/chai": "^4.3.16",
+    "@types/mocha": "^10.0.7",
+    "@types/node": "^22.5.0",
+    "@types/selenium-webdriver": "^4.1.24",
+    "chai": "^4.5.0",
+    "mocha": "^12.0.0",
+    "selenium-webdriver": "^4.23.0",
+    "tsx": "^4.23.13",
+    "typescript": "^5.5.0"
+  }
+}
