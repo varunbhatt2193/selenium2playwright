@@ -20,6 +20,8 @@ One agent, three conversion scopes:
 
 **The v1 quality bar (the demo promise):** output always compiles (`tsc --noEmit`), contains **zero** Selenium APIs, and is idiomatic Playwright — auto-waiting instead of explicit waits, web-first assertions, `getByRole`/`getByTestId` where inferable. Anything uncertain gets an honest `// TODO(review)` note — never an invented API.
 
+**North star (post-v2):** accept Selenium in *any* language (Java, Python, C#…) — the output stays Playwright TS. Fixing the target language means the entire output-side gate stack (compile, lint, residue, output parity) is reused as-is; each new source language costs only a playbook + source-side parsing (classify, source parity counting). MVP is strictly Selenium TS → Playwright TS.
+
 **Two flagship demo moments (the LinkedIn video):**
 1. Paste a real POM into the hosted playground → watch convert → validate → reflect → ✅ badges.
 2. `s2p convert samples/selenium-suite/` → converted project passes `npx playwright test` against the bundled demo app.
