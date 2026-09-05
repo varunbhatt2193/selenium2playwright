@@ -13,6 +13,8 @@ of the schema, so they are prompt text. Write them for the model.
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -41,3 +43,44 @@ class ConversionResult(BaseModel):
             "(playbook rule 25: the consolidated ledger). Empty if none."
         ),
     )
+
+
+# --- validation --------------------------------------------------------------
+# Every deterministic gate (compile, residue, lint, parity) reports in this one
+# shape. The critic (Phase 5) reads it as text; evals (Phase 6) read it as data.
+
+Gate = Literal["compile", "residue", "lint", "parity"]
+
+
+class Finding(BaseModel):
+    """One concrete problem at one place in one file."""
+
+    gate: Gate
+    file: str
+    line: int | None = None  # None when the finding is about the whole file
+    column: int | None = None
+    code: str  # e.g. "TS2551", "selenium-import", "no-floating-promises", "missing-test"
+    message: str
+
+    def render(self) -> str:
+        """`file:line:col code message` — the line the critic will quote back."""
+        where = self.file + (f":{self.line}" if self.line else "") + (f":{self.column}" if self.column else "")
+        return f"{where} {self.code} {self.message}"
+
+
+class ValidationReport(BaseModel):
+    """Verdict of one gate over one set of files."""
+
+    gate: Gate
+    passed: bool
+    findings: list[Finding] = Field(default_factory=list)
+    tool_output: str = ""  # raw stdout/stderr, kept for the trace and for debugging the parser
+
+    @property
+    def summary(self) -> str:
+        n = len(self.findings)
+        return f"{self.gate}: {'passed' if self.passed else f'{n} finding' + ('s' if n != 1 else '')}"
+
+    def render(self) -> str:
+        """Human/critic-readable block: summary line then one line per finding."""
+        return "\n".join([self.summary, *(f.render() for f in self.findings)])
