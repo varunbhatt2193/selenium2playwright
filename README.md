@@ -4,6 +4,7 @@
 
 > **Status: building in public.** Phase 5 of 12 implemented — **bounded reflection is working**. The graph converts, validates, and reviews code, then repairs it using the actual findings, for at most three conversion attempts. Assembly always reports the outcome and retains the latest available draft. A live seeded demo repaired a missing `await` on attempt 2: all four gates and the critic passed, while two locator TODOs correctly kept the final status at `needs-review`. See the [reflection walkthrough and demo](docs/reflection-loop.md).
 > Architecture & decisions: [plan.md](plan.md)
+> Next: **Phase 6 — evaluations**. The [theory and code primer](docs/evaluation-primer.md) is available; dataset implementation has not started. [Session restart notes](docs/session-handoff.md) preserve the current work and next step.
 >
 > 🗺️ **[Interactive architecture diagram](https://claude.ai/code/artifact/877b27e1-3cc2-4f84-802f-091419bf27c1)** — the whole system on one page: the pipeline, the reflection loop, memory, evals, and the v2 AgentCore path. *(Source: [docs/architecture.html](docs/architecture.html))*
 
@@ -66,7 +67,7 @@ For a one-off file, Claude in a repo is genuinely fine. An agent earns its exist
 - [x] Architecture + phased roadmap
 - [x] **M0** — one-prompt conversion, traced end-to-end in LangSmith
 - [x] **M1** — LangGraph pipeline: classify → convert (with honest refusals)
-- [ ] **M2** — deterministic validators + reflection loop
+- [x] **M2** — deterministic validators + reflection loop
 - [ ] **Evals** — measured conversion quality on a public dataset *(the numbers will go here)*
 - [ ] **M3** — conversation memory + human-in-the-loop for risky patterns
 - [ ] **M4** — whole-suite conversion: page objects first, then tests, in parallel
