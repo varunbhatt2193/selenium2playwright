@@ -1,10 +1,14 @@
 {
   "name": "s2p-sandbox",
   "private": true,
-  "description": "Validation sandbox: the compiler the agent's OUTPUT must satisfy. Deliberately contains NO selenium-webdriver, so any leftover Selenium import fails to compile instead of passing quietly.",
+  "description": "Validation sandbox: the compiler + linter the agent's OUTPUT must satisfy. Deliberately contains NO selenium-webdriver, so any leftover Selenium import fails to compile instead of passing quietly.",
   "devDependencies": {
+    "@eslint/js": "10.0.1",
     "@playwright/test": "1.63.0",
     "@types/node": "22.20.1",
-    "typescript": "5.9.3"
+    "eslint": "10.10.0",
+    "eslint-plugin-playwright": "2.11.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.69.0"
   }
 }

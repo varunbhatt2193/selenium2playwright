@@ -2,7 +2,7 @@
 
 **An AI agent that converts TypeScript Selenium test suites to Playwright** — a single test, a page object, or the whole suite — built on LangGraph + Claude, with a self-correcting loop that validates its own output before you ever see it.
 
-> **Status: building in public.** Phase 3 of 12 complete — **M1 shipped**: the converter is now a LangGraph (`intake → convert | refuse`) with structured output to disk and every node traced in LangSmith. The login sample converts to code that compiles and passes in a real browser; unsupported inputs (WebdriverIO, Cypress, non-TypeScript Selenium) get an honest refusal instead of a guess. What still goes wrong is catalogued in the [gap log + failure taxonomy](docs/gap-log.md) — that list is Phase 4's spec, next.
+> **Status: building in public.** Phase 4 of 12 in progress — **M1 shipped**. Compile, residue, typed lint, and parity validators now work independently; connecting them to the graph is next. The current graph remains `intake → convert | refuse`, with structured output to disk and every node traced in LangSmith. The login sample converts to code that compiles and passes in a real browser; unsupported inputs get an honest refusal. See the [gap log + failure taxonomy](docs/gap-log.md) and [parity gate walkthrough](docs/parity-gate.md).
 > Architecture & decisions: [plan.md](plan.md)
 >
 > 🗺️ **[Interactive architecture diagram](https://claude.ai/code/artifact/877b27e1-3cc2-4f84-802f-091419bf27c1)** — the whole system on one page: the pipeline, the reflection loop, memory, evals, and the v2 AgentCore path. *(Source: [docs/architecture.html](docs/architecture.html))*

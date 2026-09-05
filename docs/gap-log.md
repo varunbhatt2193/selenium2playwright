@@ -98,6 +98,11 @@ import of a type under strict settings. Loud: `tsc` reports line + code.
 A Playwright call without `await` is a valid Promise expression; `tsc` is
 happy, the assertion never runs, the test goes green. #1 conversion bug class.
 *Seen:* none this time. *Gate:* lint with `no-floating-promises` (4.3).
+*Gate built (4.3):* typed ESLint catches the dropped `await` and the
+promise-as-boolean (`if (locator.isVisible())`). Known hole: the plugin's
+`prefer-web-first-assertions` rewrites `textContent()` + `toBe`, but not the
+`expect(await el.textContent()).toContain(x)` form — that one still leans on
+the critic/judge until the rule (or a residue pattern) covers it.
 
 ### T5 · Parity loss — tests or assertions quietly vanish
 A test dropped, renamed, or merged; an assertion "simplified" away; an
@@ -107,6 +112,13 @@ compiles and passes.
 held (2 → 2) and the mutant proved Playwright still fails the test, so this
 instance is fine — but the pattern needs the count + name check every time.
 *Gate:* parity (4.4). Also playbook rule 24, already in the prompt.
+*Gate built (4.4):* the golden suite passes; deleting its invalid-login assertion
+still compiles but produces `missing-assertion`, naming the test and showing the
+original source assertion. Comparison is per file, suite, and test occurrence;
+extra assertions in a different test cannot mask the loss. A regex probe counted
+a commented-out assertion and truncated a nested callback, so this gate uses the
+existing TypeScript parser. Counts do not establish semantic equivalence or that
+a callback executes. See the [walkthrough and limits](parity-gate.md).
 
 ### T6 · Semantic drift — compiles, runs, does the wrong thing
 The conversion is idiomatic and typed and still wrong for this page:
