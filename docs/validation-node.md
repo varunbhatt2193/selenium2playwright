@@ -8,7 +8,8 @@ intake → convert → validate → END
 ```
 
 Implementation, offline checks, and the learning review are complete.
-This step reports failures. Phase 5 adds the critic and bounded repair loop.
+This walkthrough records step 4.5. The current graph also runs the
+[step 5.1 critic](critic-node.md) after validation; 5.2 will add the repair loop.
 
 ## What changed, and why
 
@@ -67,8 +68,9 @@ Validation (report-only):
   PASS parity: 0 finding(s)
 ```
 
-Exit 0 means every gate passed; exit 1 means at least one gate failed; exit 2 means
-the input was refused or CLI arguments were invalid. Lint warnings are displayed
+Since step 5.1, exit 0 requires every gate and the critic to pass. Exit 1 also
+covers a critic revision request or unavailable review. Exit 2 means the input
+was refused or CLI arguments were invalid. Lint warnings are displayed
 without failing the gate. Code is still emitted on validation failure so it can
 be inspected. The CLI rejects `--out` paths that would replace the source or a
 supplied companion. Unprovided imports remain real compile findings.
@@ -79,7 +81,7 @@ supplied companion. Unprovided imports remain real compile findings.
 uv run python -m unittest discover -s tests -v
 ```
 
-All 20 tests pass: 12 parity regressions and 8 graph integration tests. Graph
+At step 4.5, all 20 tests passed: 12 parity regressions and 8 graph integration tests. Graph
 tests use fixed model replies through the real conversion chain and run the real
 validators, except where a tool error or lint warning is deliberately injected.
 They cover POM and test conversions, relative companion imports, unchanged
@@ -88,4 +90,4 @@ streams and exit codes, tool failures, and refusal bypasses.
 
 No live model call or new LangSmith trace was used to verify this increment.
 Passing these static gates does not prove runtime or semantic equivalence;
-the critic and execution evaluations remain later steps.
+the critic adds review, and execution evaluations remain a later step.

@@ -1,4 +1,4 @@
-"""Step 4.5 — intake -> convert -> validate, or an honest refusal.
+"""Step 5.1 — intake -> convert -> validate -> critic, or an honest refusal.
 
     uv run python -m selenium2playwright.graph samples/selenium-suite/pages/LoginPage.ts
     uv run python -m selenium2playwright.graph some/webdriverio.e2e.ts   # -> clean refusal
@@ -31,8 +31,8 @@ from langgraph.graph import END, START, StateGraph
 from selenium2playwright.classify import Classification, classify
 from selenium2playwright.llm import make_model, prepare_messages
 from selenium2playwright.one_shot import report_ledger, report_usage
-from selenium2playwright.prompts import build_prompt, format_context
-from selenium2playwright.schemas import ConversionResult, Finding, ValidationReport
+from selenium2playwright.prompts import build_critic_prompt, build_prompt, format_context
+from selenium2playwright.schemas import ConversionResult, Critique, Finding, ValidationReport
 from selenium2playwright.validators.compile import compile_check
 from selenium2playwright.validators.lint import lint_check
 from selenium2playwright.validators.parity import parity_check
@@ -62,6 +62,10 @@ class ConversionState(TypedDict, total=False):
     refusal: str  # the honest reason, when status == "refused"
     # filled by validate; conversion status and validation verdict are separate
     validation: list[ValidationReport]
+    # filled by critic; an unavailable review is explicit, never an automatic pass
+    critique: Critique | None
+    critic_usage: dict | None
+    critique_error: str
 
 
 def intake(state: ConversionState) -> ConversionState:
@@ -141,26 +145,77 @@ def report_validation(reports: list[ValidationReport]) -> bool:
     return all(report.passed for report in reports)
 
 
+def critic(state: ConversionState) -> ConversionState:
+    """Review the conversion once. No rewriting or retry edge until step 5.2."""
+    usage = None
+    try:
+        structured_model = make_model(for_critic=True).with_structured_output(
+            Critique, method="json_schema", include_raw=True,
+        )
+        chain = build_critic_prompt() | prepare_messages() | structured_model
+        evidence = "\n\n".join(
+            f"{'PASS' if r.passed else 'FAIL'} {r.render()}"
+            + (f"\n{r.tool_output}" if not r.passed and not r.findings else "")
+            for r in state["validation"]
+        )
+        response = chain.invoke({
+            "file_path": state["source_path"], "source": state["source"],
+            "context": state.get("context", ""),
+            "conversion": state["result"].model_dump_json(indent=2), "validation": evidence,
+        })
+        usage = response["raw"].usage_metadata
+        if response["parsing_error"] is not None:
+            raise RuntimeError(f"critic reply did not match Critique: {response['parsing_error']}")
+        critique = Critique.model_validate(response["parsed"])
+    except Exception as exc:
+        # Provider or parsing failures must still let the CLI emit the converted
+        # file and existing scorecard. Keep the review error visible and fail the run.
+        return {"critique": None, "critic_usage": usage, "critique_error": str(exc)}
+
+    failed = [report for report in state["validation"] if not report.passed]
+    if failed and critique.verdict == "pass":
+        # The model cannot override a deterministic failure. These fallback fixes
+        # come from the reports, not from a claim that the model noticed the bug.
+        critique = Critique(verdict="revise", fixes=[
+            f"Resolve the failed {r.gate} gate: {r.render()}"
+            + (f"\n{r.tool_output}" if not r.findings else "") for r in failed
+        ])
+    return {"critique": critique, "critic_usage": usage, "critique_error": ""}
+
+
+def report_critique(critique: Critique | None, error: str) -> bool:
+    """Print the review without mixing it into the generated TypeScript."""
+    if critique is None:
+        print(f"Critic: UNAVAILABLE — {error}", file=sys.stderr)
+        return False
+    print(f"Critic: {critique.verdict.upper()}", file=sys.stderr)
+    for fix in critique.fixes:
+        print(f"  - {fix}", file=sys.stderr)
+    return critique.verdict == "pass"
+
+
 def build_graph():
-    """START -> intake -> convert -> validate -> END; refuse still goes to END."""
+    """START -> intake -> convert -> validate -> critic -> END; refuse goes to END."""
     builder = StateGraph(ConversionState)
     builder.add_node("intake", intake)
     builder.add_node("convert", convert)
     builder.add_node("refuse", refuse)
     builder.add_node("validate", validate)
+    builder.add_node("critic", critic)
     builder.add_edge(START, "intake")
     # After intake, ask route_after_intake which node comes next. The mapping
     # {returned name: node name} is what lets LangGraph draw the branch.
     builder.add_conditional_edges("intake", route_after_intake,
                                   {"convert": "convert", "refuse": "refuse"})
     builder.add_edge("convert", "validate")
-    builder.add_edge("validate", END)
+    builder.add_edge("validate", "critic")
+    builder.add_edge("critic", END)
     builder.add_edge("refuse", END)
     return builder.compile()
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Convert Selenium TypeScript and report all four validation gates")
+    parser = argparse.ArgumentParser(description="Convert Selenium TypeScript, run four gates, and review the result")
     parser.add_argument("source", type=Path)
     parser.add_argument("context", nargs="*", type=Path, help="already-converted companion files")
     parser.add_argument("--out", type=Path, help="output file; also anchors relative imports to companions")
@@ -172,7 +227,7 @@ def main(argv: list[str] | None = None) -> int:
         inputs["output_path"] = str(args.out)
     graph = build_graph()
     final = graph.invoke(
-        inputs, config={"run_name": "conversion-graph", "tags": ["step:4.5", "prompt:v1"]},
+        inputs, config={"run_name": "conversion-graph", "tags": ["step:5.1", "prompt:v1", "critic:v1"]},
     )
     c = final["classification"]
     print(f"[{c.automation} · {c.runner} · {c.language}] {c.reason}", file=sys.stderr)
@@ -182,13 +237,17 @@ def main(argv: list[str] | None = None) -> int:
     report_usage(final["usage"])
     report_ledger(final["result"])
     passed = report_validation(final["validation"])
+    review_passed = report_critique(final["critique"], final["critique_error"])
+    if final["critic_usage"]:
+        print("Critic token usage:", file=sys.stderr)
+        report_usage(final["critic_usage"])
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(final["result"].code, encoding="utf-8")
         print(f"[wrote {args.out}]", file=sys.stderr)
     else:
         print(final["result"].code, end="")
-    return 0 if passed else 1
+    return 0 if passed and review_passed else 1
 
 
 if __name__ == "__main__":

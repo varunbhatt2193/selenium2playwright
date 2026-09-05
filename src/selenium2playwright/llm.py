@@ -24,11 +24,16 @@ from selenium2playwright import env
 MAX_OUTPUT_TOKENS = 8_192
 
 
-def make_model(model_name: str | None = None) -> BaseChatModel:
+def make_model(model_name: str | None = None, *, for_critic: bool = False) -> BaseChatModel:
     """Return a ready chat model. Precedence: argument > S2P_MODEL env > default."""
     name = model_name or env.model_name()
     provider = name.split(":", 1)[0]
-    return init_chat_model(name, max_tokens=MAX_OUTPUT_TOKENS, **_client_kwargs(provider))
+    kwargs = _client_kwargs(provider)
+    if for_critic and provider == "anthropic":
+        # Keep review effort explicit (plan-review §4.10). Native JSON output in
+        # the critic avoids forced tool-choice conflicts with adaptive thinking.
+        kwargs["effort"] = "medium"
+    return init_chat_model(name, max_tokens=MAX_OUTPUT_TOKENS, **kwargs)
 
 
 def _client_kwargs(provider: str) -> dict:

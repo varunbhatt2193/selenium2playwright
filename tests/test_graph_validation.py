@@ -14,7 +14,7 @@ from langchain_core.runnables import RunnableLambda
 
 from selenium2playwright import graph
 from selenium2playwright.prompts import format_context
-from selenium2playwright.schemas import ConversionResult, Finding, ValidationReport
+from selenium2playwright.schemas import ConversionResult, Critique, Finding, ValidationReport
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "samples/selenium-suite"
@@ -31,9 +31,12 @@ class GraphValidationTests(unittest.TestCase):
 
     def model_reply(self, code):
         model = Mock()
-        model.with_structured_output.return_value = RunnableLambda(lambda prompt: {
-            "parsed": ConversionResult(code=code), "raw": AIMessage(content=""), "parsing_error": None,
-        })
+        def structured(schema, **kwargs):
+            parsed = Critique(verdict="pass", fixes=[]) if schema is Critique else ConversionResult(code=code)
+            return RunnableLambda(lambda prompt: {
+                "parsed": parsed, "raw": AIMessage(content=""), "parsing_error": None,
+            })
+        model.with_structured_output.side_effect = structured
         return patch.object(graph, "make_model", return_value=model)
 
     def inputs(self, relative=POM):
@@ -51,6 +54,7 @@ class GraphValidationTests(unittest.TestCase):
                 self.assertEqual(final["result"].code, code)
                 self.assertEqual([r.gate for r in final["validation"]], ["compile", "residue", "lint", "parity"])
                 self.assertTrue(all(r.passed for r in final["validation"]), final["validation"])
+                self.assertEqual(final["critique"].verdict, "pass")
 
     def test_assertion_loss_reaches_parity_after_compile_passes(self):
         code = (GOLDEN / TEST).read_text().replace(

@@ -13,9 +13,9 @@ of the schema, so they are prompt text. Write them for the model.
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class ConversionResult(BaseModel):
@@ -43,6 +43,30 @@ class ConversionResult(BaseModel):
             "(playbook rule 25: the consolidated ledger). Empty if none."
         ),
     )
+
+
+class Critique(BaseModel):
+    """The reviewer's decision; step 5.2 will use it to choose whether to revise."""
+
+    verdict: Literal["pass", "revise"] = Field(
+        description="pass only when all gates pass and no concrete correctness/idiom fix is needed; otherwise revise."
+    )
+    fixes: list[str] = Field(
+        description=(
+            "Concrete, actionable fixes grounded in the source, converted code, or validator findings. "
+            "Name the file/location and evidence when available; never invent a line number. "
+            "Use a TODO(review) task for unresolved uncertainty. Empty only for pass."
+        )
+    )
+
+    @model_validator(mode="after")
+    def consistent_verdict(self) -> Self:
+        """Contradictory or empty reviews are parse failures, not usable decisions."""
+        if (self.verdict == "pass") != (not self.fixes):
+            raise ValueError("pass requires no fixes; revise requires at least one fix")
+        if any(not fix.strip() for fix in self.fixes):
+            raise ValueError("fixes must contain non-blank instructions")
+        return self
 
 
 # --- validation --------------------------------------------------------------
