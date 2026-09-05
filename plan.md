@@ -84,7 +84,7 @@ State (simplified): `scope, source_files, analysis, converted_files, validation,
 4. **Validate** — deterministic tools: compile, lint, Selenium-residue scan, structure parity (every public method preserved; same test-case count and assertion coverage as the source — any drop is a validation failure that feeds the refine loop).
 5. **Critic (reflection)** — LLM reviews for idiom: no `waitForTimeout`, web-first assertions, locator quality; returns a structured verdict.
 6. **Refine loop** — re-convert with validator errors + critique; max 3 iterations, then flag `needs-review` instead of looping forever.
-7. **Assemble & report** — write files, generate `playwright.config.ts`, per-file confidence + review notes.
+7. **Assemble & report** — write files, generate `playwright.config.ts`, per-file confidence + review notes, and a consolidated `TODO(review)` ledger: every TODO across the whole conversion collected in one place, pointed to at the end of the run (playground panel / CLI report file).
 
 Suite mode fans out per-file conversion in parallel with the **Send API**, respecting dependency order and sharing one "suite context" from Analyze. **Human-in-the-loop** (M4+): on ambiguity (e.g., a POM imports a file that wasn't provided), interrupt and ask rather than guess.
 
