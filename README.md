@@ -2,7 +2,7 @@
 
 **An AI agent that converts TypeScript Selenium test suites to Playwright** — a single test, a page object, or the whole suite — built on LangGraph + Claude, with a self-correcting loop that validates its own output before you ever see it.
 
-> **Status: building in public.** Phase 1 of 12 complete — real Selenium samples, a hand-written Playwright golden (the eval answer key), and the [conversion playbook](docs/playbook.md) that becomes the system prompt. Milestone M0 next.
+> **Status: building in public.** Phase 2 of 12 complete — **M0 shipped**: a one-prompt, model-agnostic converter (playbook as system prompt, structured output to disk, every run traced in LangSmith). The login sample converts to code that compiles and passes in a real browser. What still goes wrong is catalogued in the [gap log + failure taxonomy](docs/gap-log.md) — that list is Phase 4's spec. Next: the first LangGraph (M1).
 > Architecture & decisions: [plan.md](plan.md)
 >
 > 🗺️ **[Interactive architecture diagram](https://claude.ai/code/artifact/877b27e1-3cc2-4f84-802f-091419bf27c1)** — the whole system on one page: the pipeline, the reflection loop, memory, evals, and the v2 AgentCore path. *(Source: [docs/architecture.html](docs/architecture.html))*
@@ -28,7 +28,7 @@ For a one-off file, Claude in a repo is genuinely fine. An agent earns its exist
 ## What's coming
 
 - [x] Architecture + phased roadmap
-- [ ] **M0** — one-prompt conversion, traced end-to-end in LangSmith
+- [x] **M0** — one-prompt conversion, traced end-to-end in LangSmith
 - [ ] **M1** — LangGraph pipeline: classify → convert (with honest refusals)
 - [ ] **M2** — deterministic validators + reflection loop
 - [ ] **Evals** — measured conversion quality on a public dataset *(the numbers will go here)*

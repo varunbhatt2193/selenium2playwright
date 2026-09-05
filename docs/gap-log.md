@@ -53,3 +53,93 @@ Every run read ~2.1k tokens of playbook from the prompt cache (≈85 % of input 
 - Locators climbed the ladder to `getByLabel` / `getByRole` (rule 7) and
   `getFlashText()` became an exposed `Locator` + web-first assert (rule 20).
 - `baseURL` relative path (rule 22).
+
+---
+
+# Failure taxonomy — what can go wrong, and which gate catches it
+
+*Roadmap 2.3, 2026-09-04. Evidence: the 2.1 raw outputs, the 2.2 structured
+outputs, and a throw-away "hard cases" probe (JS alert, iframe editor, new
+window, xpath, sleep, executeScript) converted with the 2.2 pipeline. This is
+M0's closing artifact and the requirements list for the Phase 4 validators.*
+
+## Evidence gathered
+
+| Run | `tsc --noEmit` | Runs in a browser? |
+|---|---|---|
+| 2.1 raw test output (markdown fence) | ❌ `TS2349` on line 1 | n/a |
+| 2.2 POM + test (login) | ✅ 0 errors | ✅ 2 passed against the-internet |
+| 2.2 hard-case probe (3 tests) | ✅ 0 errors | ❌ 1 of 3 failed (iframe editor) |
+| mutant: wrong text inside the `page.once("dialog")` handler | ✅ | ✅ test failed as it should |
+
+## The taxonomy
+
+Ordered by how loud the failure is. **The quiet ones are the dangerous ones.**
+
+### T1 · Shape failures — output is not a file
+Fences, prose, truncation (max_tokens too low). Loud: `tsc` dies on line 1.
+*Seen:* 2.1 fence. *Closed by:* 2.2 schema (`code` is a typed field), and a
+`max_tokens` large enough for a whole file. *Gate:* compile (4.1).
+
+### T2 · Type/compile failures — file is real but wrong
+Missing imports, wrong Playwright API names, wrong fixture signatures, value
+import of a type under strict settings. Loud: `tsc` reports line + code.
+*Seen:* none on this sample set (Sonnet 5 + playbook produced 0 errors on all
+3 files). Expected to appear with unfamiliar APIs and bigger suites.
+*Gate:* compile (4.1). Feeds the critic loop directly (5.1).
+
+### T3 · Residue — Selenium survives in the output
+`selenium-webdriver` imports, `driver.` calls, `By.`/`until.` left behind,
+`chai` still imported. Loud if the import is missing (tsc), **silent if
+`selenium-webdriver` is still installed** in the sandbox — then it compiles.
+*Seen:* none. *Gate:* residue scan (4.2), independent of the compiler.
+
+### T4 · Async/await slips — compiles, passes wrongly
+A Playwright call without `await` is a valid Promise expression; `tsc` is
+happy, the assertion never runs, the test goes green. #1 conversion bug class.
+*Seen:* none this time. *Gate:* lint with `no-floating-promises` (4.3).
+
+### T5 · Parity loss — tests or assertions quietly vanish
+A test dropped, renamed, or merged; an assertion "simplified" away; an
+assertion moved into a callback that might not run. Silent: everything
+compiles and passes.
+*Seen:* the alert assertion moved into `page.once("dialog", ...)`. Count parity
+held (2 → 2) and the mutant proved Playwright still fails the test, so this
+instance is fine — but the pattern needs the count + name check every time.
+*Gate:* parity (4.4). Also playbook rule 24, already in the prompt.
+
+### T6 · Semantic drift — compiles, runs, does the wrong thing
+The conversion is idiomatic and typed and still wrong for this page:
+- `sendKeys` → `fill()` on a **contenteditable** editor (TinyMCE): Playwright
+  refuses — "not an input/textarea/select or [contenteditable]". Needs
+  `click()` + `keyboard.type()` / `pressSequentially()`. → *Playbook rule 15
+  needs a contenteditable clause.*
+- `driver.sleep(1000)` deleted (correct per rule 13) — but if the sleep was
+  hiding a real timing dependency the test now flakes. Rule 13 already asks
+  for a TODO when timing "genuinely matters"; the model cannot know, so this
+  stays a human-review item.
+- `executeScript(...)` rewritten as a locator assertion: right here, but a
+  script with side effects would be lost.
+**No static gate catches T6.** Only running the tests does (11.2 execution
+evals on curated cases) — or a human, which is why the TODO ledger exists.
+
+### T7 · Honesty failures — the model was confident and wrong
+Invented API, or a risky mapping with no `TODO(review)`. The probe did the
+right thing once (dialog handler flagged) and arguably under-flagged once
+(iframe `fill` had no TODO). Silent by construction.
+*Gate:* LLM-as-judge rubric (6.4) + HITL interrupt on risky patterns (7.2) +
+the consolidated TODO ledger (rule 25) so a human sees every flag in one place.
+
+### T8 · Style drift — correct but noisy
+Value vs `type` imports, identifier renames (`url` → `path`), line wrapping,
+absolute URLs in tests while POMs use `baseURL`. Harmless to the compiler,
+costly to review diffs and exact-match evals.
+*Gate:* Prettier before any diff-based eval (6.2); playbook rules for
+`type` imports and "preserve identifiers"; extend rule 22 to test files.
+
+## What this means for Phase 4
+
+Four deterministic gates, in the order the taxonomy demands: **compile (T1,
+T2) → residue (T3) → lint (T4) → parity (T5)**. T6–T8 are the reason the
+gates are necessary but not sufficient — they justify the critic (5), the
+judge (6.4), the execution evals (11.2), and the human in the loop (7.2).
