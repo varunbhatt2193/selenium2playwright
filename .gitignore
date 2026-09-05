@@ -29,3 +29,6 @@ plan-review.md
 # IDE
 .idea/
 .vscode/
+
+# Generated conversions (scratch output of the converter, never source of truth)
+out/

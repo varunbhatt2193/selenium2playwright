@@ -36,7 +36,7 @@ For a one-off file, Claude in a repo is genuinely fine. An agent earns its exist
 - [ ] **M4** — whole-suite conversion: page objects first, then tests, in parallel
 - [ ] **M5** — deployed playground you can try
 
-**Stack:** Python · LangGraph · LangSmith · Claude (Anthropic) · TypeScript toolchain as the referee
+**Stack:** Python · LangGraph · LangSmith · any LangChain chat model (Claude by default, swappable via `S2P_MODEL`) · TypeScript toolchain as the referee
 
 ---
 

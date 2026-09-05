@@ -18,12 +18,40 @@ from dotenv import load_dotenv
 # override=False: a variable already exported in your shell wins over .env.
 load_dotenv(override=False)
 
-# var name -> expected prefix (catches "right var, wrong paste" mistakes)
-REQUIRED = {
-    "ANTHROPIC_API_KEY": "sk-ant-",  # console.anthropic.com -> API Keys
-    "ANTHROPIC_WORKSPACE_ID": "wrkspc_",  # Settings -> Workspaces (an ID, not a secret)
+# "provider:model" in init_chat_model syntax. The provider half decides which
+# API key must exist; the model half is passed through untouched.
+DEFAULT_MODEL = "anthropic:claude-sonnet-5"
+
+# provider -> (env var, expected prefix). Prefix catches "right var, wrong paste".
+PROVIDER_KEYS = {
+    "anthropic": ("ANTHROPIC_API_KEY", "sk-ant-"),  # console.anthropic.com -> API Keys
+    "openai": ("OPENAI_API_KEY", "sk-"),  # platform.openai.com -> API keys
+    "google_genai": ("GOOGLE_API_KEY", "AIza"),  # aistudio.google.com -> Get API key
+}
+
+ALWAYS_REQUIRED = {
     "LANGSMITH_API_KEY": "lsv2_",  # smith.langchain.com -> Settings -> API Keys
 }
+
+
+def model_name() -> str:
+    """The configured 'provider:model' string (S2P_MODEL env var or the default)."""
+    return os.environ.get("S2P_MODEL") or DEFAULT_MODEL
+
+
+def provider() -> str:
+    return model_name().split(":", 1)[0]
+
+
+def required() -> dict[str, str]:
+    """Vars this configuration needs: LangSmith + the selected provider's key."""
+    if provider() not in PROVIDER_KEYS:
+        raise ValueError(
+            f"Unknown provider {provider()!r} in S2P_MODEL={model_name()!r}; "
+            f"known: {', '.join(PROVIDER_KEYS)}. Add it to PROVIDER_KEYS in env.py."
+        )
+    var, prefix = PROVIDER_KEYS[provider()]
+    return {**ALWAYS_REQUIRED, var: prefix}
 
 
 def masked(value: str) -> str:
@@ -33,8 +61,9 @@ def masked(value: str) -> str:
 
 def check() -> bool:
     """Print one line per required var; return True only if all are usable."""
+    print(f"model: {model_name()}")
     ok = True
-    for name, prefix in REQUIRED.items():
+    for name, prefix in required().items():
         value = os.environ.get(name, "")
         if not value:
             print(f"✗ {name}  missing — add it to .env (see .env.example)")
