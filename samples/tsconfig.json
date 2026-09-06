@@ -29,5 +29,7 @@
     "noEmit": true
   },
   "include": ["**/*.ts"],
-  "exclude": ["node_modules"]
+  // Scratch conversions may intentionally be broken; the converter gates check
+  // those outputs separately. This command validates the maintained sample suites.
+  "exclude": ["node_modules", "out"]
 }

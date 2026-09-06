@@ -1,8 +1,11 @@
 # Phase 6.1 — dataset theory, first code increment, and reporting design
 
 Status: the user approved committing the local snapshot builder and continuing.
-The expanded sample collection, upload script, target adapter, and experiments
-are still future work. No Phase 6 cloud dataset or scored experiment exists yet.
+It is pushed in `60fd0b5`; the coverage manifest is in
+[evaluation-coverage.md](evaluation-coverage.md), and the approved alerts tests and
+browser evidence are in [alerts-tests.md](alerts-tests.md).
+Login and alerts fixtures are complete; four scenarios, the upload script,
+target adapter, and experiments remain. No Phase 6 cloud dataset or scored experiment exists yet.
 
 Phase 6 working rule: explain theory before writing each increment, put the
 reasoning in code comments and docstrings, and walk through the implementation.
@@ -150,7 +153,8 @@ These are local probes, not new persisted regression tests or a scored experimen
 The existing offline suite also passed: 36 tests using
 `.venv/bin/python -m unittest discover -s tests -v`.
 
-The user approved continuing from this contract. Next, define the
-scenario coverage and explicit case manifest, expand and review the source/golden
-pairs, and build the upload script. Step 6.1 finishes when the curated dataset is
+The user approved continuing from this contract. The scenario coverage and
+explicit case manifest are in [evaluation-coverage.md](evaluation-coverage.md).
+Next, expand and review the source/golden pairs and build the upload script.
+Step 6.1 finishes when the curated dataset is
 visible and verified in LangSmith; Step 6.2 then runs the first scored experiment.
