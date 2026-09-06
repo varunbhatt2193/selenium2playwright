@@ -165,8 +165,10 @@ and the graph routes to `assemble` with no draft: no validation, no critic, no
 repair. Seen in 5 of 36 first drafts across the 6.2 baseline and both 6.3 arms
 (WindowsPage; IframeTest; AlertsPage, LoginPage, WindowsTest). It is the single
 largest source of failed rows and it is invisible to the reflection loop.
-*Gate:* none today. *Fix options (each is a converter change and needs its own
-green eval run, measured with `scripts/run_reflection_ab.py`):* coerce a string
+**Fixed 2026-09-06 (commit `c9459f2`):** a `mode="before"` validator wraps a
+string `notes`/`todos` into a list; field descriptions unchanged. Rerun of the
+6.3 A/B: 0 of 24 first drafts failed to parse, 12/12 static in both arms.
+*Other options considered (not needed now):* coerce a string
 `notes` into a one-item list in the schema; use the JSON-schema structured-output
 method for the actor as the critic already does; or route a conversion error on
 attempt 1 back to `convert` while budget remains. Evidence:

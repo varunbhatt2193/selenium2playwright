@@ -7,50 +7,50 @@
     "dataset_version": "2026-09-06T03:05:09.476354+00:00",
     "collection_sha256": "4920b5f319d827a25a3d8f1a2f026c430e1fb20bdb897c6b9c3599f55b8aeb3d",
     "model": "anthropic:claude-opus-5",
-    "git_revision": "653ba6df0df7a5c4331fba8ba76ef67e79f63799",
+    "git_revision": "c9459f21e9264c0446726bb54b01b9d46901c4a2",
     "evaluator_version": "deterministic-v1"
   },
   "arms": {
     "one_attempt": {
       "experiment": {
-        "name": "s2p-6.3-claude-opus-5-attempts1-d75f27de",
-        "id": "a8fead0a-b63c-4b38-ad34-18f9c5474d2e",
-        "url": "https://smith.langchain.com/o/32ac11b4-3e72-4765-a59b-5dc1bcd32cbe/datasets/33c80b1e-96bd-4b5b-a9c1-ca49d215828f/compare?selectedSessions=a8fead0a-b63c-4b38-ad34-18f9c5474d2e",
+        "name": "s2p-6.3-claude-opus-5-attempts1-d44da1dd",
+        "id": "d630ee69-6e27-46bb-b14a-36999db469cf",
+        "url": "https://smith.langchain.com/o/32ac11b4-3e72-4765-a59b-5dc1bcd32cbe/datasets/33c80b1e-96bd-4b5b-a9c1-ca49d215828f/compare?selectedSessions=d630ee69-6e27-46bb-b14a-36999db469cf",
         "mode": "live_converter",
-        "elapsed_seconds": 174.52786687500338
+        "elapsed_seconds": 185.70403691699903
       },
       "max_attempts": 1,
       "model": "anthropic:claude-opus-5",
-      "configuration_sha256": "c4865e53506125211715934d836636a8530341ff27870aa621f537598bb04cc5",
-      "git_revision": "653ba6df0df7a5c4331fba8ba76ef67e79f63799",
+      "configuration_sha256": "91c37545bbd12fd8b3fa04f345d986068eff422ede8637cde8f1e687949f1b07",
+      "git_revision": "c9459f21e9264c0446726bb54b01b9d46901c4a2",
       "git_dirty": false,
       "local_complete": true,
       "cloud_status": "verified",
       "scheduled": 12,
       "passes": {
-        "compiles": 11,
-        "residue_free": 11,
-        "typed_lint_pass": 11,
-        "parity_pass": 11,
-        "all_static_passed": 11,
-        "graph_report_passed": 9
+        "compiles": 12,
+        "residue_free": 12,
+        "typed_lint_pass": 12,
+        "parity_pass": 12,
+        "all_static_passed": 12,
+        "graph_report_passed": 6
       },
       "percent": {
-        "compiles": 91.67,
-        "residue_free": 91.67,
-        "typed_lint_pass": 91.67,
-        "parity_pass": 91.67,
-        "all_static_passed": 91.67,
-        "graph_report_passed": 75.0
+        "compiles": 100.0,
+        "residue_free": 100.0,
+        "typed_lint_pass": 100.0,
+        "parity_pass": 100.0,
+        "all_static_passed": 100.0,
+        "graph_report_passed": 50.0
       },
       "attempt_counts": {
         "1": 12
       },
       "with_draft": {
-        "rows": 11,
-        "no_draft_rows": 1,
-        "all_static_passed": 11,
-        "graph_report_passed": 9,
+        "rows": 12,
+        "no_draft_rows": 0,
+        "all_static_passed": 12,
+        "graph_report_passed": 6,
         "repaired_rows": 0
       },
       "actor_calls": {
@@ -60,28 +60,28 @@
         "missing_rows": 0
       },
       "target_seconds": {
-        "total": "172.479504583985544",
-        "known_subtotal": "172.479504583985544",
+        "total": "183.679581042990322",
+        "known_subtotal": "183.679581042990322",
         "known_rows": 12,
         "missing_rows": 0
       },
       "actor_total_tokens": {
-        "total": "51327",
-        "known_subtotal": "51327",
+        "total": "50860",
+        "known_subtotal": "50860",
         "known_rows": 12,
         "missing_rows": 0
       },
       "critic_total_tokens": {
-        "total": null,
-        "known_subtotal": "52792",
-        "known_rows": 11,
-        "missing_rows": 1
+        "total": "57831",
+        "known_subtotal": "57831",
+        "known_rows": 12,
+        "missing_rows": 0
       },
       "langsmith_root_cost_usd": {
-        "total": null,
-        "known_subtotal": "0.464905",
-        "known_rows": 11,
-        "missing_rows": 1
+        "total": "0.515358",
+        "known_subtotal": "0.515358",
+        "known_rows": 12,
+        "missing_rows": 0
       },
       "rows": {
         "alerts-page": {
@@ -91,10 +91,10 @@
           "attempts": 1,
           "all_static": true,
           "todos": 0,
-          "target_seconds": 21.73914845899708,
-          "actor_tokens": 4468,
-          "critic_tokens": 5329,
-          "cost_usd": "0.08579"
+          "target_seconds": 23.335497207997832,
+          "actor_tokens": 4425,
+          "critic_tokens": 5504,
+          "cost_usd": "0.08989"
         },
         "alerts-test": {
           "graph_status": "passed",
@@ -103,10 +103,10 @@
           "attempts": 1,
           "all_static": true,
           "todos": 0,
-          "target_seconds": 10.630020208001952,
-          "actor_tokens": 4846,
-          "critic_tokens": 5141,
-          "cost_usd": "0.037593"
+          "target_seconds": 10.226527124999848,
+          "actor_tokens": 4814,
+          "critic_tokens": 5110,
+          "cost_usd": "0.036558"
         },
         "dynamic-loading-page": {
           "graph_status": "needs-review",
@@ -115,10 +115,10 @@
           "attempts": 1,
           "all_static": true,
           "todos": 0,
-          "target_seconds": 18.287680082998122,
-          "actor_tokens": 3839,
-          "critic_tokens": 4684,
-          "cost_usd": "0.041813"
+          "target_seconds": 16.651135166997847,
+          "actor_tokens": 3754,
+          "critic_tokens": 4521,
+          "cost_usd": "0.037433"
         },
         "dynamic-loading-test": {
           "graph_status": "passed",
@@ -127,48 +127,46 @@
           "attempts": 1,
           "all_static": true,
           "todos": 0,
-          "target_seconds": 10.405766332994972,
-          "actor_tokens": 4121,
-          "critic_tokens": 4402,
-          "cost_usd": "0.028153"
+          "target_seconds": 8.825392749997263,
+          "actor_tokens": 4034,
+          "critic_tokens": 4306,
+          "cost_usd": "0.025498"
         },
         "iframe-page": {
-          "graph_status": "passed",
+          "graph_status": "needs-review",
           "draft": true,
           "errors": [],
           "attempts": 1,
           "all_static": true,
           "todos": 0,
-          "target_seconds": 17.94265233400074,
-          "actor_tokens": 4161,
-          "critic_tokens": 4786,
-          "cost_usd": "0.043813"
+          "target_seconds": 17.8862572500002,
+          "actor_tokens": 3776,
+          "critic_tokens": 4773,
+          "cost_usd": "0.041203"
         },
         "iframe-test": {
-          "graph_status": "needs-review",
-          "draft": false,
-          "errors": [
-            "model reply did not match ConversionResult: 1 validation error for ConversionResult\nnotes\n  Input should be a valid list [type=list_type, input_value=\"Kept the "
-          ],
-          "attempts": 1,
-          "all_static": false,
-          "todos": null,
-          "target_seconds": 8.061316416999034,
-          "actor_tokens": 4219,
-          "critic_tokens": null,
-          "cost_usd": null
-        },
-        "login-page": {
           "graph_status": "passed",
           "draft": true,
           "errors": [],
           "attempts": 1,
           "all_static": true,
           "todos": 0,
-          "target_seconds": 19.37387199999648,
-          "actor_tokens": 4001,
-          "critic_tokens": 4788,
-          "cost_usd": "0.042683"
+          "target_seconds": 13.235455958994862,
+          "actor_tokens": 4129,
+          "critic_tokens": 4488,
+          "cost_usd": "0.030183"
+        },
+        "login-page": {
+          "graph_status": "needs-review",
+          "draft": true,
+          "errors": [],
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 21.3046210829998,
+          "actor_tokens": 4156,
+          "critic_tokens": 4847,
+          "cost_usd": "0.053433"
         },
         "login-test": {
           "graph_status": "passed",
@@ -177,22 +175,22 @@
           "attempts": 1,
           "all_static": true,
           "todos": 0,
-          "target_seconds": 10.004358209000202,
-          "actor_tokens": 4371,
-          "critic_tokens": 4678,
-          "cost_usd": "0.031903"
+          "target_seconds": 9.029980375002197,
+          "actor_tokens": 4347,
+          "critic_tokens": 4648,
+          "cost_usd": "0.031073"
         },
         "upload-page": {
-          "graph_status": "passed",
+          "graph_status": "needs-review",
           "draft": true,
           "errors": [],
           "attempts": 1,
           "all_static": true,
           "todos": 0,
-          "target_seconds": 14.037257916999806,
-          "actor_tokens": 4052,
-          "critic_tokens": 4440,
-          "cost_usd": "0.035318"
+          "target_seconds": 16.0916986250013,
+          "actor_tokens": 4040,
+          "critic_tokens": 4661,
+          "cost_usd": "0.040843"
         },
         "upload-test": {
           "graph_status": "passed",
@@ -201,22 +199,22 @@
           "attempts": 1,
           "all_static": true,
           "todos": 0,
-          "target_seconds": 10.426924040999438,
-          "actor_tokens": 4591,
-          "critic_tokens": 4904,
-          "cost_usd": "0.037113"
+          "target_seconds": 11.540021333996265,
+          "actor_tokens": 4595,
+          "critic_tokens": 4969,
+          "cost_usd": "0.038718"
         },
         "windows-page": {
-          "graph_status": "passed",
+          "graph_status": "needs-review",
           "draft": true,
           "errors": [],
           "attempts": 1,
           "all_static": true,
-          "todos": 0,
-          "target_seconds": 20.668128124998475,
-          "actor_tokens": 4382,
-          "critic_tokens": 5073,
-          "cost_usd": "0.050133"
+          "todos": 2,
+          "target_seconds": 24.805094916999224,
+          "actor_tokens": 4454,
+          "critic_tokens": 5370,
+          "cost_usd": "0.058098"
         },
         "windows-test": {
           "graph_status": "passed",
@@ -225,54 +223,54 @@
           "attempts": 1,
           "all_static": true,
           "todos": 0,
-          "target_seconds": 10.902380457999243,
-          "actor_tokens": 4276,
-          "critic_tokens": 4567,
-          "cost_usd": "0.030593"
+          "target_seconds": 10.747899250003684,
+          "actor_tokens": 4336,
+          "critic_tokens": 4634,
+          "cost_usd": "0.032428"
         }
       }
     },
     "reflective": {
       "experiment": {
-        "name": "s2p-6.3-claude-opus-5-attempts3-3c890967",
-        "id": "e4b095f6-f29e-4dc6-9c47-ee211014e7be",
-        "url": "https://smith.langchain.com/o/32ac11b4-3e72-4765-a59b-5dc1bcd32cbe/datasets/33c80b1e-96bd-4b5b-a9c1-ca49d215828f/compare?selectedSessions=e4b095f6-f29e-4dc6-9c47-ee211014e7be",
+        "name": "s2p-6.3-claude-opus-5-attempts3-eda105ea",
+        "id": "d52cc925-4038-4a44-89c2-e2bc7640755c",
+        "url": "https://smith.langchain.com/o/32ac11b4-3e72-4765-a59b-5dc1bcd32cbe/datasets/33c80b1e-96bd-4b5b-a9c1-ca49d215828f/compare?selectedSessions=d52cc925-4038-4a44-89c2-e2bc7640755c",
         "mode": "live_converter",
-        "elapsed_seconds": 174.16080891599995
+        "elapsed_seconds": 212.82866349999676
       },
       "max_attempts": 3,
       "model": "anthropic:claude-opus-5",
-      "configuration_sha256": "2e8e284cfac4c5df377d32f9b04e2825f87d9a6a535989008aa58730a65a8f93",
-      "git_revision": "653ba6df0df7a5c4331fba8ba76ef67e79f63799",
+      "configuration_sha256": "e57e6aead16e1ca8bc2e2b387105b468fc7a4b2cc37734410dc5cb398d23effa",
+      "git_revision": "c9459f21e9264c0446726bb54b01b9d46901c4a2",
       "git_dirty": false,
       "local_complete": true,
       "cloud_status": "verified",
       "scheduled": 12,
       "passes": {
-        "compiles": 9,
-        "residue_free": 9,
-        "typed_lint_pass": 9,
-        "parity_pass": 9,
-        "all_static_passed": 9,
-        "graph_report_passed": 8
+        "compiles": 12,
+        "residue_free": 12,
+        "typed_lint_pass": 12,
+        "parity_pass": 12,
+        "all_static_passed": 12,
+        "graph_report_passed": 11
       },
       "percent": {
-        "compiles": 75.0,
-        "residue_free": 75.0,
-        "typed_lint_pass": 75.0,
-        "parity_pass": 75.0,
-        "all_static_passed": 75.0,
-        "graph_report_passed": 66.67
+        "compiles": 100.0,
+        "residue_free": 100.0,
+        "typed_lint_pass": 100.0,
+        "parity_pass": 100.0,
+        "all_static_passed": 100.0,
+        "graph_report_passed": 91.67
       },
       "attempt_counts": {
         "1": 10,
         "2": 2
       },
       "with_draft": {
-        "rows": 9,
-        "no_draft_rows": 3,
-        "all_static_passed": 9,
-        "graph_report_passed": 8,
+        "rows": 12,
+        "no_draft_rows": 0,
+        "all_static_passed": 12,
+        "graph_report_passed": 11,
         "repaired_rows": 2
       },
       "actor_calls": {
@@ -282,43 +280,41 @@
         "missing_rows": 0
       },
       "target_seconds": {
-        "total": "173.346779253028218",
-        "known_subtotal": "173.346779253028218",
+        "total": "211.096237955993269",
+        "known_subtotal": "211.096237955993269",
         "known_rows": 12,
         "missing_rows": 0
       },
       "actor_total_tokens": {
-        "total": "62347",
-        "known_subtotal": "62347",
+        "total": "63139",
+        "known_subtotal": "63139",
         "known_rows": 12,
         "missing_rows": 0
       },
       "critic_total_tokens": {
-        "total": null,
-        "known_subtotal": "51465",
-        "known_rows": 9,
-        "missing_rows": 3
+        "total": "66795",
+        "known_subtotal": "66795",
+        "known_rows": 12,
+        "missing_rows": 0
       },
       "langsmith_root_cost_usd": {
         "total": null,
-        "known_subtotal": "0.419288",
-        "known_rows": 9,
-        "missing_rows": 3
+        "known_subtotal": "0.541349",
+        "known_rows": 11,
+        "missing_rows": 1
       },
       "rows": {
         "alerts-page": {
           "graph_status": "needs-review",
-          "draft": false,
-          "errors": [
-            "model reply did not match ConversionResult: 1 validation error for ConversionResult\nnotes\n  Input should be a valid list [type=list_type, input_value='Dialog ha"
-          ],
-          "attempts": 1,
-          "all_static": false,
-          "todos": null,
-          "target_seconds": 10.766761416001827,
-          "actor_tokens": 4512,
-          "critic_tokens": null,
-          "cost_usd": null
+          "draft": true,
+          "errors": [],
+          "attempts": 2,
+          "all_static": true,
+          "todos": 2,
+          "target_seconds": 44.28030175000458,
+          "actor_tokens": 11235,
+          "critic_tokens": 10995,
+          "cost_usd": "0.126026"
         },
         "alerts-test": {
           "graph_status": "passed",
@@ -327,10 +323,10 @@
           "attempts": 1,
           "all_static": true,
           "todos": 0,
-          "target_seconds": 9.641703125002095,
-          "actor_tokens": 4795,
-          "critic_tokens": 5090,
-          "cost_usd": "0.036063"
+          "target_seconds": 10.14405016600358,
+          "actor_tokens": 4799,
+          "critic_tokens": 5095,
+          "cost_usd": "0.036108"
         },
         "dynamic-loading-page": {
           "graph_status": "passed",
@@ -339,10 +335,10 @@
           "attempts": 2,
           "all_static": true,
           "todos": 0,
-          "target_seconds": 28.49104691699904,
-          "actor_tokens": 9001,
-          "critic_tokens": 8904,
-          "cost_usd": "0.078501"
+          "target_seconds": 33.24051591599709,
+          "actor_tokens": 9051,
+          "critic_tokens": 9018,
+          "cost_usd": "0.081701"
         },
         "dynamic-loading-test": {
           "graph_status": "passed",
@@ -351,10 +347,10 @@
           "attempts": 1,
           "all_static": true,
           "todos": 0,
-          "target_seconds": 8.410923084004025,
-          "actor_tokens": 4054,
-          "critic_tokens": 4333,
-          "cost_usd": "0.026093"
+          "target_seconds": 9.34429345800163,
+          "actor_tokens": 4086,
+          "critic_tokens": 4368,
+          "cost_usd": "0.027068"
         },
         "iframe-page": {
           "graph_status": "passed",
@@ -363,10 +359,10 @@
           "attempts": 1,
           "all_static": true,
           "todos": 0,
-          "target_seconds": 16.02354308399663,
-          "actor_tokens": 4123,
-          "critic_tokens": 4578,
-          "cost_usd": "0.038423"
+          "target_seconds": 16.367104082994047,
+          "actor_tokens": 4141,
+          "critic_tokens": 4706,
+          "cost_usd": "0.041673"
         },
         "iframe-test": {
           "graph_status": "passed",
@@ -375,24 +371,22 @@
           "attempts": 1,
           "all_static": true,
           "todos": 0,
-          "target_seconds": 11.824249458004488,
-          "actor_tokens": 4120,
-          "critic_tokens": 4484,
-          "cost_usd": "0.030058"
+          "target_seconds": 9.104141624993645,
+          "actor_tokens": 4115,
+          "critic_tokens": 4401,
+          "cost_usd": "0.027958"
         },
         "login-page": {
-          "graph_status": "needs-review",
-          "draft": false,
-          "errors": [
-            "model reply did not match ConversionResult: 1 validation error for ConversionResult\nnotes\n  Input should be a valid list [type=list_type, input_value='Rule 20: "
-          ],
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
           "attempts": 1,
-          "all_static": false,
-          "todos": null,
-          "target_seconds": 8.770818792007049,
-          "actor_tokens": 4109,
-          "critic_tokens": null,
-          "cost_usd": null
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 16.746682458004216,
+          "actor_tokens": 4031,
+          "critic_tokens": 4554,
+          "cost_usd": "0.037043"
         },
         "login-test": {
           "graph_status": "passed",
@@ -401,10 +395,10 @@
           "attempts": 1,
           "all_static": true,
           "todos": 0,
-          "target_seconds": 9.787429584001075,
-          "actor_tokens": 4350,
-          "critic_tokens": 4654,
-          "cost_usd": "0.031218"
+          "target_seconds": 9.16146562499489,
+          "actor_tokens": 4353,
+          "critic_tokens": 4657,
+          "cost_usd": "0.031268"
         },
         "upload-page": {
           "graph_status": "passed",
@@ -413,10 +407,10 @@
           "attempts": 1,
           "all_static": true,
           "todos": 0,
-          "target_seconds": 11.661875167003018,
-          "actor_tokens": 4002,
-          "critic_tokens": 4301,
-          "cost_usd": "0.031673"
+          "target_seconds": 16.689411958002893,
+          "actor_tokens": 4106,
+          "critic_tokens": 4214,
+          "cost_usd": "0.039058"
         },
         "upload-test": {
           "graph_status": "passed",
@@ -425,35 +419,33 @@
           "attempts": 1,
           "all_static": true,
           "todos": 0,
-          "target_seconds": 11.037451167001564,
-          "actor_tokens": 4570,
-          "critic_tokens": 4883,
-          "cost_usd": "0.036563"
+          "target_seconds": 11.135861041999306,
+          "actor_tokens": 4626,
+          "critic_tokens": 4942,
+          "cost_usd": "0.038138"
         },
         "windows-page": {
-          "graph_status": "needs-review",
+          "graph_status": "passed",
           "draft": true,
           "errors": [],
-          "attempts": 2,
+          "attempts": 1,
           "all_static": true,
-          "todos": 1,
-          "target_seconds": 39.62433391700324,
-          "actor_tokens": 10374,
-          "critic_tokens": 10238,
-          "cost_usd": "0.110696"
+          "todos": 0,
+          "target_seconds": 24.923647374998836,
+          "actor_tokens": 4328,
+          "critic_tokens": 5286,
+          "cost_usd": "0.055308"
         },
         "windows-test": {
-          "graph_status": "needs-review",
-          "draft": false,
-          "errors": [
-            "model reply did not match ConversionResult: 1 validation error for ConversionResult\nnotes\n  Input should be a valid list [type=list_type, input_value=\"\\n<item>R"
-          ],
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
           "attempts": 1,
-          "all_static": false,
-          "todos": null,
-          "target_seconds": 7.306643542004167,
-          "actor_tokens": 4337,
-          "critic_tokens": null,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 9.958762499998556,
+          "actor_tokens": 4268,
+          "critic_tokens": 4559,
           "cost_usd": null
         }
       }
@@ -461,37 +453,36 @@
   },
   "delta": {
     "passes": {
-      "compiles": -2,
-      "residue_free": -2,
-      "typed_lint_pass": -2,
-      "parity_pass": -2,
-      "all_static_passed": -2,
-      "graph_report_passed": -1
+      "compiles": 0,
+      "residue_free": 0,
+      "typed_lint_pass": 0,
+      "parity_pass": 0,
+      "all_static_passed": 0,
+      "graph_report_passed": 5
     },
     "percent_points": {
-      "compiles": -16.67,
-      "residue_free": -16.67,
-      "typed_lint_pass": -16.67,
-      "parity_pass": -16.67,
-      "all_static_passed": -16.67,
-      "graph_report_passed": -8.33
+      "compiles": 0.0,
+      "residue_free": 0.0,
+      "typed_lint_pass": 0.0,
+      "parity_pass": 0.0,
+      "all_static_passed": 0.0,
+      "graph_report_passed": 41.67
     },
     "target_seconds": {
-      "total": "0.867274669042674",
-      "ratio": "1.005"
+      "total": "27.416656913002947",
+      "ratio": "1.149"
     },
     "actor_total_tokens": {
-      "total": "11020",
-      "ratio": "1.215"
+      "total": "12279",
+      "ratio": "1.241"
     },
     "critic_total_tokens": {
-      "total": null,
-      "known_subtotal": "-1327",
-      "note": "one or both arms have missing rows; only the known subtotal is shown"
+      "total": "8964",
+      "ratio": "1.155"
     },
     "langsmith_root_cost_usd": {
       "total": null,
-      "known_subtotal": "-0.045617",
+      "known_subtotal": "0.025991",
       "note": "one or both arms have missing rows; only the known subtotal is shown"
     },
     "actor_calls": {
@@ -508,27 +499,25 @@
         "attempts": 1,
         "all_static": true,
         "todos": 0,
-        "target_seconds": 21.73914845899708,
-        "actor_tokens": 4468,
-        "critic_tokens": 5329,
-        "cost_usd": "0.08579"
+        "target_seconds": 23.335497207997832,
+        "actor_tokens": 4425,
+        "critic_tokens": 5504,
+        "cost_usd": "0.08989"
       },
       "reflective": {
         "graph_status": "needs-review",
-        "draft": false,
-        "errors": [
-          "model reply did not match ConversionResult: 1 validation error for ConversionResult\nnotes\n  Input should be a valid list [type=list_type, input_value='Dialog ha"
-        ],
-        "attempts": 1,
-        "all_static": false,
-        "todos": null,
-        "target_seconds": 10.766761416001827,
-        "actor_tokens": 4512,
-        "critic_tokens": null,
-        "cost_usd": null
+        "draft": true,
+        "errors": [],
+        "attempts": 2,
+        "all_static": true,
+        "todos": 2,
+        "target_seconds": 44.28030175000458,
+        "actor_tokens": 11235,
+        "critic_tokens": 10995,
+        "cost_usd": "0.126026"
       },
-      "change": "no draft in B",
-      "repairs_used": 0
+      "change": "same",
+      "repairs_used": 1
     },
     {
       "case_id": "alerts-test",
@@ -539,10 +528,10 @@
         "attempts": 1,
         "all_static": true,
         "todos": 0,
-        "target_seconds": 10.630020208001952,
-        "actor_tokens": 4846,
-        "critic_tokens": 5141,
-        "cost_usd": "0.037593"
+        "target_seconds": 10.226527124999848,
+        "actor_tokens": 4814,
+        "critic_tokens": 5110,
+        "cost_usd": "0.036558"
       },
       "reflective": {
         "graph_status": "passed",
@@ -551,10 +540,10 @@
         "attempts": 1,
         "all_static": true,
         "todos": 0,
-        "target_seconds": 9.641703125002095,
-        "actor_tokens": 4795,
-        "critic_tokens": 5090,
-        "cost_usd": "0.036063"
+        "target_seconds": 10.14405016600358,
+        "actor_tokens": 4799,
+        "critic_tokens": 5095,
+        "cost_usd": "0.036108"
       },
       "change": "same",
       "repairs_used": 0
@@ -568,10 +557,10 @@
         "attempts": 1,
         "all_static": true,
         "todos": 0,
-        "target_seconds": 18.287680082998122,
-        "actor_tokens": 3839,
-        "critic_tokens": 4684,
-        "cost_usd": "0.041813"
+        "target_seconds": 16.651135166997847,
+        "actor_tokens": 3754,
+        "critic_tokens": 4521,
+        "cost_usd": "0.037433"
       },
       "reflective": {
         "graph_status": "passed",
@@ -580,10 +569,10 @@
         "attempts": 2,
         "all_static": true,
         "todos": 0,
-        "target_seconds": 28.49104691699904,
-        "actor_tokens": 9001,
-        "critic_tokens": 8904,
-        "cost_usd": "0.078501"
+        "target_seconds": 33.24051591599709,
+        "actor_tokens": 9051,
+        "critic_tokens": 9018,
+        "cost_usd": "0.081701"
       },
       "change": "improved",
       "repairs_used": 1
@@ -597,10 +586,10 @@
         "attempts": 1,
         "all_static": true,
         "todos": 0,
-        "target_seconds": 10.405766332994972,
-        "actor_tokens": 4121,
-        "critic_tokens": 4402,
-        "cost_usd": "0.028153"
+        "target_seconds": 8.825392749997263,
+        "actor_tokens": 4034,
+        "critic_tokens": 4306,
+        "cost_usd": "0.025498"
       },
       "reflective": {
         "graph_status": "passed",
@@ -609,10 +598,10 @@
         "attempts": 1,
         "all_static": true,
         "todos": 0,
-        "target_seconds": 8.410923084004025,
-        "actor_tokens": 4054,
-        "critic_tokens": 4333,
-        "cost_usd": "0.026093"
+        "target_seconds": 9.34429345800163,
+        "actor_tokens": 4086,
+        "critic_tokens": 4368,
+        "cost_usd": "0.027068"
       },
       "change": "same",
       "repairs_used": 0
@@ -620,16 +609,16 @@
     {
       "case_id": "iframe-page",
       "one_attempt": {
-        "graph_status": "passed",
+        "graph_status": "needs-review",
         "draft": true,
         "errors": [],
         "attempts": 1,
         "all_static": true,
         "todos": 0,
-        "target_seconds": 17.94265233400074,
-        "actor_tokens": 4161,
-        "critic_tokens": 4786,
-        "cost_usd": "0.043813"
+        "target_seconds": 17.8862572500002,
+        "actor_tokens": 3776,
+        "critic_tokens": 4773,
+        "cost_usd": "0.041203"
       },
       "reflective": {
         "graph_status": "passed",
@@ -638,29 +627,27 @@
         "attempts": 1,
         "all_static": true,
         "todos": 0,
-        "target_seconds": 16.02354308399663,
-        "actor_tokens": 4123,
-        "critic_tokens": 4578,
-        "cost_usd": "0.038423"
+        "target_seconds": 16.367104082994047,
+        "actor_tokens": 4141,
+        "critic_tokens": 4706,
+        "cost_usd": "0.041673"
       },
-      "change": "same",
+      "change": "improved without repair (variance)",
       "repairs_used": 0
     },
     {
       "case_id": "iframe-test",
       "one_attempt": {
-        "graph_status": "needs-review",
-        "draft": false,
-        "errors": [
-          "model reply did not match ConversionResult: 1 validation error for ConversionResult\nnotes\n  Input should be a valid list [type=list_type, input_value=\"Kept the "
-        ],
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
         "attempts": 1,
-        "all_static": false,
-        "todos": null,
-        "target_seconds": 8.061316416999034,
-        "actor_tokens": 4219,
-        "critic_tokens": null,
-        "cost_usd": null
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 13.235455958994862,
+        "actor_tokens": 4129,
+        "critic_tokens": 4488,
+        "cost_usd": "0.030183"
       },
       "reflective": {
         "graph_status": "passed",
@@ -669,43 +656,41 @@
         "attempts": 1,
         "all_static": true,
         "todos": 0,
-        "target_seconds": 11.824249458004488,
-        "actor_tokens": 4120,
-        "critic_tokens": 4484,
-        "cost_usd": "0.030058"
+        "target_seconds": 9.104141624993645,
+        "actor_tokens": 4115,
+        "critic_tokens": 4401,
+        "cost_usd": "0.027958"
       },
-      "change": "no draft in A",
+      "change": "same",
       "repairs_used": 0
     },
     {
       "case_id": "login-page",
       "one_attempt": {
+        "graph_status": "needs-review",
+        "draft": true,
+        "errors": [],
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 21.3046210829998,
+        "actor_tokens": 4156,
+        "critic_tokens": 4847,
+        "cost_usd": "0.053433"
+      },
+      "reflective": {
         "graph_status": "passed",
         "draft": true,
         "errors": [],
         "attempts": 1,
         "all_static": true,
         "todos": 0,
-        "target_seconds": 19.37387199999648,
-        "actor_tokens": 4001,
-        "critic_tokens": 4788,
-        "cost_usd": "0.042683"
+        "target_seconds": 16.746682458004216,
+        "actor_tokens": 4031,
+        "critic_tokens": 4554,
+        "cost_usd": "0.037043"
       },
-      "reflective": {
-        "graph_status": "needs-review",
-        "draft": false,
-        "errors": [
-          "model reply did not match ConversionResult: 1 validation error for ConversionResult\nnotes\n  Input should be a valid list [type=list_type, input_value='Rule 20: "
-        ],
-        "attempts": 1,
-        "all_static": false,
-        "todos": null,
-        "target_seconds": 8.770818792007049,
-        "actor_tokens": 4109,
-        "critic_tokens": null,
-        "cost_usd": null
-      },
-      "change": "no draft in B",
+      "change": "improved without repair (variance)",
       "repairs_used": 0
     },
     {
@@ -717,10 +702,10 @@
         "attempts": 1,
         "all_static": true,
         "todos": 0,
-        "target_seconds": 10.004358209000202,
-        "actor_tokens": 4371,
-        "critic_tokens": 4678,
-        "cost_usd": "0.031903"
+        "target_seconds": 9.029980375002197,
+        "actor_tokens": 4347,
+        "critic_tokens": 4648,
+        "cost_usd": "0.031073"
       },
       "reflective": {
         "graph_status": "passed",
@@ -729,10 +714,10 @@
         "attempts": 1,
         "all_static": true,
         "todos": 0,
-        "target_seconds": 9.787429584001075,
-        "actor_tokens": 4350,
-        "critic_tokens": 4654,
-        "cost_usd": "0.031218"
+        "target_seconds": 9.16146562499489,
+        "actor_tokens": 4353,
+        "critic_tokens": 4657,
+        "cost_usd": "0.031268"
       },
       "change": "same",
       "repairs_used": 0
@@ -740,16 +725,16 @@
     {
       "case_id": "upload-page",
       "one_attempt": {
-        "graph_status": "passed",
+        "graph_status": "needs-review",
         "draft": true,
         "errors": [],
         "attempts": 1,
         "all_static": true,
         "todos": 0,
-        "target_seconds": 14.037257916999806,
-        "actor_tokens": 4052,
-        "critic_tokens": 4440,
-        "cost_usd": "0.035318"
+        "target_seconds": 16.0916986250013,
+        "actor_tokens": 4040,
+        "critic_tokens": 4661,
+        "cost_usd": "0.040843"
       },
       "reflective": {
         "graph_status": "passed",
@@ -758,12 +743,12 @@
         "attempts": 1,
         "all_static": true,
         "todos": 0,
-        "target_seconds": 11.661875167003018,
-        "actor_tokens": 4002,
-        "critic_tokens": 4301,
-        "cost_usd": "0.031673"
+        "target_seconds": 16.689411958002893,
+        "actor_tokens": 4106,
+        "critic_tokens": 4214,
+        "cost_usd": "0.039058"
       },
-      "change": "same",
+      "change": "improved without repair (variance)",
       "repairs_used": 0
     },
     {
@@ -775,10 +760,10 @@
         "attempts": 1,
         "all_static": true,
         "todos": 0,
-        "target_seconds": 10.426924040999438,
-        "actor_tokens": 4591,
-        "critic_tokens": 4904,
-        "cost_usd": "0.037113"
+        "target_seconds": 11.540021333996265,
+        "actor_tokens": 4595,
+        "critic_tokens": 4969,
+        "cost_usd": "0.038718"
       },
       "reflective": {
         "graph_status": "passed",
@@ -787,10 +772,10 @@
         "attempts": 1,
         "all_static": true,
         "todos": 0,
-        "target_seconds": 11.037451167001564,
-        "actor_tokens": 4570,
-        "critic_tokens": 4883,
-        "cost_usd": "0.036563"
+        "target_seconds": 11.135861041999306,
+        "actor_tokens": 4626,
+        "critic_tokens": 4942,
+        "cost_usd": "0.038138"
       },
       "change": "same",
       "repairs_used": 0
@@ -798,31 +783,31 @@
     {
       "case_id": "windows-page",
       "one_attempt": {
+        "graph_status": "needs-review",
+        "draft": true,
+        "errors": [],
+        "attempts": 1,
+        "all_static": true,
+        "todos": 2,
+        "target_seconds": 24.805094916999224,
+        "actor_tokens": 4454,
+        "critic_tokens": 5370,
+        "cost_usd": "0.058098"
+      },
+      "reflective": {
         "graph_status": "passed",
         "draft": true,
         "errors": [],
         "attempts": 1,
         "all_static": true,
         "todos": 0,
-        "target_seconds": 20.668128124998475,
-        "actor_tokens": 4382,
-        "critic_tokens": 5073,
-        "cost_usd": "0.050133"
+        "target_seconds": 24.923647374998836,
+        "actor_tokens": 4328,
+        "critic_tokens": 5286,
+        "cost_usd": "0.055308"
       },
-      "reflective": {
-        "graph_status": "needs-review",
-        "draft": true,
-        "errors": [],
-        "attempts": 2,
-        "all_static": true,
-        "todos": 1,
-        "target_seconds": 39.62433391700324,
-        "actor_tokens": 10374,
-        "critic_tokens": 10238,
-        "cost_usd": "0.110696"
-      },
-      "change": "regressed",
-      "repairs_used": 1
+      "change": "improved without repair (variance)",
+      "repairs_used": 0
     },
     {
       "case_id": "windows-test",
@@ -833,35 +818,31 @@
         "attempts": 1,
         "all_static": true,
         "todos": 0,
-        "target_seconds": 10.902380457999243,
-        "actor_tokens": 4276,
-        "critic_tokens": 4567,
-        "cost_usd": "0.030593"
+        "target_seconds": 10.747899250003684,
+        "actor_tokens": 4336,
+        "critic_tokens": 4634,
+        "cost_usd": "0.032428"
       },
       "reflective": {
-        "graph_status": "needs-review",
-        "draft": false,
-        "errors": [
-          "model reply did not match ConversionResult: 1 validation error for ConversionResult\nnotes\n  Input should be a valid list [type=list_type, input_value=\"\\n<item>R"
-        ],
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
         "attempts": 1,
-        "all_static": false,
-        "todos": null,
-        "target_seconds": 7.306643542004167,
-        "actor_tokens": 4337,
-        "critic_tokens": null,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 9.958762499998556,
+        "actor_tokens": 4268,
+        "critic_tokens": 4559,
         "cost_usd": null
       },
-      "change": "no draft in B",
+      "change": "same",
       "repairs_used": 0
     }
   ],
   "case_changes": {
-    "no draft in B": 3,
-    "same": 6,
+    "same": 7,
     "improved": 1,
-    "no draft in A": 1,
-    "regressed": 1
+    "improved without repair (variance)": 4
   },
-  "headline": "all-static pass 11/12 -> 9/12 (91.67% -> 75.0%); graph passed 9/12 -> 8/12"
+  "headline": "all-static pass 12/12 -> 12/12 (100.0% -> 100.0%); graph passed 6/12 -> 11/12"
 }

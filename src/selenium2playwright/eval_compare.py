@@ -103,6 +103,7 @@ def compare_reports(single: dict, reflective: dict) -> dict:
     per_case = []
     for case_id in sorted(set(a["rows"]) & set(b["rows"])):
         ra, rb = a["rows"][case_id], b["rows"][case_id]
+        repairs = (rb["attempts"] - 1) if isinstance(rb["attempts"], int) else None
         if ra["all_static"] == rb["all_static"] and ra["graph_status"] == rb["graph_status"]:
             change = "same"
         elif ra["draft"] != rb["draft"]:
@@ -110,11 +111,12 @@ def compare_reports(single: dict, reflective: dict) -> dict:
             # parse failure, not evidence about the repair loop either way.
             change = "no draft in " + ("A" if not ra["draft"] else "B")
         elif (not ra["all_static"] and rb["all_static"]) or (ra["graph_status"] != "passed" and rb["graph_status"] == "passed"):
-            change = "improved"
+            # Only a row that actually used a repair lap can credit reflection.
+            # A better result with zero repairs is run-to-run model variance.
+            change = "improved" if repairs else "improved without repair (variance)"
         else:
-            change = "regressed"
-        per_case.append({"case_id": case_id, "one_attempt": ra, "reflective": rb, "change": change,
-                         "repairs_used": (rb["attempts"] or 1) - 1 if isinstance(rb["attempts"], int) else None})
+            change = "regressed" if repairs else "regressed without repair (variance)"
+        per_case.append({"case_id": case_id, "one_attempt": ra, "reflective": rb, "change": change, "repairs_used": repairs})
     n = a["scheduled"]
     delta = {"passes": {k: b["passes"][k] - a["passes"][k] for k in PASS_KEYS},
              "percent_points": {k: round(100 * (b["passes"][k] - a["passes"][k]) / n, 2) if n else None for k in PASS_KEYS},

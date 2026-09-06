@@ -127,28 +127,53 @@ revision is what makes the result reviewable by someone else.
 
 ## 6. What we measured (2026-09-06, Opus, 12 files)
 
+We ran the A/B twice. The first run found a bug. The second run, after a
+one-line-of-logic fix, gives the answer.
+
+**Run 1 (before the fix).** Reflection looked worse: 11 of 12 files passed all
+four checks with one attempt, only 9 of 12 with reflection. The per-file table
+explained it. Four files across the two arms (one in A, three in B) never
+produced code at all: the model wrote `notes` as a sentence instead of a list,
+the reply failed to parse, and the graph went straight to assembly. Reflection
+cannot fix a file it never sees. That failure was random from run to run.
+
+**The fix.** `ConversionResult` now accepts a string for `notes` and `todos`
+and wraps it into a list. Nothing the model sees changed. After the fix, zero
+of 24 first drafts failed to parse.
+
+**Run 2 (after the fix), the real answer:**
+
 | | A: one attempt | B: reflection |
 | --- | --- | --- |
-| All four checks passed | 11 of 12 | 9 of 12 |
-| Graph report passed | 9 of 12 | 8 of 12 |
+| All four checks passed | 12 of 12 | 12 of 12 |
+| Graph report passed | 6 of 12 | 11 of 12 |
+| Files that used a repair | 0 | 2 |
 | Actor model calls | 12 | 14 |
-| Actor tokens | 51,327 | 62,347 |
-| Wall-clock | 174.5 s | 174.2 s |
+| Actor tokens | 50,860 | 63,139 |
+| Wall-clock | 184 s | 211 s |
 
-At first glance reflection looks worse. The per-file table explains it. Four
-files across the two arms (one in A, three in B) never produced code at all:
-the model wrote `notes` as a sentence instead of a list, the reply failed to
-parse, and the graph went straight to assembly. Reflection cannot fix a file it
-never sees. That failure is random from run to run, and it is the biggest
-quality problem in the pipeline right now.
+Three things to take from that table.
 
-Looking only at files that did produce a draft: every one passed all four
-checks on the first try in both arms. Reflection fired on two files in arm B
-and turned one of them from "needs review" into "passed". The price was two
-extra model calls and about 11,000 extra tokens.
+1. **The four checks are not where reflection helps.** Every first draft
+   passed compile, residue, lint, and parity in both arms. There was nothing
+   to repair at that level.
+2. **Reflection fired on two files and did its job on both.** One page object
+   went from "needs review" to "passed". The other passed every check and the
+   critic after its repair, but still carried two `TODO(review)` notes, so it
+   correctly stayed "needs review" for a human.
+3. **Four of the five extra "passed" files are not reflection.** They passed on
+   their first attempt in arm B. In arm A, the critic had said "revise" on the
+   same kind of draft. Same budget, different verdict: that is run-to-run
+   variance in the critic, and the comparison labels it that way.
 
-So the number that replaces "perfect" is: **9 to 11 files out of 12 pass all
-four static checks per run, and 1 to 3 first drafts out of 12 fail to parse.**
+Also worth knowing: every "needs review" in arm A was a page object. All six
+test files passed in one attempt in both arms. The critic is strict about
+locators in page objects and relaxed about tests.
+
+So the number that replaces "perfect" is: **12 of 12 files pass all four
+static checks; the fully passed report goes from 6 of 12 to 11 of 12 with
+reflection, about 1 of those 5 is the loop itself, and reflection costs about
+a quarter more actor tokens and 15% more time.**
 Full evidence and links: [phase-6.3-report.md](phase-6.3-report.md).
 
 ## 7. What this does not prove
@@ -170,8 +195,10 @@ Full evidence and links: [phase-6.3-report.md](phase-6.3-report.md).
    Is the quality delta still meaningful? Why not?
 4. Arm B used two attempts on two files and one attempt on the other ten.
    How many extra actor calls did reflection cost on this dataset?
-5. Three files in arm B produced no code because the reply did not parse.
-   Which edge in the graph decided that, and why did the repair loop not run?
+5. In run 1, three files in arm B produced no code because the reply did not
+   parse. Which edge in the graph decided that, and why did the loop not run?
+6. In run 2, four page objects "improved" with zero repairs. Why does the
+   comparison refuse to credit reflection for them?
 
 Answers are in the code comments and in [phase-6.3-report.md](phase-6.3-report.md).
 
