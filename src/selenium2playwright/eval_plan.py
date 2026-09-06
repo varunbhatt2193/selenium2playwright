@@ -15,7 +15,7 @@ from selenium2playwright.eval_collection import build_collection
 from selenium2playwright.eval_evaluators import EVALUATOR_VERSION, GATE_KEYS
 from selenium2playwright.eval_upload import expected_examples
 from selenium2playwright.llm import MAX_OUTPUT_TOKENS
-from selenium2playwright.reflection import MAX_ATTEMPTS
+from selenium2playwright.reflection import MAX_ATTEMPTS, resolve_attempt_cap
 
 DEFAULT_EVAL_MODEL = "anthropic:claude-opus-5"  # Learning agreement: Opus for evals.
 FEEDBACK_KEYS = [key for metric in GATE_KEYS.values() for key in (metric, metric + "_status")]
@@ -33,8 +33,12 @@ def write_json(path: Path, value: dict) -> None:
     temporary.replace(path)
 
 
-def configuration(root: Path, model: str) -> dict:
-    """Capture explicit settings and relevant file/tool identities, never credentials."""
+def configuration(root: Path, model: str, max_attempts: int = MAX_ATTEMPTS) -> dict:
+    """Capture explicit settings and relevant file/tool identities, never credentials.
+
+    max_attempts is part of the configuration on purpose: two plans that differ
+    only in the lap budget must have different configuration hashes (step 6.3).
+    """
     paths = set((root / "src").rglob("*.py")) | set((root / "sandbox").glob("*.json"))
     paths |= set((root / "sandbox").glob("*.mjs")) | set((root / "sandbox").glob("*.cjs"))
     paths |= {root / p for p in ("docs/playbook.md", "pyproject.toml", "uv.lock",
@@ -48,7 +52,7 @@ def configuration(root: Path, model: str) -> dict:
         raise ValueError("Installed sandbox package versions differ from the pinned manifest")
     git = lambda *args: subprocess.check_output(["git", *args], cwd=root, text=True).strip()
     return {
-        "model": model, "max_output_tokens": MAX_OUTPUT_TOKENS, "max_attempts": MAX_ATTEMPTS,
+        "model": model, "max_output_tokens": MAX_OUTPUT_TOKENS, "max_attempts": resolve_attempt_cap(max_attempts),
         "critic_effort": "medium" if model.startswith("anthropic:") else None,
         "critic_structured_output": "json_schema",
         "actor_structured_output": "provider_default", "temperature": "not_set",
@@ -62,8 +66,13 @@ def configuration(root: Path, model: str) -> dict:
     }
 
 
-def build_plan(root: Path, model: str = DEFAULT_EVAL_MODEL) -> dict:
-    """Bind the complete local collection to its verified upload receipt and configuration."""
+def build_plan(root: Path, model: str = DEFAULT_EVAL_MODEL, max_attempts: int = MAX_ATTEMPTS,
+               phase: str = "6.2") -> dict:
+    """Bind the complete local collection to its verified upload receipt and configuration.
+
+    phase labels the experiment (name prefix, report title, project metadata);
+    max_attempts is the lap budget every row of this experiment will use.
+    """
     collection = build_collection(root / "samples", root / "docs/evaluation-fixture-evidence.json")
     receipt = json.loads((root / "docs/phase-6.1-receipt.json").read_text())
     if (receipt["status"] != "verified" or receipt["collection_sha256"] != collection["collection_sha256"]
@@ -76,12 +85,12 @@ def build_plan(root: Path, model: str = DEFAULT_EVAL_MODEL) -> dict:
     if (receipt["example_ids"] != {row["metadata"]["case_id"]: identity for identity, row in expected.items()}
             or receipt["examples_verified"] != len(expected)):
         raise ValueError("Receipt example identities/count differ from the planned collection")
-    config = configuration(root, model)
+    config = configuration(root, model, max_attempts)
     return {
         "schema_version": 1, "dataset_id": receipt["dataset_id"], "dataset_url": receipt["dataset_url"],
         "dataset_name": receipt["dataset_name"], "dataset_version": receipt["dataset_version"],
         "examples": expected, "coverage": collection["coverage"],
-        "metadata": {"phase": "6.2", "collection_sha256": collection["collection_sha256"],
+        "metadata": {"phase": phase, "collection_sha256": collection["collection_sha256"],
                      "pinned_dataset_version": receipt["dataset_version"], "models": [model],
                      "configuration": config, "configuration_sha256": digest(config),
                      "expected_examples": len(expected), "expected_feedback_keys": FEEDBACK_KEYS},

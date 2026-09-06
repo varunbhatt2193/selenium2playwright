@@ -32,7 +32,8 @@ from selenium2playwright.classify import Classification, classify
 from selenium2playwright.llm import make_model, prepare_messages
 from selenium2playwright.one_shot import report_ledger, report_usage
 from selenium2playwright.prompts import build_critic_prompt, build_prompt, format_context
-from selenium2playwright.reflection import MAX_ATTEMPTS, collect_todos, revision_feedback, sum_usage
+from selenium2playwright.reflection import (MAX_ATTEMPTS, collect_todos, resolve_attempt_cap,
+                                            revision_feedback, sum_usage)
 from selenium2playwright.schemas import ConversionReport, ConversionResult, Critique, Finding, ValidationReport
 from selenium2playwright.validators.compile import compile_check
 from selenium2playwright.validators.lint import lint_check
@@ -51,6 +52,7 @@ class ConversionState(TypedDict, total=False):
     source_path: str
     context_paths: list[str]
     output_path: str  # optional intended output location; anchors companion imports
+    max_attempts: int  # optional lap budget, 1..MAX_ATTEMPTS; intake fills in the default (step 6.3)
     # filled by intake
     source: str  # the Selenium file contents
     context: str  # already-converted companions, formatted for the prompt ("" if none)
@@ -80,6 +82,7 @@ def intake(state: ConversionState) -> ConversionState:
     context = format_context(paths, contents=context_files)
     return {"source": source, "context": context, "context_files": context_files,
             "classification": classify(source, state["source_path"]),
+            "max_attempts": resolve_attempt_cap(state.get("max_attempts")),
             "iteration": 0, "result": None, "validation": [], "critique": None,
             "conversion_error": "", "critique_error": "", "usage": None,
             "critic_usage": None, "report": None}
@@ -231,11 +234,16 @@ def validator_unavailable(state: ConversionState) -> bool:
 
 
 def route_after_critic(state: ConversionState) -> Literal["convert", "assemble"]:
-    """Repeat only for an actionable review while the three-attempt budget remains."""
+    """Repeat only for an actionable review while this run's attempt budget remains.
+
+    The budget is state["max_attempts"] (default MAX_ATTEMPTS = 3). With a budget
+    of 1 the critic still runs and its verdict is still reported, but no repair
+    lap follows: that is the "one attempt" arm of the step 6.3 comparison.
+    """
     critique = state["critique"]
     if (critique is not None and critique.verdict == "revise"
             and not state.get("critique_error") and not validator_unavailable(state)
-            and state["iteration"] < MAX_ATTEMPTS):
+            and state["iteration"] < state.get("max_attempts", MAX_ATTEMPTS)):
         return "convert"
     return "assemble"
 
@@ -254,7 +262,8 @@ def assemble(state: ConversionState) -> ConversionState:
     elif validator_unavailable(state):
         reason = "A validation tool failed; restore it before requesting another conversion."
     elif len(reports) != 4 or not all(r.passed for r in reports) or critique.verdict != "pass":
-        reason = f"Stopped after {state['iteration']} of {MAX_ATTEMPTS} allowed attempts; findings remain."
+        reason = (f"Stopped after {state['iteration']} of {state.get('max_attempts', MAX_ATTEMPTS)} "
+                  "allowed attempts; findings remain.")
     elif result is None:
         reason = "No converted file is available."
     elif result.todos:
@@ -267,7 +276,7 @@ def assemble(state: ConversionState) -> ConversionState:
 
 
 def build_graph():
-    """Up to three convert/validate/critic laps, then assemble. Refuse goes to END."""
+    """Up to max_attempts convert/validate/critic laps, then assemble. Refuse goes to END."""
     builder = StateGraph(ConversionState)
     builder.add_node("intake", intake)
     builder.add_node("convert", convert)
@@ -295,10 +304,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("source", type=Path)
     parser.add_argument("context", nargs="*", type=Path, help="already-converted companion files")
     parser.add_argument("--out", type=Path, help="output file; also anchors relative imports to companions")
+    parser.add_argument("--max-attempts", type=int, default=MAX_ATTEMPTS, choices=range(1, MAX_ATTEMPTS + 1),
+                        help="total conversion attempts: 1 = no repairs; 3 = initial draft plus two repairs")
     args = parser.parse_args(argv)
     if args.out and args.out.resolve() in {p.resolve() for p in [args.source, *args.context]}:
         parser.error("--out must differ from the source and companion files")
-    inputs: ConversionState = {"source_path": str(args.source), "context_paths": [str(p) for p in args.context]}
+    inputs: ConversionState = {"source_path": str(args.source), "context_paths": [str(p) for p in args.context],
+                               "max_attempts": args.max_attempts}
     if args.out:
         inputs["output_path"] = str(args.out)
     graph = build_graph()
@@ -312,7 +324,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"✗ not converted: {final['refusal']}", file=sys.stderr)
         return 2
     report = final["report"]
-    print(f"Conversion: {report.status} ({report.attempts}/{MAX_ATTEMPTS} attempts) — {report.reason}", file=sys.stderr)
+    print(f"Conversion: {report.status} ({report.attempts}/{final['max_attempts']} attempts) — {report.reason}",
+          file=sys.stderr)
     for error in report.errors:
         print(f"  error: {error}", file=sys.stderr)
     if final["usage"]:

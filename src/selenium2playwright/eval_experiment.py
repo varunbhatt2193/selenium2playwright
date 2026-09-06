@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import json
 from datetime import datetime, timezone
+from functools import partial
 from pathlib import Path
 from time import perf_counter
 
@@ -61,18 +62,24 @@ def run_experiment(plan: dict, client, folder: Path, *, upload_results: bool = T
             config = plan["metadata"]["configuration"]
             if upload_results and target is not conversion_target:
                 raise ValueError("Live runs must use conversion_target; injected candidates are offline test helpers")
+            if target is conversion_target:
+                # The plan, not the caller, decides the lap budget, so the recorded
+                # configuration hash and the executed graph can never disagree.
+                target = partial(conversion_target, max_attempts=config["max_attempts"])
             if upload_results and env.model_name() != config["model"]:
                 raise ValueError("S2P_MODEL differs from the model recorded in the plan")
-            if digest(configuration(ROOT, config["model"])) != plan["metadata"]["configuration_sha256"]:
+            if digest(configuration(ROOT, config["model"], config["max_attempts"])) != plan["metadata"]["configuration_sha256"]:
                 raise ValueError("Configuration changed since the plan was prepared")
             examples = verified_examples(client, plan)
             # Local tests inject a fixed target and use SDK local tracing. The
             # production CLI always uses conversion_target with uploads enabled.
             with tracing_context(client=client, enabled=True if upload_results else "local"):
+                phase = plan["metadata"].get("phase", "6.2")
                 results = evaluate(
                     target, data=examples, evaluators=EVALUATORS, client=client,
-                    experiment_prefix="s2p-6.2-" + config["model"].split(":", 1)[-1],
-                    description="Pinned 12-file benchmark; independent static checks; golden POM context for tests.",
+                    experiment_prefix=f"s2p-{phase}-{config['model'].split(':', 1)[-1]}-attempts{config['max_attempts']}",
+                    description=(f"Pinned 12-file benchmark; {config['max_attempts']} total conversion attempt(s); "
+                                 "independent static checks; golden POM context for tests."),
                     metadata=copy.deepcopy(plan["metadata"]), max_concurrency=1, num_repetitions=1,
                     blocking=False, upload_results=upload_results, error_handling="log",
                 )
@@ -92,7 +99,7 @@ def run_experiment(plan: dict, client, folder: Path, *, upload_results: bool = T
                     journal.write(json.dumps(record, ensure_ascii=False) + "\n")
                     journal.flush()  # Completed rows survive a later ordinary failure.
                     print(f"Recorded {len(records)}/{len(examples)}: {item['example'].metadata['case_id']}", flush=True)
-            if digest(configuration(ROOT, config["model"])) != plan["metadata"]["configuration_sha256"]:
+            if digest(configuration(ROOT, config["model"], config["max_attempts"])) != plan["metadata"]["configuration_sha256"]:
                 raise ValueError("Configuration changed during execution; this is not a single-configuration experiment")
         except Exception as exc:
             error = {"type": type(exc).__name__, "message": str(exc) or type(exc).__name__}

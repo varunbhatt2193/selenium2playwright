@@ -125,7 +125,7 @@ def render_markdown(report: dict) -> str:
     """Render a readable scorecard; full code, tool output, and feedback stay in JSON."""
     plan, totals = report["plan"], report["aggregate"]
     config = plan["metadata"]["configuration"]
-    lines = ["# Phase 6.2 experiment report", "",
+    lines = [f"# Phase {plan['metadata'].get('phase', '6.2')} experiment report", "",
              f"Experiment: {report['experiment'].get('url') or 'not uploaded'}", "",
              f"Execution mode: **{report['experiment'].get('mode', 'test_fixture')}**. "
              "Offline SDK checks do not measure model conversion quality.", "",

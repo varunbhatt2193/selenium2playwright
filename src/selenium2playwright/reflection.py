@@ -5,7 +5,23 @@ from __future__ import annotations
 from selenium2playwright.schemas import ConversionResult, Critique, ValidationReport
 
 # Three complete convert/validate/critic laps: one initial draft plus two repairs.
+# This is the hard ceiling. A run may ask for fewer laps (step 6.3 A/B), never more.
 MAX_ATTEMPTS = 3
+
+
+def resolve_attempt_cap(value: object) -> int:
+    """Turn an optional 'max_attempts' input into a checked whole number of laps.
+
+    None means "use the default". Anything else must be an int from 1 to
+    MAX_ATTEMPTS: 1 = one conversion and no repairs; 3 = the full loop.
+    The check is strict on purpose: a bool or a float would silently change
+    how many model calls an evaluation makes.
+    """
+    if value is None:
+        return MAX_ATTEMPTS
+    if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= MAX_ATTEMPTS:
+        raise ValueError(f"max_attempts must be an integer from 1 to {MAX_ATTEMPTS}, got {value!r}")
+    return value
 
 
 def revision_feedback(result: ConversionResult, reports: list[ValidationReport], critique: Critique) -> str:

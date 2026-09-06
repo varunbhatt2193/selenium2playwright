@@ -11,7 +11,7 @@ from tempfile import TemporaryDirectory
 from time import perf_counter
 
 from selenium2playwright.graph import build_graph
-from selenium2playwright.reflection import MAX_ATTEMPTS
+from selenium2playwright.reflection import MAX_ATTEMPTS, resolve_attempt_cap
 
 
 def validate_inputs(inputs: dict) -> None:
@@ -59,18 +59,24 @@ def materialize_inputs(inputs: dict, workspace: Path) -> dict:
     return {"source_path": str(source), "context_paths": companions, "output_path": str(target)}
 
 
-def conversion_target(inputs: dict) -> dict:
-    """Run one isolated conversion and return JSON-compatible evidence for scoring."""
+def conversion_target(inputs: dict, *, max_attempts: int | None = None) -> dict:
+    """Run one isolated conversion and return JSON-compatible evidence for scoring.
+
+    max_attempts is the lap budget handed to the graph (step 6.3 A/B): 1 means a
+    single conversion with no repair; None means the graph default of 3.
+    The recorded output includes the cap so a row can never be misread later.
+    """
     started = perf_counter()
+    cap = resolve_attempt_cap(max_attempts)
     output = {"code": None, "conversion_status": "error", "report": None, "refusal": "",
-              "usage": None, "critic_usage": None, "adapter_error": None}
+              "usage": None, "critic_usage": None, "adapter_error": None, "max_attempts": cap}
     try:
         # Every call owns its directory; no shared cwd change and no reads from
         # samples/ or playwright-golden/. Cleanup runs even when invoke raises.
         with TemporaryDirectory(prefix="s2p-eval-") as folder:
-            graph_inputs = materialize_inputs(inputs, Path(folder))
+            graph_inputs = materialize_inputs(inputs, Path(folder)) | {"max_attempts": cap}
             final = build_graph().invoke(graph_inputs, config={
-                "run_name": "evaluation-conversion", "tags": ["step:6.2", "target:v1"],
+                "run_name": "evaluation-conversion", "tags": ["step:6.3", "target:v2", f"attempts:{cap}"],
                 "recursion_limit": 3 * MAX_ATTEMPTS + 5,
             })
             # Assembly is authoritative: it includes the final TODO ledger and
