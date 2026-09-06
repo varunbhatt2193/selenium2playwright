@@ -31,7 +31,7 @@ class DatasetCase:
     path: str
     expected_behaviors: tuple[str, ...]  # Acceptance criteria, not exact code matches.
     companions: tuple[str, ...] = ()
-    # Compiling a reference does not make it human-reviewed. Record that separately.
+    # Compilation is not review. The note must identify the actual reviewer/provenance.
     reference_review: Literal["pending", "reviewed"] = "pending"
     review_note: str = ""  # Evidence/location of the review; never inferred by this module.
 

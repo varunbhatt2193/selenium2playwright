@@ -4,7 +4,7 @@
 
 > **Status: building in public.** Phase 5 of 12 implemented — **bounded reflection is working**. The graph converts, validates, and reviews code, then repairs it using the actual findings, for at most three conversion attempts. Assembly always reports the outcome and retains the latest available draft. A live seeded demo repaired a missing `await` on attempt 2: all four gates and the critic passed, while two locator TODOs correctly kept the final status at `needs-review`. See the [reflection walkthrough and demo](docs/reflection-loop.md).
 > Architecture & decisions: [plan.md](plan.md)
-> In progress: **Phase 6.1 — evaluation dataset**. The snapshot builder and coverage manifest are implemented; login and alerts fixtures are reviewed. Four scenarios and LangSmith upload remain. See the [coverage matrix](docs/evaluation-coverage.md), [alerts browser evidence](docs/alerts-tests.md), and [session restart notes](docs/session-handoff.md).
+> Complete: **Phase 6.1 — evaluation dataset**. Twelve conversion examples across six scenarios are uploaded and verified in LangSmith; all eight Selenium and eight Playwright fixture tests pass. See the [completion report](docs/phase-6.1-report.md), [fixture walkthrough](docs/evaluation-fixtures.md), [upload theory and code](docs/evaluation-upload.md), and [session restart notes](docs/session-handoff.md). Next: 6.2, the first scored converter experiment.
 >
 > 🗺️ **[Interactive architecture diagram](https://claude.ai/code/artifact/877b27e1-3cc2-4f84-802f-091419bf27c1)** — the whole system on one page: the pipeline, the reflection loop, memory, evals, and the v2 AgentCore path. *(Source: [docs/architecture.html](docs/architecture.html))*
 

@@ -2,146 +2,100 @@
 
 ## Current position
 
-Phase 5.2 is implemented, reviewed, committed, and pushed. The user has now said
-they are ready for Phase 6 and requires detailed theory before code, explanatory
-comments in the repository, and detailed LangSmith reports.
+**Phase 6.1 is complete. Next is 6.2; it has not started.** The user asked to
+finish 6.1, overriding pauses between its remaining increments. The full dataset
+is uploaded and verified, and the user supplied a screenshot confirming the
+correct LangSmith dataset with 12 examples visible. Finish-6.1 authorization
+included completing the remaining fixtures, curation, upload, and verification.
+Existing commit/push authorization persists.
 
-**6.1 is not complete. Login and alerts are approved; iframe POMs are next.**
-The user requested committing/pushing all current work and a 6.1 status check.
-`src/selenium2playwright/eval_dataset.py` contains a 109-line local snapshot
-builder: `DatasetCase` and `snapshot_example`. Read the detailed theory, code
-walkthrough, reporting design, and local probe evidence in
-[evaluation-dataset.md](evaluation-dataset.md). The earlier introductory lesson
-remains in [evaluation-primer.md](evaluation-primer.md).
+Start with [phase-6.1-report.md](phase-6.1-report.md). Detailed lessons:
+[evaluation-fixtures.md](evaluation-fixtures.md) explains remaining source/golden
+POMs and tests; [evaluation-upload.md](evaluation-upload.md) explains preflight,
+repeatable upload, versioned readback, and reporting. Earlier snapshot and coverage
+lessons are [evaluation-dataset.md](evaluation-dataset.md) and
+[evaluation-coverage.md](evaluation-coverage.md).
 
-The user approved continuing from `eval_manifest.py` (now 102 lines), which
-defines 12 planned conversion cases across six scenarios, with eight planned
-browser tests. The two login and two alerts references have recorded review;
-eight references remain pending, with all eight file pairs still unwritten.
-Read [evaluation-coverage.md](evaluation-coverage.md)
-for the matrix, walkthrough, local checks, and explicit coverage gaps. The iframe
-case covers frame reads and parent access; editor typing remains uncovered.
+## Dataset and evidence
 
-The Selenium and independent Playwright `pages/AlertsPage.ts` files now exist.
-They expose open/acceptAlert/dismissConfirm; Selenium reads result text, while
-Playwright exposes a result locator and awaits dialog handling plus the click.
-Read [alerts-page-objects.md](alerts-page-objects.md) for the theory and walkthrough.
-The user confirmed this POM step understood. The new `tests/alerts.spec.ts` pair
-is now written (Selenium 46 lines, Playwright 25) and approved for commit/push; read
-[alerts-tests.md](alerts-tests.md). Both Selenium tests and both Playwright tests
-passed headlessly against the demo. Both alerts references are reviewed in the manifest.
+- Dataset: `selenium2playwright-v1-4920b5f319d8`.
+- ID: `33c80b1e-96bd-4b5b-a9c1-ca49d215828f`.
+- Version UTC: `2026-09-06T03:05:09.476354+00:00`.
+- [Open in LangSmith](https://smith.langchain.com/o/32ac11b4-3e72-4765-a59b-5dc1bcd32cbe/datasets/33c80b1e-96bd-4b5b-a9c1-ca49d215828f).
+- 12 file-conversion rows: six POMs + six test files, eight browser tests per framework.
+- Login, alerts, iframe, windows, upload, dynamic loading are complete in both suites.
+- Login and alerts retain user-review provenance. The other eight references record
+  agent review under delegated completion; do not call them human-approved.
+- Source Selenium: 8 passed in 19.426s. Golden Playwright: 8 passed in 18.661s,
+  headless, one worker, retries 0, no skipped/unexpected/flaky tests.
+- Sample typecheck and all four suite-wide golden static gates passed, no findings.
+- Latest full offline suite: **47 tests passed in 34.853s**. This includes 11
+  dataset/upload tests; tests use a fake cloud service, not live credentials.
+- Exact server readback verified all 12 rows at the pinned version. Rerun added zero.
+- Tracked evidence: `docs/evaluation-fixture-evidence.json` (also in row metadata),
+  and `docs/phase-6.1-receipt.json` (dataset/row IDs, version, code provenance).
+- Ignored raw browser reports/traces: `samples/out/6.1/completion/`; local collection,
+  receipts, gate output, offline logs and screenshot: `out/6.1/`.
 
-An isolated copy changed confirmation dismissal to acceptance. All four static
-gates still passed, but the browser assertion failed with expected Cancel versus
-actual Ok. Original goldens were retained. Passing traces and the mutation copy/
-failing trace are in ignored `samples/out/6.1/`; reproduction commands are in
-alerts-tests.md. These are browser fixture checks, not LangSmith experiments.
-Browser execution was explained as the additional check needed for semantic
-errors; no browser execution gate has been integrated into the converter/evaluators.
+The first readback caught LangSmith's automatic `dataset_split: ["base"]` metadata.
+The uploader now explicitly selects and validates that split; other unexpected
+metadata still fails. This was resolved without changing reference code or
+replacing/deleting uploaded examples. Browser tools reported no available browser;
+UI visibility was established from the user's screenshot, not agent UI automation.
 
-The builder captures source/companion/reference text and acceptance criteria,
-records review metadata, and fingerprints captured inputs/outputs. It rejects
-invalid paths and the target's own reference as a companion. It is not yet wired
-to the graph: a later target adapter must materialize snapshots for file intake.
-Sample expansion now includes the complete alerts source/golden pairs. No upload
-script, evaluator module, runner, or cloud experiment exists. Begin the iframe POM pair,
-then the remaining scenarios and upload. Do not advance into 6.2 before 6.1 is complete.
+## Implementation boundaries
 
-## Working agreement
+- `eval_dataset.py`: safe file reads and one-row snapshots; reference answers stay
+  outside inputs; per-row content hashes cover source, companions, golden and criteria.
+- `eval_manifest.py`: 12 reviewed cases and planned browser counts; no import-time IO.
+- `eval_collection.py`: complete-manifest preflight, evidence/hash checks, metadata,
+  stable collection identity, coverage summary; local reads only.
+- `eval_upload.py`: deterministic UUIDs, conflict detection, partial-upload recovery,
+  exact versioned readback; never silently overwrite mismatches or delete rows.
+- `scripts/upload_eval_dataset.py`: preview by default, `--upload` for network write/
+  readback, exports snapshots and receipt; no model/provider credential required.
+- `langsmith>=0.12.1` is now a direct dependency; lockfile retains installed 0.12.1.
 
-- Teach in simple language tied to the user's SDET experience. Explain where code
-  lives and why it exists before advancing.
-- Work one roadmap step at a time. Explain the concept and interface, write less
-  than 150 lines per patch, walk through the code, allow review, then verify the
-  completion check. Multiple explained patches can make up one step.
-- Preserve the user's review point; delivered explanations do not establish that
-  the user has understood or approved the next increment.
-- Phase 6 specifically requires detailed theory before each code increment,
-  explanatory code comments, and detailed, evidence-backed LangSmith reports.
-- Report progress during longer work and follow existing commit/push authorization.
-- Once the evaluation baseline exists, prompt/playbook changes need a green eval.
+The benchmark measures isolated files with supplied golden POMs for test rows.
+The current graph intake reads disk paths; it cannot consume row snapshots directly.
+No target adapter, evaluator runner, scored experiment, or integrated runtime gate
+has been added. Iframe reading/parent access passes; editor typing remains uncovered,
+including the earlier gap-log failure. Other limits are in the completion report.
 
-`roadmap.md` contains the detailed local sequence and is intentionally gitignored,
-as is `plan-review.md`. They remain on this machine across session resets. This
-tracked handoff preserves the restart point for fresh checkouts too. `plan.md`
-is the broader architecture; its milestone order predates the early eval phase.
+## Working agreement and next increment
 
-## Completed implementation and evidence
+Teach theory before code, use explanatory comments/docstrings, and keep individual
+code patches below 150 lines. The user is learning as an SDET and wants detailed
+LangSmith reports. Work one roadmap step at a time. The instruction to finish 6.1
+permitted all its increments; it is not authorization to auto-complete later phases.
+Use short answers when the user requests TLDR. Do not spawn agents unless requested.
 
-- `ee8fa85`: Step 4.5, graph validation and scorecard.
-- `0d5ad94`: Step 5.1, structured critic grounded in source and validation evidence.
-- `a57076f`: Step 5.2, bounded repair loop and final conversion report.
-- `60fd0b5`: first 6.1 increment, reviewed snapshot builder and reporting design.
-- Last full verification: **36 offline tests passed** after adding the alerts test
-  pair (40.115s). Earlier local probes checked snapshot contents, SDK format,
-  fingerprints, path rejection, and self-reference exclusion. These probes are
-  not persisted tests or a live evaluation; details are in evaluation-dataset.md.
-- The manifest increment passed local consistency checks: unique IDs/paths,
-  six scenario pairs, companion relationships, eight planned browser tests, two
-  valid login snapshots, and explicit failure for missing planned files.
-- At the alerts POM checkpoint: sample typecheck passes; golden compile/residue/lint/parity
-  pass; snapshot captures both files with pending review. Parity has no tests or
-  assertions for this POM. `samples/tsconfig.json` now excludes ignored `out/`
-  scratch conversions after an old Markdown-fenced Phase 2.1 file broke typecheck.
-- Alerts test checks: sample typecheck and all golden static gates pass; parity
-  matches two tests with one assertion each; test snapshot includes the POM.
-  Selenium: 2 passing (~4s); Playwright: 2 passed (3.3s, retries disabled).
-  Mutation: expected browser assertion failure, despite four passing static gates.
-  Initial sandbox runs failed during browser startup; approved external runs passed.
-- The introductory lesson's local compiler probe returned 1 for golden LoginPage, 0
-  for a `.fill()` to `.fil()` mutation, and 0 for empty code. No live model call
-  or cloud evaluation was used for the lesson.
+On the next request to proceed, begin **6.2** with the snapshot target-adapter theory:
+materialize source and supplied companions into an isolated workspace, pass only
+inputs to the graph, keep references with evaluators, and preserve explicit failures.
+Then wrap existing compile/residue/typed-lint checks as evaluators and run the first
+scored experiment. Record the pinned dataset version, exact code/prompt/tool/model
+configuration, per-row output and findings, status/attempts/critic, time, usage, and
+available cost. Missing cost is unavailable, not zero. Use all scheduled rows in
+primary denominators, with POM/test-file breakdowns and tool failures visible.
 
-The cap is **three total conversion attempts: initial draft plus two repairs**.
-Every new draft is validated and reviewed afresh. Failed deterministic gates
-cannot be overridden by a critic pass. Tool/critic failures stop rewrites; failed
-repairs retain the previous draft. Final open TODOs mean `needs-review` without
-additional rewrites. Token usage includes all attempts.
+6.3 later compares one attempt against up to three with other settings fixed;
+the graph's hardcoded cap still needs configuration. 6.4 adds a calibrated judge;
+6.5 compares models. Once the eval baseline exists, prompt/playbook changes need
+passing evaluation evidence. Do not invent quality percentages from fixture passes.
 
-The live seeded missing-await demo repaired its first draft on attempt 2. All
-four gates and the critic passed; two locator TODOs correctly kept `needs-review`
-and exit code 1. This demonstrates repair mechanics, not general conversion
-quality. Run ID: `64ce108a-d3e7-46e6-87b2-cc660f2f50cf`. Artifacts and the private
-trace URL are in ignored `out/5.2/`. Replay script: `scripts/demo_reflection.py`.
-The full explanation is in [reflection-loop.md](reflection-loop.md).
+## Existing graph and environment
 
-## Next: Phase 6
+Phase 5.2 remains complete: intake → convert → four gates → critic → bounded repair
+or final report. Three total attempts means initial plus two repairs. Gate failures
+cannot be overridden by critic pass; errors preserve prior draft; final TODOs cause
+needs-review. The live seeded demo repaired a missing await on attempt 2 but retained
+two locator TODOs. See `docs/reflection-loop.md` and ignored `out/5.2/`.
 
-1. **6.1 Dataset:** grow samples to roughly five POMs and eight tests covering
-   login, alerts, iframe, windows, upload, and dynamic loading on the-internet.
-   Preserve source/companion contents and independent reviewed golden outputs.
-   Snapshot builder is approved/pushed; the six-POM/six-test-file manifest is
-   accepted for continuation. Login and alerts source/golden pairs are reviewed.
-   Eight browser tests are planned; remaining sample expansion and upload remain.
-   Prepare the LangSmith upload script. Done when the dataset is visible in the UI.
-2. **6.2 Deterministic evaluators:** reuse compile, residue, and typed lint checks
-   in evaluator functions and run the first scored experiment. Preserve tool
-   errors and missing outputs explicitly; handle companion imports.
-3. **6.3 Reflection comparison:** one attempt versus up to three total attempts,
-   holding other settings and the dataset fixed. Record quality, time, and usage.
-   The current graph has no `max_iterations` input; a configurable cap is still
-   needed to run this comparison cleanly.
-4. **6.4 LLM judge:** explicit idiomatic-quality rubric, calibrated against human
-   reviews/goldens. Judge verdicts and compile scores do not prove runtime behavior.
-5. **6.5 Model comparison:** repeat the curated experiment per configured model.
-   Verify available model IDs when implementing; do not invent benchmark numbers.
-
-## Files and environment
-
-- Runtime: `src/selenium2playwright/graph.py`, `reflection.py`, `schemas.py`,
-  `prompts.py`, `llm.py`, and `validators/`.
-- Existing examples: `samples/selenium-suite/` and `samples/playwright-golden/`,
-  each currently containing LoginPage/login.spec.ts and AlertsPage/alerts.spec.ts.
-- Full offline suite: `.venv/bin/python -m unittest discover -s tests -v`.
-  Repeat after relevant code changes, not just to reconstruct this session.
-- Live demonstration: `.venv/bin/python scripts/demo_reflection.py`; this makes
-  provider calls and writes ignored artifacts. No rerun is needed for the handoff.
-- Model selection uses `S2P_MODEL` through `env.py`/`llm.py`. Local development
-  currently uses `anthropic:claude-sonnet-5`; provider credentials stay in `.env`.
-  The Anthropic workspace header is already handled by `llm.py`.
-- Branch: `main`; remote: `https://github.com/varunbhatt2193/selenium2playwright.git`.
-  `.env`, virtual environments, node modules, sandbox work, and `out/` remain
-  ignored. Do not force-add secrets, generated files, or the private roadmap.
-
-Read this file, the primer, and the local roadmap if present. Then continue the
-user's learning/review or Step 6.1 according to their new instruction.
+Repo: `/Users/varunbhatt/Downloads/Selenium2Playwright`, branch `main`;
+remote `https://github.com/varunbhatt2193/selenium2playwright.git`.
+`.env`, dependencies, generated `out/`, local `roadmap.md` and `plan-review.md`
+remain ignored. Never force-add them. `S2P_MODEL` configures the actor/critic model;
+credentials load through `env.py` and must not be exposed. Use the existing
+`.venv`, sample and sandbox Node toolchains. Sandbox browser/network/git failures
+need approved escalation, not alternative workarounds.

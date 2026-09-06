@@ -21,6 +21,12 @@ PLANNED_BROWSER_TEST_COUNTS = {
 
 # Existing goldens were user-reviewed in Phase 1.3; new references default to pending.
 LOGIN_REVIEW = "User-approved 2026-09-04 in roadmap.md Step 1.3; see docs/evaluation-coverage.md."
+# Delegated completion includes agent curation; do not mislabel it as user review.
+COMPLETION_REVIEW = (
+    "Agent-reviewed 2026-09-05 under user instruction to finish 6.1; independently authored "
+    "golden, source/reference browser checks and static gates passed. "
+    "See docs/evaluation-fixtures.md and docs/evaluation-fixture-evidence.json."
+)
 
 CASES: tuple[DatasetCase, ...] = (
     # Login supplies the existing baseline: one POM and a file containing two tests.
@@ -58,33 +64,39 @@ CASES: tuple[DatasetCase, ...] = (
         case_id="iframe-page", scenario="iframe", kind="page-object", path="pages/IframePage.ts",
         expected_behaviors=("Open /iframe and access the editor body inside its iframe.",
                             "Allow subsequent access to the heading on the parent page."),
+        reference_review="reviewed", review_note=COMPLETION_REVIEW,
     ),
     DatasetCase(
         case_id="iframe-test", scenario="iframe", kind="test", path="tests/iframe.spec.ts",
         expected_behaviors=("Read 'Your content goes here.' inside the iframe, then verify the parent heading.",),
         companions=("pages/IframePage.ts",),
+        reference_review="reviewed", review_note=COMPLETION_REVIEW,
     ),
     # A popup must remain a separate page; checking the original page's heading is wrong.
     DatasetCase(
         case_id="windows-page", scenario="windows", kind="page-object", path="pages/WindowsPage.ts",
         expected_behaviors=("Open /windows and follow its link into a new browser window.",
                             "Provide access to the new window and preserve access to the original."),
+        reference_review="reviewed", review_note=COMPLETION_REVIEW,
     ),
     DatasetCase(
         case_id="windows-test", scenario="windows", kind="test", path="tests/windows.spec.ts",
         expected_behaviors=("Verify the new window's heading, close it, then verify the original page is usable.",),
         companions=("pages/WindowsPage.ts",),
+        reference_review="reviewed", review_note=COMPLETION_REVIEW,
     ),
     # Generate the upload fixture within the test so the future snapshot is self-contained.
     DatasetCase(
         case_id="upload-page", scenario="upload", kind="page-object", path="pages/UploadPage.ts",
         expected_behaviors=("Open /upload, select the caller's file, and submit the upload.",
                             "Expose the upload confirmation and uploaded filename."),
+        reference_review="reviewed", review_note=COMPLETION_REVIEW,
     ),
     DatasetCase(
         case_id="upload-test", scenario="upload", kind="test", path="tests/upload.spec.ts",
         expected_behaviors=("Upload a test-created file and verify confirmation plus its exact filename; clean up the fixture.",),
         companions=("pages/UploadPage.ts",),
+        reference_review="reviewed", review_note=COMPLETION_REVIEW,
     ),
     # Example 2 inserts an element later: immediate reads can miss it even when code compiles.
     DatasetCase(
@@ -92,11 +104,13 @@ CASES: tuple[DatasetCase, ...] = (
         path="pages/DynamicLoadingPage.ts",
         expected_behaviors=("Open /dynamic_loading/2 and start loading the delayed element.",
                             "Expose the completed content so the caller can wait for and check it."),
+        reference_review="reviewed", review_note=COMPLETION_REVIEW,
     ),
     DatasetCase(
         case_id="dynamic-loading-test", scenario="dynamic-loading", kind="test",
         path="tests/dynamic-loading.spec.ts",
         expected_behaviors=("Start loading, wait for the delayed content, and verify its completion text.",),
         companions=("pages/DynamicLoadingPage.ts",),
+        reference_review="reviewed", review_note=COMPLETION_REVIEW,
     ),
 )

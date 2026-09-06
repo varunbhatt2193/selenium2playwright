@@ -44,7 +44,11 @@ class ParityTests(unittest.TestCase):
         self.assertIn("rejects invalid credentials", finding.message)
         self.assertIn('expect(flash).to.contain("Your password is invalid!")', finding.message)
         self.assertEqual(finding.file, "tests/login.spec.ts")
-        self.assertEqual(finding.line, 33)  # points into the original Selenium file
+        # Match the actual source location even when browser setup gains comments.
+        source_lines = self.source["tests/login.spec.ts"].splitlines()
+        expected_line = next(i for i, line in enumerate(source_lines, 1)
+                             if 'expect(flash).to.contain("Your password is invalid!")' in line)
+        self.assertEqual(finding.line, expected_line)
 
     def test_renamed_test_does_not_hide_behind_equal_totals(self):
         report = compare('it("original", () => { expect(x).to.equal(1); });',

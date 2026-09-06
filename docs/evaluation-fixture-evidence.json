@@ -1,0 +1,336 @@
+{
+  "schema_version": 1,
+  "scope": "Maintained source and independent golden fixtures; not converter outputs or a scored experiment.",
+  "measured_at_utc": "2026-09-06T01:51:30.496Z",
+  "tools": {
+    "@playwright/test": "1.63.0",
+    "selenium-webdriver": "4.48.0",
+    "typescript": "5.9.3",
+    "mocha": "12.0.0",
+    "node": "v26.0.0"
+  },
+  "browser_settings": {
+    "source": "headless Chrome",
+    "reference": "headless Chromium",
+    "playwright_workers": 1,
+    "playwright_retries": 0
+  },
+  "browser_totals": {
+    "source": {
+      "suites": 6,
+      "tests": 8,
+      "passes": 8,
+      "pending": 0,
+      "failures": 0,
+      "start": "2026-09-06T01:51:11.070Z",
+      "end": "2026-09-06T01:51:30.496Z",
+      "duration": 19426
+    },
+    "reference": {
+      "startTime": "2026-09-06T01:51:08.607Z",
+      "duration": 18660.829999999998,
+      "expected": 8,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    }
+  },
+  "static_gates": {
+    "compile": {
+      "passed": true,
+      "findings": [],
+      "scope": "all 12 golden files together"
+    },
+    "residue": {
+      "passed": true,
+      "findings": [],
+      "scope": "all 12 golden files together"
+    },
+    "lint": {
+      "passed": true,
+      "findings": [],
+      "scope": "all 12 golden files together"
+    },
+    "parity": {
+      "passed": true,
+      "findings": [],
+      "scope": "all 12 golden files together"
+    }
+  },
+  "artifacts": {
+    "source": "samples/out/6.1/completion/selenium.json",
+    "reference": "samples/out/6.1/completion/playwright.json",
+    "traces": "samples/out/6.1/completion/playwright/",
+    "static": "out/6.1/completion/static-gates.json"
+  },
+  "cases": {
+    "login-page": {
+      "source_sha256": "feb36a38ffbba7ed41d51f520e3ab26397bbc3d423e161a5c9a6377eea718e17",
+      "reference_sha256": "e735f04f5aed8254e2cd71017dff970063a4be1d996df01d3fbbd95660c3c8f7",
+      "browser_test_case_id": "login-test",
+      "source_browser": [
+        {
+          "name": "logs in with valid credentials",
+          "status": "passed",
+          "duration_ms": 384
+        },
+        {
+          "name": "rejects invalid credentials",
+          "status": "passed",
+          "duration_ms": 534
+        }
+      ],
+      "reference_browser": [
+        {
+          "name": "logs in with valid credentials",
+          "status": "passed",
+          "duration_ms": 1770
+        },
+        {
+          "name": "rejects invalid credentials",
+          "status": "passed",
+          "duration_ms": 1613
+        }
+      ]
+    },
+    "login-test": {
+      "source_sha256": "46a1b6f1f6d35a31cf7aed93f178bf7b6688b2ebee887c3a1e3d038db00e7f78",
+      "reference_sha256": "c29a08f96b02aace9ea7fc2283a58f598c12a602c434e62e8565ae2c15e09a01",
+      "browser_test_case_id": "login-test",
+      "source_browser": [
+        {
+          "name": "logs in with valid credentials",
+          "status": "passed",
+          "duration_ms": 384
+        },
+        {
+          "name": "rejects invalid credentials",
+          "status": "passed",
+          "duration_ms": 534
+        }
+      ],
+      "reference_browser": [
+        {
+          "name": "logs in with valid credentials",
+          "status": "passed",
+          "duration_ms": 1770
+        },
+        {
+          "name": "rejects invalid credentials",
+          "status": "passed",
+          "duration_ms": 1613
+        }
+      ]
+    },
+    "alerts-page": {
+      "source_sha256": "0a729afecab3f9576ac6e6b78b655ca35a599abc3bcbf55428961a4f9faa2468",
+      "reference_sha256": "60a244f18e839c666a4afeb8e8a4561bc560710a0d6e6915613a87bede2c614a",
+      "browser_test_case_id": "alerts-test",
+      "source_browser": [
+        {
+          "name": "accepts a JavaScript alert",
+          "status": "passed",
+          "duration_ms": 43
+        },
+        {
+          "name": "dismisses a JavaScript confirmation",
+          "status": "passed",
+          "duration_ms": 30
+        }
+      ],
+      "reference_browser": [
+        {
+          "name": "accepts a JavaScript alert",
+          "status": "passed",
+          "duration_ms": 1390
+        },
+        {
+          "name": "dismisses a JavaScript confirmation",
+          "status": "passed",
+          "duration_ms": 1239
+        }
+      ]
+    },
+    "alerts-test": {
+      "source_sha256": "ecb1d567d12c3df03f797da59984040ee1a96e897dd7f5a1efff576537fa331b",
+      "reference_sha256": "2cc1c14d0dbf75ebc6524027a3c74e8b7c3c6cbaacae0e5f8bb1d3df25bd5f80",
+      "browser_test_case_id": "alerts-test",
+      "source_browser": [
+        {
+          "name": "accepts a JavaScript alert",
+          "status": "passed",
+          "duration_ms": 43
+        },
+        {
+          "name": "dismisses a JavaScript confirmation",
+          "status": "passed",
+          "duration_ms": 30
+        }
+      ],
+      "reference_browser": [
+        {
+          "name": "accepts a JavaScript alert",
+          "status": "passed",
+          "duration_ms": 1390
+        },
+        {
+          "name": "dismisses a JavaScript confirmation",
+          "status": "passed",
+          "duration_ms": 1239
+        }
+      ]
+    },
+    "iframe-page": {
+      "source_sha256": "ef0eab91f4a1c51291104e131eeda5a3c04913b1b2b95d82f1bc0224d9cdbcb6",
+      "reference_sha256": "d7399775a28786dde58b881713e59aa78b92663a455a6064de43c47e5eb7ac05",
+      "browser_test_case_id": "iframe-test",
+      "source_browser": [
+        {
+          "name": "reads the editor and returns to the parent page",
+          "status": "passed",
+          "duration_ms": 1580
+        }
+      ],
+      "reference_browser": [
+        {
+          "name": "reads the editor and returns to the parent page",
+          "status": "passed",
+          "duration_ms": 2439
+        }
+      ]
+    },
+    "iframe-test": {
+      "source_sha256": "20e90d9a47090047e0a94c514004bd75adfe4dcdf9783d06e3e66642e0db20d7",
+      "reference_sha256": "0ca77f71cb1feb6a5773aadfef70e960be09ac6abf85b1d57219948078e9e07c",
+      "browser_test_case_id": "iframe-test",
+      "source_browser": [
+        {
+          "name": "reads the editor and returns to the parent page",
+          "status": "passed",
+          "duration_ms": 1580
+        }
+      ],
+      "reference_browser": [
+        {
+          "name": "reads the editor and returns to the parent page",
+          "status": "passed",
+          "duration_ms": 2439
+        }
+      ]
+    },
+    "windows-page": {
+      "source_sha256": "f2e1fa5cb7b24cbb25b8f1d47e79557590b5d2a2165a0ebf1f3057e4d9f72a48",
+      "reference_sha256": "4692a410f0008bcd2e3b2a8e7134ac61e63c190d29126029f54979afadf48b1f",
+      "browser_test_case_id": "windows-test",
+      "source_browser": [
+        {
+          "name": "checks the new window then returns to the original",
+          "status": "passed",
+          "duration_ms": 2560
+        }
+      ],
+      "reference_browser": [
+        {
+          "name": "checks the new window then returns to the original",
+          "status": "passed",
+          "duration_ms": 1482
+        }
+      ]
+    },
+    "windows-test": {
+      "source_sha256": "71e917ef3d769818bcf114ccec9b36f5a85d0acf9b6e74b654288a8ec8c03976",
+      "reference_sha256": "300da347bbbf302c793288c0e49ef21c31c77aa5d51ca1fdc26d2a3471eb8f5a",
+      "browser_test_case_id": "windows-test",
+      "source_browser": [
+        {
+          "name": "checks the new window then returns to the original",
+          "status": "passed",
+          "duration_ms": 2560
+        }
+      ],
+      "reference_browser": [
+        {
+          "name": "checks the new window then returns to the original",
+          "status": "passed",
+          "duration_ms": 1482
+        }
+      ]
+    },
+    "upload-page": {
+      "source_sha256": "d6f4df357a276049d61a7df72a67609ea6e58c9764b262e81677e664148ff6a5",
+      "reference_sha256": "6c189b16ba37fdcdbc47d8a4d0627aae34812e4d53d4ccb45ad909f9b1d91b72",
+      "browser_test_case_id": "upload-test",
+      "source_browser": [
+        {
+          "name": "uploads a created file and verifies its name",
+          "status": "passed",
+          "duration_ms": 1481
+        }
+      ],
+      "reference_browser": [
+        {
+          "name": "uploads a created file and verifies its name",
+          "status": "passed",
+          "duration_ms": 1328
+        }
+      ]
+    },
+    "upload-test": {
+      "source_sha256": "c9dd2af809ecefff4a4d0e6b7fc69c23ede0a1d685641c54e0e39a636c9b0d3c",
+      "reference_sha256": "793037f5e4310f98c424d7072563a58c62747d6403e2c2e13ecbed0a27e5c5c3",
+      "browser_test_case_id": "upload-test",
+      "source_browser": [
+        {
+          "name": "uploads a created file and verifies its name",
+          "status": "passed",
+          "duration_ms": 1481
+        }
+      ],
+      "reference_browser": [
+        {
+          "name": "uploads a created file and verifies its name",
+          "status": "passed",
+          "duration_ms": 1328
+        }
+      ]
+    },
+    "dynamic-loading-page": {
+      "source_sha256": "c412e74a9c06d01583576c99913c0bac67807a631c9145351888897ea7734cec",
+      "reference_sha256": "c9a46bb21575c842bcb8f077f8c25790986f410190534aa769c4766aa410e253",
+      "browser_test_case_id": "dynamic-loading-test",
+      "source_browser": [
+        {
+          "name": "waits for the dynamically inserted result",
+          "status": "passed",
+          "duration_ms": 6277
+        }
+      ],
+      "reference_browser": [
+        {
+          "name": "waits for the dynamically inserted result",
+          "status": "passed",
+          "duration_ms": 6454
+        }
+      ]
+    },
+    "dynamic-loading-test": {
+      "source_sha256": "a7bf9ac5c79daa0f4c9a97f51ee72b2aec667afd7799e3e63b91e664ca2c8224",
+      "reference_sha256": "2d2eacaf6bc667959976b3008747281d5dcf2fb0c76de43f1ff0feda8cb197f8",
+      "browser_test_case_id": "dynamic-loading-test",
+      "source_browser": [
+        {
+          "name": "waits for the dynamically inserted result",
+          "status": "passed",
+          "duration_ms": 6277
+        }
+      ],
+      "reference_browser": [
+        {
+          "name": "waits for the dynamically inserted result",
+          "status": "passed",
+          "duration_ms": 6454
+        }
+      ]
+    }
+  }
+}

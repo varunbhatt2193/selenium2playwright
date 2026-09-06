@@ -1,4 +1,5 @@
 import { Builder, WebDriver } from "selenium-webdriver";
+import { Options } from "selenium-webdriver/chrome";
 import { expect } from "chai";
 import { LoginPage } from "../pages/LoginPage";
 
@@ -9,12 +10,15 @@ describe("Login", function () {
   let loginPage: LoginPage;
 
   before(async () => {
-    driver = await new Builder().forBrowser("chrome").build();
+    // Keep the complete evaluation fixture suite runnable without a visible browser.
+    const options = new Options();
+    options.addArguments("--headless=new");
+    driver = await new Builder().forBrowser("chrome").setChromeOptions(options).build();
     loginPage = new LoginPage(driver);
   });
 
   after(async () => {
-    await driver.quit();
+    if (driver) await driver.quit();
   });
 
   beforeEach(async () => {

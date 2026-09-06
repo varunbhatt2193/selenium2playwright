@@ -198,7 +198,7 @@ reviews. A judge's opinion cannot establish correct browser execution. Golden
 code should guide expected behavior, not force exact string equality: equivalent
 implementations can use different names or structure.
 
-## The next implementation step
+## Implementation sequence and current position
 
 Step 6.1 is dataset curation: roughly five POMs and eight tests spanning login,
 alerts, iframe, windows, upload, and dynamic loading. First define the behavior
@@ -207,6 +207,9 @@ goldens, then prepare the upload script. Completion means the dataset is visible
 in LangSmith. Step 6.2 adds evaluator functions and the first scored experiment;
 6.3 compares reflection, 6.4 adds a calibrated judge, and 6.5 compares models.
 
-The user has now confirmed readiness for Phase 6, with detailed theory before
-code and explanatory comments required. Follow the current review point in
-[the restart notes](session-handoff.md); do not automatically advance through steps.
+Step 6.1 is now complete: 12 curated examples are uploaded and verified in
+LangSmith. See the [completion report](phase-6.1-report.md). The examples earlier
+in this primer remain teaching snippets; they are not a scored experiment.
+Detailed theory before code and explanatory comments remain required. Follow
+[the restart notes](session-handoff.md) for Step 6.2; do not automatically advance
+through later phases.

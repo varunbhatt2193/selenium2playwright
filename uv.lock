@@ -798,6 +798,7 @@ source = { editable = "." }
 dependencies = [
     { name = "langchain" },
     { name = "langchain-anthropic" },
+    { name = "langsmith" },
     { name = "python-dotenv" },
 ]
 
@@ -805,6 +806,7 @@ dependencies = [
 requires-dist = [
     { name = "langchain", specifier = ">=1.3.18" },
     { name = "langchain-anthropic", specifier = ">=1.7.0" },
+    { name = "langsmith", specifier = ">=0.12.1" },
     { name = "python-dotenv", specifier = ">=1.2.3" },
 ]
 

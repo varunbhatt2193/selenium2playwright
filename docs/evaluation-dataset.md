@@ -1,11 +1,11 @@
 # Phase 6.1 — dataset theory, first code increment, and reporting design
 
-Status: the user approved committing the local snapshot builder and continuing.
-It is pushed in `60fd0b5`; the coverage manifest is in
-[evaluation-coverage.md](evaluation-coverage.md), and the approved alerts tests and
-browser evidence are in [alerts-tests.md](alerts-tests.md).
-Login and alerts fixtures are complete; four scenarios, the upload script,
-target adapter, and experiments remain. No Phase 6 cloud dataset or scored experiment exists yet.
+Status: Phase 6.1 is complete. This page preserves the snapshot-builder lesson
+first committed in `60fd0b5`. The full collection now contains 12 curated pairs,
+with passing fixture checks and verified LangSmith upload/UI visibility. Read the
+[completion report](phase-6.1-report.md), [fixture walkthrough](evaluation-fixtures.md),
+and [upload walkthrough](evaluation-upload.md). The target adapter and scored
+converter experiments begin in 6.2.
 
 Phase 6 working rule: explain theory before writing each increment, put the
 reasoning in code comments and docstrings, and walk through the implementation.
@@ -97,7 +97,8 @@ It deliberately has no model client, LangSmith client, or graph dependency.
 The returned dictionary is mutable, while its strings no longer depend on disk.
 The caller must avoid altering an example after selecting it for an experiment.
 Dataset-level duplicate IDs, review readiness, and repeatable upload behavior
-belong in later curation/upload increments; they are not implemented here.
+are implemented separately in `eval_collection.py` and `eval_upload.py`; they
+remain outside this single-example snapshot builder.
 
 ## The detailed LangSmith report we will build
 
@@ -155,6 +156,5 @@ The existing offline suite also passed: 36 tests using
 
 The user approved continuing from this contract. The scenario coverage and
 explicit case manifest are in [evaluation-coverage.md](evaluation-coverage.md).
-Next, expand and review the source/golden pairs and build the upload script.
-Step 6.1 finishes when the curated dataset is
-visible and verified in LangSmith; Step 6.2 then runs the first scored experiment.
+Those subsequent increments are now complete. The curated dataset is visible
+and verified in LangSmith; Step 6.2 next runs the first scored converter experiment.

@@ -1,0 +1,49 @@
+{
+  "status": "verified",
+  "dataset_name": "selenium2playwright-v1-4920b5f319d8",
+  "dataset_id": "33c80b1e-96bd-4b5b-a9c1-ca49d215828f",
+  "dataset_url": "https://smith.langchain.com/o/32ac11b4-3e72-4765-a59b-5dc1bcd32cbe/datasets/33c80b1e-96bd-4b5b-a9c1-ca49d215828f",
+  "dataset_version": "2026-09-06T03:05:09.476354+00:00",
+  "collection_sha256": "4920b5f319d827a25a3d8f1a2f026c430e1fb20bdb897c6b9c3599f55b8aeb3d",
+  "dataset_created": false,
+  "examples_created": 0,
+  "examples_verified": 12,
+  "coverage": {
+    "conversion_examples": 12,
+    "scenarios": {
+      "alerts": 2,
+      "dynamic-loading": 2,
+      "iframe": 2,
+      "login": 2,
+      "upload": 2,
+      "windows": 2
+    },
+    "kinds": {
+      "page-object": 6,
+      "test": 6
+    },
+    "browser_tests_per_framework": 8
+  },
+  "example_ids": {
+    "alerts-page": "a6a4c03f-99bd-52bc-9cff-2eafbc1fe527",
+    "alerts-test": "2ecbf607-73fc-50d2-ae1c-21348bd0c9f7",
+    "dynamic-loading-page": "7f7b656f-f6cc-5c80-bf59-91660efb7dcb",
+    "dynamic-loading-test": "e38899e7-eb3f-57b3-adab-0fd93724e0fc",
+    "iframe-page": "fe7c8eea-51b5-5a0b-b3c1-9aad71d8a057",
+    "iframe-test": "26506903-6178-52b5-aa0a-b13227da86e1",
+    "login-page": "1c829c4d-4482-5b29-9750-c5ec7b9cb0e8",
+    "login-test": "0f3ff041-28f0-5a01-9ee8-e628ff3fea45",
+    "upload-page": "7f575ecf-d9a5-55e5-bf0b-d3ecee6bc610",
+    "upload-test": "7c4f907e-af64-587b-b9b5-9b577a095a9a",
+    "windows-page": "cf570540-ed63-537f-ac8c-b098160791ca",
+    "windows-test": "532d1ab2-80c3-58b0-a875-766de6c8d39d"
+  },
+  "verification": "Exact inputs, reference outputs and metadata at the recorded dataset version",
+  "recorded_at_utc": "2026-09-06T03:08:21.129789+00:00",
+  "elapsed_seconds": 1.059,
+  "langsmith_sdk_version": "0.12.1",
+  "git_revision": "86707d05bb5395b813d56f56a47d652baa00cace",
+  "git_dirty": true,
+  "model_calls": 0,
+  "converter_experiment": "not_run; Phase 6.2"
+}

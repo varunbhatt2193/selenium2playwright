@@ -1,10 +1,9 @@
 # Phase 6.1 — coverage matrix and case manifest
 
-Status: snapshot builder approved and pushed in `60fd0b5`; the user approved
-continuing from the manifest and confirmed the alerts POM step understood.
-The user has now approved committing the alerts test pair; its browser evidence and walkthrough
-are in [alerts-tests.md](alerts-tests.md).
-This document describes planned coverage, not browser execution or eval scores.
+Status: Phase 6.1 complete. All 12 source/golden pairs are curated and verified;
+the dataset is uploaded, read back exactly, and visible in LangSmith. This page
+explains the coverage plan; measured evidence is in [evaluation-fixtures.md](evaluation-fixtures.md)
+and the [completion report](phase-6.1-report.md). Converter scoring starts in 6.2.
 
 ## Theory: select the cases before measuring the converter
 
@@ -36,10 +35,10 @@ the same paths must exist beneath both sample suites before snapshotting them.
 |---|---|---|---:|---|
 | [Login](https://the-internet.herokuapp.com/login) | `pages/LoginPage.ts` | `tests/login.spec.ts` | 2 | Existing, reviewed |
 | [Alerts](https://the-internet.herokuapp.com/javascript_alerts) | `pages/AlertsPage.ts` | `tests/alerts.spec.ts` | 2 | Existing, reviewed, browser-verified |
-| [Iframe](https://the-internet.herokuapp.com/iframe) | `pages/IframePage.ts` | `tests/iframe.spec.ts` | 1 | To implement/review |
-| [Windows](https://the-internet.herokuapp.com/windows) | `pages/WindowsPage.ts` | `tests/windows.spec.ts` | 1 | To implement/review |
-| [Upload](https://the-internet.herokuapp.com/upload) | `pages/UploadPage.ts` | `tests/upload.spec.ts` | 1 | To implement/review |
-| [Dynamic loading](https://the-internet.herokuapp.com/dynamic_loading/2) | `pages/DynamicLoadingPage.ts` | `tests/dynamic-loading.spec.ts` | 1 | To implement/review |
+| [Iframe](https://the-internet.herokuapp.com/iframe) | `pages/IframePage.ts` | `tests/iframe.spec.ts` | 1 | Agent-curated, browser-verified |
+| [Windows](https://the-internet.herokuapp.com/windows) | `pages/WindowsPage.ts` | `tests/windows.spec.ts` | 1 | Agent-curated, browser-verified |
+| [Upload](https://the-internet.herokuapp.com/upload) | `pages/UploadPage.ts` | `tests/upload.spec.ts` | 1 | Agent-curated, browser-verified |
+| [Dynamic loading](https://the-internet.herokuapp.com/dynamic_loading/2) | `pages/DynamicLoadingPage.ts` | `tests/dynamic-loading.spec.ts` | 1 | Agent-curated, browser-verified |
 
 1. Login preserves successful authentication and rejection of an invalid password.
    These are the two existing tests. Review approval for their goldens was recorded
@@ -57,7 +56,7 @@ the same paths must exist beneath both sample suites before snapshotting them.
 5. Upload creates its own small local fixture, uploads it, checks confirmation and
    the exact filename, and cleans up. Generating the fixture within each test avoids
    an unstated dependency on a developer's filesystem. Fixture creation/cleanup
-   must be present in both source and golden; these files have not been written yet.
+   are present in both source and golden.
 6. Dynamic loading uses Example 2, whose page describes an element rendered later.
    The test must start loading, wait for completion, and check the resulting text.
    Successful compilation alone cannot establish that the timing was preserved.
@@ -90,18 +89,17 @@ POM entries omit `companions`, using the dataclass's empty-tuple default. Test
 entries explicitly supply their POM. In `("pages/AlertsPage.ts",)`, the trailing
 comma makes a one-item tuple; parentheses alone would leave a plain string.
 
-The two login and two alerts entries explicitly set `reference_review="reviewed"`.
-The eight remaining entries inherit `pending`. Listing a missing file is valid in this
-planning module; trying to snapshot it still raises an error in the builder.
-The future upload step must validate readiness of the intended collection and
-must not silently shrink the benchmark by skipping missing or pending entries.
+All 12 entries explicitly set `reference_review="reviewed"`. Login and alerts retain
+their user-review notes; `COMPLETION_REVIEW` identifies agent curation for the
+remaining eight under the user's instruction to finish 6.1. A manifest can describe
+pending work, but `build_collection()` refuses to upload missing or pending cases.
 
 ## How this will shape the LangSmith reports
 
 The snapshot builder already copies `case_id`, `scenario`, `kind`, review metadata,
 and context policy into each example's metadata. The manifest now supplies
-consistent values across the planned collection. The runner and upload script
-remain future work; the planned browser counts are not yet uploaded metadata.
+consistent values across the collection. The uploader adds measured fixture
+evidence and coverage metadata. The scored converter runner remains future work.
 
 Reports will state the number of conversion rows and browser cases separately,
 show scenario and file-kind results, and identify supplied golden companions.
@@ -124,9 +122,8 @@ or cloud calls. All 36 offline tests passed again after adding the alerts tests.
 Subsequent alerts POM checks are recorded in alerts-page-objects.md;
 the two Selenium/two Playwright browser passes and mutation check are in alerts-tests.md.
 
-The user approved continuing from this matrix and confirmed the alerts POM step.
-The alerts tests are written, browser-verified, and approved for commit/push.
-The iframe POM pair comes next, in patches below 150 lines.
-Continue through the other scenarios, review the goldens,
-and prepare the upload script. Step 6.1 remains open until the completed dataset
-is visible and verified in LangSmith. Step 6.2 then adds the scored experiment.
+The user subsequently requested finishing 6.1. The four remaining scenarios are
+implemented and browser-verified; all eight tests per framework pass. The complete
+dataset was uploaded and verified through exact versioned readback. The user's
+screenshot confirms 12 examples in the UI. Step 6.2 is next; the full completion
+evidence and limits are in [phase-6.1-report.md](phase-6.1-report.md).
