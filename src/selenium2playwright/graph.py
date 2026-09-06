@@ -185,7 +185,7 @@ def critic(state: ConversionState) -> ConversionState:
         structured_model = make_model(for_critic=True).with_structured_output(
             Critique, method="json_schema", include_raw=True,
         )
-        chain = build_critic_prompt() | prepare_messages() | structured_model
+        chain = build_critic_prompt() | prepare_messages(for_critic=True) | structured_model
         evidence = "\n\n".join(
             f"{'PASS' if r.passed else 'FAIL'} {r.render()}"
             + (f"\n{r.tool_output}" if not r.passed and not r.findings else "")

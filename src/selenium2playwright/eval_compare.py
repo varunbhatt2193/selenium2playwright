@@ -55,6 +55,7 @@ def arm_summary(report: dict) -> dict:
     return {
         "experiment": {k: report["experiment"].get(k) for k in ("name", "id", "url", "mode", "elapsed_seconds")},
         "max_attempts": config["max_attempts"], "model": config["model"],
+        "critic_model": config.get("critic_model", config["model"]), "phase": report["plan"]["metadata"].get("phase", "6.2"),
         "configuration_sha256": report["plan"]["metadata"]["configuration_sha256"],
         "git_revision": config["git_revision"], "git_dirty": config["git_dirty"],
         "local_complete": report["local_integrity"]["complete"],
@@ -127,6 +128,7 @@ def compare_reports(single: dict, reflective: dict) -> dict:
     return {"schema_version": 1, "comparable": not issues, "issues": issues,
             "held_fixed": {"dataset_id": plans[0]["dataset_id"], "dataset_version": plans[0]["dataset_version"],
                            "collection_sha256": plans[0]["metadata"]["collection_sha256"], "model": a["model"],
+                           "critic_model": a["critic_model"],
                            "git_revision": a["git_revision"], "evaluator_version": configs[0].get("evaluator_version")},
             "arms": {"one_attempt": a, "reflective": b}, "delta": delta, "per_case": per_case,
             "case_changes": dict(changes),
@@ -142,7 +144,7 @@ def _fmt(value) -> str:
 def render_comparison_markdown(comparison: dict) -> str:
     """A short human scorecard; comparison.json keeps every number."""
     a, b, d = comparison["arms"]["one_attempt"], comparison["arms"]["reflective"], comparison["delta"]
-    lines = ["# Phase 6.3 — one attempt vs. reflection", "",
+    lines = [f"# Phase {a['phase']} — one attempt vs. reflection", "",
              f"Comparable: **{comparison['comparable']}**" + (f" — issues: {comparison['issues']}" if comparison["issues"] else ""),
              "", f"**{comparison['headline']}**", "",
              "| Held fixed | Value |", "| --- | --- |",

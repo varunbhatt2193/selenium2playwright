@@ -130,7 +130,8 @@ def render_markdown(report: dict) -> str:
              f"Execution mode: **{report['experiment'].get('mode', 'test_fixture')}**. "
              "Offline SDK checks do not measure model conversion quality.", "",
              f"Dataset: `{plan['dataset_id']}` at `{plan['dataset_version']}`.",
-             f"Model requested: `{config['model']}`; {config['max_attempts']} total attempts; one repetition.",
+             f"Model requested: `{config['model']}` (critic: `{config.get('critic_model', config['model'])}`); "
+             f"{config['max_attempts']} total attempts; one repetition.",
              f"Configuration SHA-256: `{plan['metadata']['configuration_sha256']}`.",
              f"Git: `{config['git_revision']}`; dirty: `{config['git_dirty']}`.", "",
              f"Local integrity complete: **{report['local_integrity']['complete']}**. "

@@ -35,23 +35,42 @@ ALWAYS_REQUIRED = {
 
 
 def model_name() -> str:
-    """The configured 'provider:model' string (S2P_MODEL env var or the default)."""
+    """The actor's 'provider:model' string (S2P_MODEL env var or the default)."""
     return os.environ.get("S2P_MODEL") or DEFAULT_MODEL
 
 
-def provider() -> str:
-    return model_name().split(":", 1)[0]
+def critic_model_name() -> str:
+    """The critic's model: S2P_CRITIC_MODEL when set, otherwise the same as the actor.
+
+    Two settings, one graph: the actor writes the code and the critic reviews
+    it. Leaving S2P_CRITIC_MODEL empty keeps today's behaviour (one model for
+    both). Setting it lets a cheap actor be reviewed by a strong critic.
+    """
+    return os.environ.get("S2P_CRITIC_MODEL") or model_name()
+
+
+def model_names() -> dict[str, str]:
+    """Both configured models by role; the plan hashes exactly this pair."""
+    return {"actor": model_name(), "critic": critic_model_name()}
+
+
+def provider(name: str | None = None) -> str:
+    return (name or model_name()).split(":", 1)[0]
 
 
 def required() -> dict[str, str]:
-    """Vars this configuration needs: LangSmith + the selected provider's key."""
-    if provider() not in PROVIDER_KEYS:
-        raise ValueError(
-            f"Unknown provider {provider()!r} in S2P_MODEL={model_name()!r}; "
-            f"known: {', '.join(PROVIDER_KEYS)}. Add it to PROVIDER_KEYS in env.py."
-        )
-    var, prefix = PROVIDER_KEYS[provider()]
-    return {**ALWAYS_REQUIRED, var: prefix}
+    """Vars this configuration needs: LangSmith + a key for every provider in use."""
+    needed = dict(ALWAYS_REQUIRED)
+    for role, name in model_names().items():
+        if provider(name) not in PROVIDER_KEYS:
+            variable = "S2P_MODEL" if role == "actor" else "S2P_CRITIC_MODEL"
+            raise ValueError(
+                f"Unknown provider {provider(name)!r} in {variable}={name!r}; "
+                f"known: {', '.join(PROVIDER_KEYS)}. Add it to PROVIDER_KEYS in env.py."
+            )
+        var, prefix = PROVIDER_KEYS[provider(name)]
+        needed[var] = prefix
+    return needed
 
 
 def masked(value: str) -> str:
@@ -61,7 +80,7 @@ def masked(value: str) -> str:
 
 def check() -> bool:
     """Print one line per required var; return True only if all are usable."""
-    print(f"model: {model_name()}")
+    print(f"model: {model_name()}" + (f"  (critic: {critic_model_name()})" if critic_model_name() != model_name() else ""))
     ok = True
     for name, prefix in required().items():
         value = os.environ.get(name, "")

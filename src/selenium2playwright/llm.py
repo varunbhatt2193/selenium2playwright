@@ -25,8 +25,13 @@ MAX_OUTPUT_TOKENS = 8_192
 
 
 def make_model(model_name: str | None = None, *, for_critic: bool = False) -> BaseChatModel:
-    """Return a ready chat model. Precedence: argument > S2P_MODEL env > default."""
-    name = model_name or env.model_name()
+    """Return a ready chat model.
+
+    Precedence: argument > S2P_MODEL env > default. With for_critic=True the
+    env fallback is S2P_CRITIC_MODEL, which itself falls back to S2P_MODEL, so
+    the critic can be a different (stronger) model than the actor.
+    """
+    name = model_name or (env.critic_model_name() if for_critic else env.model_name())
     provider = name.split(":", 1)[0]
     kwargs = _client_kwargs(provider)
     if for_critic and provider == "anthropic":
@@ -44,15 +49,18 @@ def _client_kwargs(provider: str) -> dict:
     return {}
 
 
-def prepare_messages(model_name: str | None = None) -> Runnable:
+def prepare_messages(model_name: str | None = None, *, for_critic: bool = False) -> Runnable:
     """LCEL stage between prompt and model for provider-only message tweaks.
 
     Prompts stay pure LangChain; anything one vendor needs in the message
     payload is applied here, right before the model, and only for that vendor.
     Today: Anthropic's prompt-cache marker on the system message. Other
     providers get a passthrough (OpenAI/Gemini cache long prefixes automatically).
+    for_critic resolves the same env fallback as make_model, so the marker
+    always matches the model that will actually receive the messages.
     """
-    provider = (model_name or env.model_name()).split(":", 1)[0]
+    name = model_name or (env.critic_model_name() if for_critic else env.model_name())
+    provider = name.split(":", 1)[0]
     if provider == "anthropic":
         return RunnableLambda(_mark_system_cacheable)
     return RunnablePassthrough()

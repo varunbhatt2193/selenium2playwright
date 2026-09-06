@@ -33,12 +33,15 @@ def write_json(path: Path, value: dict) -> None:
     temporary.replace(path)
 
 
-def configuration(root: Path, model: str, max_attempts: int = MAX_ATTEMPTS) -> dict:
+def configuration(root: Path, model: str, max_attempts: int = MAX_ATTEMPTS, critic_model: str | None = None) -> dict:
     """Capture explicit settings and relevant file/tool identities, never credentials.
 
     max_attempts is part of the configuration on purpose: two plans that differ
     only in the lap budget must have different configuration hashes (step 6.3).
+    critic_model (default: the actor's model) is hashed too, so a "weak actor,
+    strong critic" experiment can never be mistaken for a single-model one.
     """
+    critic_model = critic_model or model
     paths = set((root / "src").rglob("*.py")) | set((root / "sandbox").glob("*.json"))
     paths |= set((root / "sandbox").glob("*.mjs")) | set((root / "sandbox").glob("*.cjs"))
     paths |= {root / p for p in ("docs/playbook.md", "pyproject.toml", "uv.lock",
@@ -52,8 +55,9 @@ def configuration(root: Path, model: str, max_attempts: int = MAX_ATTEMPTS) -> d
         raise ValueError("Installed sandbox package versions differ from the pinned manifest")
     git = lambda *args: subprocess.check_output(["git", *args], cwd=root, text=True).strip()
     return {
-        "model": model, "max_output_tokens": MAX_OUTPUT_TOKENS, "max_attempts": resolve_attempt_cap(max_attempts),
-        "critic_effort": "medium" if model.startswith("anthropic:") else None,
+        "model": model, "critic_model": critic_model, "max_output_tokens": MAX_OUTPUT_TOKENS,
+        "max_attempts": resolve_attempt_cap(max_attempts),
+        "critic_effort": "medium" if critic_model.startswith("anthropic:") else None,
         "critic_structured_output": "json_schema",
         "actor_structured_output": "provider_default", "temperature": "not_set",
         "max_concurrency": 1, "num_repetitions": 1, "evaluator_version": EVALUATOR_VERSION,
@@ -67,11 +71,12 @@ def configuration(root: Path, model: str, max_attempts: int = MAX_ATTEMPTS) -> d
 
 
 def build_plan(root: Path, model: str = DEFAULT_EVAL_MODEL, max_attempts: int = MAX_ATTEMPTS,
-               phase: str = "6.2") -> dict:
+               phase: str = "6.2", critic_model: str | None = None) -> dict:
     """Bind the complete local collection to its verified upload receipt and configuration.
 
     phase labels the experiment (name prefix, report title, project metadata);
-    max_attempts is the lap budget every row of this experiment will use.
+    max_attempts is the lap budget every row of this experiment will use;
+    critic_model reviews every draft (default: the same model as the actor).
     """
     collection = build_collection(root / "samples", root / "docs/evaluation-fixture-evidence.json")
     receipt = json.loads((root / "docs/phase-6.1-receipt.json").read_text())
@@ -85,13 +90,13 @@ def build_plan(root: Path, model: str = DEFAULT_EVAL_MODEL, max_attempts: int = 
     if (receipt["example_ids"] != {row["metadata"]["case_id"]: identity for identity, row in expected.items()}
             or receipt["examples_verified"] != len(expected)):
         raise ValueError("Receipt example identities/count differ from the planned collection")
-    config = configuration(root, model, max_attempts)
+    config = configuration(root, model, max_attempts, critic_model)
     return {
         "schema_version": 1, "dataset_id": receipt["dataset_id"], "dataset_url": receipt["dataset_url"],
         "dataset_name": receipt["dataset_name"], "dataset_version": receipt["dataset_version"],
         "examples": expected, "coverage": collection["coverage"],
         "metadata": {"phase": phase, "collection_sha256": collection["collection_sha256"],
-                     "pinned_dataset_version": receipt["dataset_version"], "models": [model],
+                     "pinned_dataset_version": receipt["dataset_version"], "models": sorted({model, config["critic_model"]}),
                      "configuration": config, "configuration_sha256": digest(config),
                      "expected_examples": len(expected), "expected_feedback_keys": FEEDBACK_KEYS},
     }
