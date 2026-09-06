@@ -1,179 +1,128 @@
-# Restart here — 2026-09-05
+# Restart here — 2026-09-06
 
 ## Current position
 
-**Phase 6.1 is complete. Phase 6.2 now has its target, evaluators, and experiment
-runner; the runner increment is ready for review.** The latest work instruction
-was “next”; the user also asked “stuck?” and was told implementation and all 80
-tests were complete, with handoff/link checks finishing. Theory was
-explained before code; see [evaluation-target.md](evaluation-target.md) and
-[evaluation-evaluators.md](evaluation-evaluators.md) for detailed walkthroughs,
-contracts, tests, and reporting semantics. The new
-[runner walkthrough](evaluation-runner.md) explains every runner/report/readback
-function. The first live scored converter experiment is next.
-The earlier “finish 6.1” instruction overrode its pauses only; the normal small
-review increments apply again. Existing commit/push authorization persists.
+**Phase 6.2 is complete. Next is 6.3; it has not started.** The user's “next”
+authorized the first live experiment. A later “Still working? Stuck?” was a status
+question, not a cancellation. The conversion run finished; upload conflicts required
+journal recovery. This completion increment contains the final code, detailed reports, and handoff;
+use git log for its reporting revision. Commit/push authorization persists.
 
-The 6.1 dataset is uploaded and verified, and the user supplied a screenshot
-confirming the correct dataset with 12 examples visible.
+Read [phase-6.2-report.md](phase-6.2-report.md) and
+[evaluation-recovery.md](evaluation-recovery.md) first. Theory was explained before
+code, and all new helpers have explanatory comments/docstrings. Earlier walkthroughs
+remain in [target](evaluation-target.md), [evaluators](evaluation-evaluators.md), and
+[runner](evaluation-runner.md). Their implementation-stage observations are historical;
+completion updates at the top point to the live evidence.
 
-Start with [phase-6.1-report.md](phase-6.1-report.md). Detailed lessons:
-[evaluation-fixtures.md](evaluation-fixtures.md) explains remaining source/golden
-POMs and tests; [evaluation-upload.md](evaluation-upload.md) explains preflight,
-repeatable upload, versioned readback, and reporting. Earlier snapshot and coverage
-lessons are [evaluation-dataset.md](evaluation-dataset.md) and
-[evaluation-coverage.md](evaluation-coverage.md).
+## Live baseline and exact evidence
 
-## Dataset and evidence
+- Experiment: `s2p-6.2-claude-opus-5-ba0e2bd3`.
+- ID: `43959805-b945-41c8-a46b-2ec3142148b8`.
+- [Open in LangSmith](https://smith.langchain.com/o/32ac11b4-3e72-4765-a59b-5dc1bcd32cbe/datasets/33c80b1e-96bd-4b5b-a9c1-ca49d215828f/compare?selectedSessions=43959805-b945-41c8-a46b-2ec3142148b8).
+- Dataset: `selenium2playwright-v1-4920b5f319d8`, ID
+  `33c80b1e-96bd-4b5b-a9c1-ca49d215828f`, pinned
+  `2026-09-06T03:05:09.476354+00:00`.
+- Collection hash: `4920b5f319d827a25a3d8f1a2f026c430e1fb20bdb897c6b9c3599f55b8aeb3d`.
+- Baseline revision: **`b440966e73e68c9df37479180bac8980f3d6e8da`**, clean at execution.
+  This committed/pushed the reviewed target, evaluators, runner, tests, and lessons.
+- Configuration hash: `0909323c71defaf78961836845e3f52bbd846d51e6778a83f972aec92b4d783f`.
+- Model: requested `anthropic:claude-opus-5`; observed persisted model calls identify
+  Anthropic `claude-opus-5`. Three total actor attempts allowed, one repetition,
+  max concurrency one; 8,192 output-token limits. Actor uses ConversionResult tool
+  output; critic uses native JSON schema with medium effort requested.
+- Execution UTC: `2026-09-06T05:57:41.221731+00:00` through
+  `2026-09-06T06:01:07.400329+00:00`; 206.177s, target sum 199.137s.
+- Artifacts: `out/6.2/experiment-20260906T055741Z-f4465fd0/` (ignored).
+- Tracked receipt: [phase-6.2-receipt.json](phase-6.2-receipt.json), with every row's
+  run/example IDs, hashes, metrics, usage, TODOs, errors, cost, and model trace coverage.
 
-- Dataset: `selenium2playwright-v1-4920b5f319d8`.
-- ID: `33c80b1e-96bd-4b5b-a9c1-ca49d215828f`.
-- Version UTC: `2026-09-06T03:05:09.476354+00:00`.
-- [Open in LangSmith](https://smith.langchain.com/o/32ac11b4-3e72-4765-a59b-5dc1bcd32cbe/datasets/33c80b1e-96bd-4b5b-a9c1-ca49d215828f).
-- 12 file-conversion rows: six POMs + six test files, eight browser tests per framework.
-- Login, alerts, iframe, windows, upload, dynamic loading are complete in both suites.
-- Login and alerts retain user-review provenance. The other eight references record
-  agent review under delegated completion; do not call them human-approved.
-- Source Selenium: 8 passed in 19.426s. Golden Playwright: 8 passed in 18.661s,
-  headless, one worker, retries 0, no skipped/unexpected/flaky tests.
-- Sample typecheck and all four suite-wide golden static gates passed, no findings.
-- Phase 6.1 full offline suite: **47 tests passed in 34.853s**. This includes 11
-  dataset/upload tests; tests use a fake cloud service, not live credentials.
-- Exact server readback verified all 12 rows at the pinned version. Rerun added zero.
-- Tracked evidence: `docs/evaluation-fixture-evidence.json` (also in row metadata),
-  and `docs/phase-6.1-receipt.json` (dataset/row IDs, version, code provenance).
-- Ignored raw browser reports/traces: `samples/out/6.1/completion/`; local collection,
-  receipts, gate output, offline logs and screenshot: `out/6.1/`.
+## Results and limits
 
-The first readback caught LangSmith's automatic `dataset_split: ["base"]` metadata.
-The uploader now explicitly selects and validates that split; other unexpected
-metadata still fails. This was resolved without changing reference code or
-replacing/deleting uploaded examples. Browser tools reported no available browser;
-UI visibility was established from the user's screenshot, not agent UI automation.
+All four independent static metrics are **11/12 = 91.67%**. Graph reports passed
+**9/12 = 75%**. POMs: 5/6 static and 3/6 graph; tests: 6/6 both. The WindowsPage
+actor returned `notes` as a string instead of a list. Parsing failed after its first
+attempt, no usable code/critic followed, and all evaluators gave zero/no_output.
+AlertsPage and LoginPage each needed a second attempt following explicit critic
+revision requests. Both ended with two review TODOs, so critic/static pass did not
+make their final graph reports passed. Preserve these failures; no prompt tuning,
+manual coercion, or conversion reruns were used to improve this baseline.
 
-## Implementation boundaries
+Known tokens: actor 63,344; critic 62,095 across 11 reported rows; combined known
+125,439. WindowsPage critic usage remains null (the parse failure prevented a call).
+There were 27 expected model calls: 14 actor + 13 critic. Cloud audit found 26 model
+nodes, 25 complete, one unfinished. WindowsPage actor completion and Windows-test
+actor trace are missing. They cannot be reconstructed from the root's final code.
+Ten roots have matching local/cloud token accounting and a cost subtotal $0.518773;
+complete experiment cost is unavailable. Readback excludes partial/unknown costs.
 
-- `eval_dataset.py`: safe file reads and one-row snapshots; reference answers stay
-  outside inputs; per-row content hashes cover source, companions, golden and criteria.
-- `eval_manifest.py`: 12 reviewed cases and planned browser counts; no import-time IO.
-- `eval_collection.py`: complete-manifest preflight, evidence/hash checks, metadata,
-  stable collection identity, coverage summary; local reads only.
-- `eval_upload.py`: deterministic UUIDs, conflict detection, partial-upload recovery,
-  exact versioned readback; never silently overwrite mismatches or delete rows.
-- `scripts/upload_eval_dataset.py`: preview by default, `--upload` for network write/
-  readback, exports snapshots and receipt; no model/provider credential required.
-- `langsmith>=0.12.1` is now a direct dependency; lockfile retains installed 0.12.1.
+No generated candidate was browser-tested here. Phase 6.1's 8 Selenium and 8 golden
+Playwright passes validate fixtures only. Static gates miss the Cancel-to-OK behavior
+bug. Iframe typing remains uncovered. Test rows use golden POM context, so isolated
+passes do not prove generated POM/test integration. Temporary prompt paths vary.
 
-The benchmark measures isolated files with supplied golden POMs for test rows.
-New `eval_target.py` (91 lines) validates exactly the three input fields, writes
-captured source/companions into a fresh temporary source/converted layout, invokes
-the existing graph, and serializes its assembled report. Top-level code is for
-evaluator access; conversion status, report status, refusal, handled graph errors,
-and escaped adapter errors remain distinct. Usage preserves unavailable values;
-elapsed time covers local target work. Cleanup happens even when the graph raises.
-Temporary absolute paths currently appear in prompts; document this variation.
+## Upload recovery and LangSmith report
 
-Seven new offline tests cover all 12 snapshots, malformed inputs, real graph/four
-gate integration with fixed replies for login POM/test, refusal, handled provider
-failure, retained report/usage serialization, and escaped errors with cleanup.
-Focused suite: 7 passed in 2.440s; full offline suite: **54 passed in 37.409s**.
-Log: `out/6.2/target-offline-tests.txt`. No provider calls, cloud writes, browser
-runs, or scored experiments occurred in the target increment. Iframe typing remains
-uncovered, including the earlier gap-log failure. Other limits are in the completion report.
+The original SDK background batches failed HTTP 400: numeric feedback_config bounds
+0–1 conflicted with stored continuous definitions without bounds. Initially 11 roots
+and 72 feedback records persisted; one root was unfinished. Root/evaluator results
+were fully present locally. The journal SHA-256 remains
+`e77031fb347cbd3d19b286186070d55d41a73d217b7bfd584dc7e68a1a9ae2b7`.
 
-New `eval_evaluators.py` (110 lines) independently reruns the existing four gates
-on final returned code and captured companions. It reuses input path validation;
-parity receives only the matching source/candidate pair. `compiles`, `residue_free`,
-`typed_lint_pass`, and `parity_pass` each return a numeric metric plus `_status`.
-Only verified pass earns 1; failed/no_output/invalid_input/tool_error earn 0.
-Full report, raw output, typed error, version, and time go in `evaluator_info`.
-Warnings preserve the lint pass policy. Unparsed unsuccessful tool results are
-conservatively tool_error. Artifact scores remain separate from conversion status.
+`eval_recovery.py` preflights all local/cloud evidence, rejects conflicts/duplicates,
+and restores only missing feedback/roots or empty unfinished roots. The CLI previews
+by default; --apply uses synchronous uploads, stable feedback IDs, and receipts.
+Live recovery acknowledged **one root create, one root finish, 24 feedback creates**.
+Readback verifies **12 roots and 96 feedback entries**. A repeat preview returned
+zero actions. No scores, original journal entries, or model histories were rewritten.
+Pre-recovery artifacts and each recovery receipt remain in the run directory.
 
-Eleven new offline evaluator tests passed in 5.553s. They exercise actual good/bad
-code, missing/broken companions, failure categories, warnings, stale graph success
-reports, the Cancel/OK static blind spot, and the installed LangSmith 0.12.1
-`run_evaluator` adapter with eight metric keys. No model/cloud/browser calls were
-made in this increment; remote feedback persistence remains unverified until the runner.
-Full offline suite: **65 passed in 41.079s**; log
-`out/6.2/evaluator-offline-tests.txt`. README, handoff, target lesson, evaluator
-lesson, target/evaluator code and tests are local, uncommitted changes on top of
-`8f31dd1`; the ignored roadmap checkpoint was updated as well.
+The evaluator now omits feedback_config while keeping the same binary policy.
+Readback now checks root tokens against local actor + critic totals before using
+costs; all raw cloud costs and comparisons remain in cost_coverage. These are
+transport/reporting changes after the original clean baseline, not converter changes.
+`scripts/inspect_eval_traces.py` reads model/graph nodes and feedback definitions;
+`scripts/publish_eval_report.py` previews/publishes the detailed narrative to this
+experiment's description and verifies exact readback. It preserves name/metadata.
+The first recovery warned about deprecated feedback creation without session_id;
+the helper now supplies session_id/start_time. The broader SDK legacy API banner
+has not been comprehensively audited or fixed.
 
-The runner increment adds `eval_plan.py` (112 lines), `eval_report.py` (184),
-`eval_readback.py` (95), `eval_experiment.py` (105), and
-`scripts/run_eval_experiment.py` (72), in individual patches below 150 lines.
-It pins and exactly compares the 12-example snapshot before SDK execution,
-records requested settings and code/tool identities, journals completed rows,
-reconciles missing/duplicate feedback, and writes detailed JSON/Markdown reports.
-Cloud readback compares root runs, metadata, scores/statuses/comments and complete
-evaluator evidence in feedback-source metadata, with bounded retries. Unknown
-cost/usage remain explicit; totals use all scheduled examples and scenario/kind groups.
+Chrome computer-use inspection confirmed all 12 rows, including WindowsPage's four
+0.00/no_output entries. The UI summary still shows 1.00 AVG / 92% evaluated after
+refresh, inconsistent with the 96 verified feedback records. Document this unresolved
+UI summary discrepancy; do not quote its 1.00 as quality. No reliable screenshot was
+retained because the user changed the active tab during capture. Avoid competing
+with the user for Chrome. API readback and observed row-level UI data are the evidence.
 
-Default command previews locally; `--run` makes real model calls and uploads;
-`--verify-only ARTIFACT_DIR` retries readback without conversions. Default eval
-model is `anthropic:claude-opus-5` under the roadmap policy; `--model` overrides
-only this process. Actor/critic still use S2P_MODEL and three total attempts.
-Live mode rejects injected test targets. The new run query uses async
-`client.runs.query`, explicit saved start time, full selected fields, and SDK
-pagination. It avoids the deprecated `list_runs` API. Other legacy SDK internals
-and the previous UI migration banner have not been fully audited.
+## Verification and next increment
 
-Fifteen new runner/report tests cover the actual SDK with 12 fixed candidates
-and 96 feedback entries, blocked HTTP, corrupted/missing cloud evidence, partial
-execution, preserved denominators, unknown accounting, and readback-only retries.
-The first focused run caught Client lacking a context manager (fixed with
-contextlib.closing) and synthetic Feedback objects needing real timestamps.
-Final full suite: **80 tests passed in 140.375s**; log
-`out/6.2/runner-offline-tests.txt`. No provider calls/cloud writes/browser runs.
-Final preview: `out/6.2/preview-20260906T053636Z-a910cb7a/plan.json`;
-configuration hash `b66b194217b02ffcf679d9f7620308a9e9f6d0e77d8901233005d98997239451`.
-All 6.2 source, tests, and lessons remain uncommitted on top of `8f31dd1`.
+Full offline suite: **86 tests passed in 57.434s**; log
+`out/6.2/completion-offline-tests.txt`. Includes SDK orchestration, four validators,
+report/readback integrity, partial-token cost exclusion, and five recovery tests.
+Publisher preview and live description write/readback were also exercised. Original
+live runner exit2 meant incomplete delivery; verify-only now exits1 because the
+verified baseline has quality failures. This is expected, not a failed recovery.
 
-## Working agreement and next increment
+On the next request to proceed, start **6.3 theory**, then make MAX_ATTEMPTS=3
+configurable for evaluation. Compare one actor attempt against up to three with
+other settings fixed. Report quality, time, tokens, cost availability, and uncertainty.
+This baseline's two repairs alone do not establish the benefit of reflection.
+Do not begin 6.4 judge calibration or 6.5 model comparisons prematurely.
 
-Teach theory before code, use explanatory comments/docstrings, and keep individual
-code patches below 150 lines. The user is learning as an SDET and wants detailed
-LangSmith reports. Work one roadmap step at a time. The instruction to finish 6.1
-permitted all its increments; it is not authorization to auto-complete later phases.
-Use short answers when the user requests TLDR. Do not spawn agents unless requested.
+## Working agreement and environment
 
-On the next request to proceed, continue **6.2** with the first live scored
-experiment using the reviewed runner. `conversion_target(inputs)`,
-`eval_evaluators.EVALUATORS`, and the runner now exist. Use only example inputs for the target,
-never reference outputs. Retain both internal graph evidence and independent
-evaluator evidence; reconcile scheduled rows and eight expected feedback keys per
-row so missing feedback cannot silently reduce the denominator. Record the pinned dataset version,
-exact code/prompt/tool/model
-configuration, per-row output and findings, status/attempts/critic, time, usage, and
-available cost. Missing cost is unavailable, not zero. Use all scheduled rows in
-primary denominators, with POM/test-file breakdowns and tool failures visible.
-Run `.venv/bin/python scripts/run_eval_experiment.py --run`, using required sandbox
-network escalation. Existing commit/push authorization persists; a clean commit
-before live execution will improve code provenance after review. Generate a fresh
-plan through the script; old preview hashes become stale after code/commit changes.
-Inspect actual child traces/model settings and available costs after the live run;
-the current remote checks cover roots and feedback, not an audit of every child.
-Create an evidence-backed 6.2 completion report and verify experiment visibility.
-Do not tune prompts to make a first baseline green or label static scores as browser correctness.
+Teach theory before code; the user wants detailed explanations and LangSmith reports.
+Keep individual code patches below 150 lines; multiple explained patches are allowed.
+Use one learning increment per “next” and concise TLDR when requested. Do not spawn
+agents unless explicitly requested. Give frequent meaningful progress updates; the
+user has repeatedly asked “stuck?” after long gaps. Existing commit/push authorization
+persists. Do not ask again for routine authorized work.
 
-6.3 later compares one attempt against up to three with other settings fixed;
-the graph's hardcoded cap still needs configuration. 6.4 adds a calibrated judge;
-6.5 compares models. Once the eval baseline exists, prompt/playbook changes need
-passing evaluation evidence. Do not invent quality percentages from fixture passes.
-
-## Existing graph and environment
-
-Phase 5.2 remains complete: intake → convert → four gates → critic → bounded repair
-or final report. Three total attempts means initial plus two repairs. Gate failures
-cannot be overridden by critic pass; errors preserve prior draft; final TODOs cause
-needs-review. The live seeded demo repaired a missing await on attempt 2 but retained
-two locator TODOs. See `docs/reflection-loop.md` and ignored `out/5.2/`.
-
-Repo: `/Users/varunbhatt/Downloads/Selenium2Playwright`, branch `main`;
+Repo `/Users/varunbhatt/Downloads/Selenium2Playwright`, main;
 remote `https://github.com/varunbhatt2193/selenium2playwright.git`.
-`.env`, dependencies, generated `out/`, local `roadmap.md` and `plan-review.md`
-remain ignored. Never force-add them. `S2P_MODEL` configures the actor/critic model;
-credentials load through `env.py` and must not be exposed. Use the existing
-`.venv`, sample and sandbox Node toolchains. Sandbox browser/network/git failures
-need approved escalation, not alternative workarounds.
+.env, dependencies, generated out/, roadmap.md, and plan-review.md stay ignored;
+never force-add them or expose credentials. S2P_MODEL configures both graph models;
+the eval CLI defaults to Opus per the learning agreement. Use existing .venv and
+Node toolchains. Sandbox network/git/browser failures require proper escalation.
+Computer-use skill was applied for Chrome; use node_repl + @oai/sky for that UI.

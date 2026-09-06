@@ -163,6 +163,8 @@ def render_markdown(report: dict) -> str:
     lines += ["", "## Time, tokens, and available cost", "",
               "Target time includes internal graph checks; evaluator time measures the additional checks.",
               "Missing totals remain unavailable; known subtotals do not include unreported usage/cost.", "",
+              "Cloud costs require matching local actor + critic token totals; a present root alone is insufficient.",
+              "Matching totals do not certify every child span or independently verify the provider invoice.", "",
               "```json", json.dumps({k: totals[k] for k in (
                   "target_seconds", "actor_total_tokens", "critic_total_tokens", "langsmith_root_cost_usd")}, indent=2), "```"]
     for row in report["rows"]:

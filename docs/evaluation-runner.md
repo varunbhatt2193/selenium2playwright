@@ -1,5 +1,12 @@
 # Phase 6.2 — the experiment runner
 
+**Completion update, 2026-09-06:** the first live experiment is complete. Read the
+[results](phase-6.2-report.md) and [upload recovery lesson](evaluation-recovery.md).
+The implementation-stage observations below describe the earlier runner increment.
+Current readback also requires cloud tokens to match locally recorded actor/critic
+usage before counting a root cost; two rows in the live baseline fail that accounting
+check. Model/feedback recovery did not rerun the target or change baseline scores.
+
 This lesson follows the [target](evaluation-target.md) and
 [evaluator](evaluation-evaluators.md) increments. The theory and interface in
 this section were written before the runner code. The runner connects those

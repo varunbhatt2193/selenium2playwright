@@ -1,5 +1,11 @@
 # Phase 6.2 — deterministic evaluator theory and code
 
+**Completion update, 2026-09-06:** all 12 live rows and 96 feedback entries now
+verify in LangSmith. See the [results](phase-6.2-report.md). `gate_feedback()` now
+omits `feedback_config`: repeated bounds conflicted with existing workspace key
+definitions during upload. Binary scoring, status values, and `deterministic-v1`
+policy remain unchanged. The [recovery lesson](evaluation-recovery.md) explains why.
+
 This is the second implementation increment of 6.2. The
 [target adapter](evaluation-target.md) already runs one captured dataset input
 through the converter. This increment adds the functions that grade its final

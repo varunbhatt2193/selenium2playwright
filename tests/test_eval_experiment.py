@@ -73,7 +73,7 @@ class FakeReadback:
     def __init__(self, plan, records, experiment):
         self.project = TracerSession(id=UUID(experiment["id"]), tenant_id=uuid4(),
             reference_dataset_id=UUID(plan["dataset_id"]), extra={"metadata": copy.deepcopy(plan["metadata"])})
-        self.root_runs = [CloudRun(**copy.deepcopy(record["run"]), total_cost=0.01) for record in records]
+        self.root_runs = [CloudRun(**copy.deepcopy(record["run"]), total_cost=0.01, total_tokens=30) for record in records]
         self.feedback = [Feedback(id=uuid4(), run_id=UUID(record["run"]["id"]), trace_id=None,
             created_at=datetime.now(timezone.utc), modified_at=datetime.now(timezone.utc),
             key=item["key"], score=item.get("score"), value=item.get("value"),
@@ -181,6 +181,8 @@ class ExperimentTests(unittest.TestCase):
 
     def test_readback_verifies_full_feedback_and_reads_older_runs_with_explicit_window(self):
         records = fixed_records(self.plan)
+        for record in records:
+            record["run"]["outputs"].update(usage={"total_tokens": 10}, critic_usage={"total_tokens": 20})
         experiment = {"id": str(uuid4()), "started_at_utc": "2026-08-01T00:00:00+00:00"}
         report = assemble_report(self.plan, records, experiment)
         client = FakeReadback(self.plan, records, experiment)
@@ -222,6 +224,8 @@ class ExperimentTests(unittest.TestCase):
     def test_saved_readback_updates_costs_without_repeating_the_target(self):
         from selenium2playwright.eval_plan import write_json
         records = fixed_records(self.plan)
+        for record in records:
+            record["run"]["outputs"].update(usage={"total_tokens": 10}, critic_usage={"total_tokens": 20})
         experiment = {"id": str(uuid4()), "started_at_utc": "2026-08-01T00:00:00+00:00"}
         report = assemble_report(self.plan, records, experiment)
         client = FakeReadback(self.plan, records, experiment)
@@ -234,6 +238,21 @@ class ExperimentTests(unittest.TestCase):
             self.assertEqual(verified["aggregate"]["langsmith_root_cost_usd"]["total"], "0.12")
             self.assertEqual(len(json.loads((folder / "cloud-readback.json").read_text())["feedback"]), 96)
         evaluate.assert_not_called()
+
+    def test_partial_cloud_tokens_or_unknown_local_usage_exclude_cost_without_changing_scores(self):
+        records = fixed_records(self.plan)
+        for record in records:
+            record["run"]["outputs"].update(usage={"total_tokens": 10}, critic_usage={"total_tokens": 20})
+        records[1]["run"]["outputs"]["critic_usage"] = None
+        experiment = {"id": str(uuid4()), "started_at_utc": "2026-08-01T00:00:00+00:00"}
+        report = assemble_report(self.plan, records, experiment)
+        client = FakeReadback(self.plan, records, experiment)
+        client.root_runs[0].total_tokens = 20  # One child upload was lost.
+        result = verify_cloud(client, report, records, attempts=1)
+        self.assertEqual(result["status"], "verified")
+        self.assertEqual(measurement(list(result["costs_usd"].values())), {
+            "total": None, "known_subtotal": "0.10", "known_rows": 10, "missing_rows": 2})
+        self.assertEqual(report["aggregate"]["all_static_passed"], 12)
 
     def test_live_mode_rejects_injected_targets_before_any_dataset_or_model_call(self):
         with TemporaryDirectory() as temporary, closing(OfflineClient(self.plan)) as client, \

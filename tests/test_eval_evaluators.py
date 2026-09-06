@@ -42,6 +42,7 @@ class EvaluatorTests(unittest.TestCase):
                 with self.subTest(case=case, evaluator=evaluator.__name__):
                     score, status = evaluator(row["inputs"], row["outputs"])
                     self.assertEqual(score["score"], 1, score["comment"])
+                    self.assertNotIn("feedback_config", score)
                     self.assertEqual(status["value"], "passed")
                     self.assertEqual(status["key"], score["key"] + "_status")
                     self.assertIsNone(score["evaluator_info"]["error"])

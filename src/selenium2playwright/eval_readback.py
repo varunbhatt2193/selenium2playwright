@@ -24,7 +24,7 @@ async def readback_once(client, report: dict, records: list[dict]) -> dict:
     # one day, so use the saved start time even for a much later readback retry.
     runs = [run async for run in client.runs.query(
         project_ids=[experiment_id], is_root=True, min_start_time=report["experiment"]["started_at_utc"],
-        selects=["ID", "REFERENCE_EXAMPLE_ID", "INPUTS", "OUTPUTS", "ERROR", "END_TIME", "TOTAL_COST"])]
+        selects=["ID", "REFERENCE_EXAMPLE_ID", "INPUTS", "OUTPUTS", "ERROR", "END_TIME", "TOTAL_COST", "TOTAL_TOKENS"])]
     by_id = {str(run.id): run for run in runs}
     expected_ids = {record["run"]["id"] for record in records}
     if len(by_id) != len(runs) or set(by_id) != expected_ids:
@@ -35,15 +35,23 @@ async def readback_once(client, report: dict, records: list[dict]) -> dict:
         if str(item.run_id) not in expected_ids:
             issues.append("Feedback targets an unexpected run")
         by_feedback[(str(item.run_id), item.key)].append(item)
-    costs = {}
+    costs, cost_coverage = {}, {}
     for record in records:
         run_id, local = record["run"]["id"], record["run"]
         remote = by_id.get(run_id)
         if remote is None:
             continue
-        # Root costs include the target's descendants when LangSmith reports an
-        # aggregate. Count each root once; never add its child costs again.
-        costs[run_id] = str(remote.total_cost) if remote.total_cost is not None else None
+        # A present root can still have missing child uploads. Reconcile its
+        # token aggregate with BOTH locally recorded roles before using cost.
+        # Missing role usage remains unknown, even when the cloud returns zero.
+        output = local["outputs"] or {}
+        usage = [(output.get(role) or {}).get("total_tokens") for role in ("usage", "critic_usage")]
+        expected_tokens = sum(usage) if all(isinstance(n, int) and n >= 0 for n in usage) else None
+        matched = expected_tokens is not None and remote.total_tokens == expected_tokens
+        costs[run_id] = str(remote.total_cost) if matched and remote.total_cost is not None else None
+        cost_coverage[run_id] = {"local_tokens": expected_tokens, "cloud_tokens": remote.total_tokens,
+                                "tokens_match": matched, "reported_cost_usd": str(remote.total_cost)
+                                if remote.total_cost is not None else None}
         if (str(remote.reference_example_id) != record["example_id"] or remote.inputs != local["inputs"]
                 or remote.outputs != local["outputs"] or remote.error != local["error"] or remote.end_time is None):
             issues.append(f"Run content/completion differs: {run_id}")
@@ -64,9 +72,10 @@ async def readback_once(client, report: dict, records: list[dict]) -> dict:
                     issues.append(f"Feedback evidence differs: {run_id}/{expected['key']}/{key}")
     return {"status": "verified" if not issues else "unverified", "issues": issues,
             "root_runs_read": len(runs), "feedback_read": len(feedback), "costs_usd": costs,
+            "cost_coverage": cost_coverage,
             "project": project.model_dump(mode="json"),
             "runs": [run.model_dump(mode="json", include={"id", "reference_example_id", "inputs", "outputs",
-                     "error", "end_time", "total_cost"}) for run in runs],
+                     "error", "end_time", "total_cost", "total_tokens"}) for run in runs],
             "feedback": [item.model_dump(mode="json") for item in feedback]}
 
 

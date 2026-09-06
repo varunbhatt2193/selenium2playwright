@@ -35,9 +35,11 @@ def gate_feedback(gate: Gate, status: str, started: float,
                 "error": error}
     # Always emit a number: missing output/tools must not disappear from the
     # denominator. The separate status distinguishes a defect from no verdict.
+    # Do not redefine the workspace's feedback key on every result. LangSmith
+    # rejected live batches when these bounds differed from its stored config;
+    # score generation still enforces 0/1 without sending feedback_config.
     return [{"key": key, "score": int(status == "passed"), "comment": comment,
-             "evaluator_info": evidence,
-             "feedback_config": {"type": "continuous", "min": 0, "max": 1}},
+             "evaluator_info": evidence},
             {"key": key + "_status", "value": status, "comment": comment}]
 
 
