@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Literal, Self
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class ConversionResult(BaseModel):
@@ -43,6 +43,23 @@ class ConversionResult(BaseModel):
             "(playbook rule 25: the consolidated ledger). Empty if none."
         ),
     )
+
+    @field_validator("notes", "todos", mode="before")
+    @classmethod
+    def accept_single_string(cls, value: object) -> object:
+        """Tolerate a string where a list was asked for (gap T9, seen in 5 of 36 first drafts).
+
+        Opus sometimes writes `notes` as one paragraph, or as lines wrapped in
+        <item> tags, instead of a JSON array. Rejecting the whole reply threw
+        away a complete, otherwise valid conversion. Wrapping is safe: these two
+        fields are prose for the human ledger, never code. The field description
+        the model sees is unchanged; only our tolerance grew.
+        """
+        if isinstance(value, str):
+            items = [line.strip().removeprefix("<item>").removesuffix("</item>").strip()
+                     for line in value.splitlines()]
+            return [item for item in items if item]
+        return value
 
 
 class Critique(BaseModel):
