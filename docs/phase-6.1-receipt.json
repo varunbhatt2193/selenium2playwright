@@ -39,11 +39,11 @@
     "windows-test": "532d1ab2-80c3-58b0-a875-766de6c8d39d"
   },
   "verification": "Exact inputs, reference outputs and metadata at the recorded dataset version",
-  "recorded_at_utc": "2026-09-06T03:08:21.129789+00:00",
-  "elapsed_seconds": 1.059,
+  "recorded_at_utc": "2026-09-06T03:14:30.280681+00:00",
+  "elapsed_seconds": 1.184,
   "langsmith_sdk_version": "0.12.1",
-  "git_revision": "86707d05bb5395b813d56f56a47d652baa00cace",
-  "git_dirty": true,
+  "git_revision": "37a877d2e09df5995c72c4dfdf2a10ce77f181c6",
+  "git_dirty": false,
   "model_calls": 0,
   "converter_experiment": "not_run; Phase 6.2"
 }
