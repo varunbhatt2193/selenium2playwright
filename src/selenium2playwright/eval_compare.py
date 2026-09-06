@@ -36,6 +36,9 @@ def arm_summary(report: dict) -> dict:
         final = row["outputs"].get("report") or {}
         rows[row["case_id"]] = {
             "graph_status": final.get("status", row["outputs"].get("conversion_status", "missing")),
+            # No draft = the actor's reply never parsed into code, so validation,
+            # the critic, and any repair lap were all impossible for this row.
+            "draft": bool(final.get("result")), "errors": [str(e)[:160] for e in final.get("errors") or []],
             "attempts": final.get("attempts"), "all_static": all(m["score"] == 1 for m in row["metrics"].values()),
             "todos": len((final.get("result") or {}).get("todos") or []) if final.get("result") else None,
             "target_seconds": row["outputs"].get("elapsed_seconds"),
@@ -44,6 +47,11 @@ def arm_summary(report: dict) -> dict:
             "cost_usd": row["cost_usd"]}
     attempts = [r["attempts"] for r in rows.values() if isinstance(r["attempts"], int)]
     passes = _passes(totals)
+    drafted = [r for r in rows.values() if r["draft"]]
+    with_draft = {"rows": len(drafted), "no_draft_rows": n - len(drafted),
+                  "all_static_passed": sum(r["all_static"] for r in drafted),
+                  "graph_report_passed": sum(r["graph_status"] == "passed" for r in drafted),
+                  "repaired_rows": sum(isinstance(r["attempts"], int) and r["attempts"] > 1 for r in drafted)}
     return {
         "experiment": {k: report["experiment"].get(k) for k in ("name", "id", "url", "mode", "elapsed_seconds")},
         "max_attempts": config["max_attempts"], "model": config["model"],
@@ -52,7 +60,7 @@ def arm_summary(report: dict) -> dict:
         "local_complete": report["local_integrity"]["complete"],
         "cloud_status": report["cloud_verification"]["status"], "scheduled": n,
         "passes": passes, "percent": {k: round(100 * v / n, 2) if n else None for k, v in passes.items()},
-        "attempt_counts": dict(sorted(Counter(attempts).items())),
+        "attempt_counts": dict(sorted(Counter(attempts).items())), "with_draft": with_draft,
         "actor_calls": {"total": sum(attempts) if len(attempts) == n else None, "known_subtotal": sum(attempts),
                         "known_rows": len(attempts), "missing_rows": n - len(attempts)},
         **{key: totals[key] for key in MEASURES}, "rows": rows,
@@ -97,6 +105,10 @@ def compare_reports(single: dict, reflective: dict) -> dict:
         ra, rb = a["rows"][case_id], b["rows"][case_id]
         if ra["all_static"] == rb["all_static"] and ra["graph_status"] == rb["graph_status"]:
             change = "same"
+        elif ra["draft"] != rb["draft"]:
+            # One arm never got code out of the model. That is a first-attempt
+            # parse failure, not evidence about the repair loop either way.
+            change = "no draft in " + ("A" if not ra["draft"] else "B")
         elif (not ra["all_static"] and rb["all_static"]) or (ra["graph_status"] != "passed" and rb["graph_status"] == "passed"):
             change = "improved"
         else:
@@ -147,6 +159,11 @@ def render_comparison_markdown(comparison: dict) -> str:
                      f"{_fmt(d[key].get('total'))}" + (f" (×{d[key]['ratio']})" if d[key].get("ratio") else "") + " |")
     lines += [f"| actor model calls | {_fmt(a['actor_calls']['total'])} | {_fmt(b['actor_calls']['total'])} | {_fmt(d['actor_calls']['total'])} |",
               f"| attempts used per row | {a['attempt_counts']} | {b['attempt_counts']} | |", "",
+              "## Only the rows where the model produced a draft", "",
+              "A row with no draft failed before validation, so no repair lap was possible. "
+              "These counts show what reflection did on the rows it could act on.", "",
+              "| Measure | A: one attempt | B: reflection |", "| --- | --- | --- |",
+              *[f"| {k} | {a['with_draft'][k]} | {b['with_draft'][k]} |" for k in a["with_draft"]], "",
               "## Each example", "", "| Case | A status (attempts) | A all-static | B status (attempts) | B all-static | Repairs used | Change |",
               "| --- | --- | --- | --- | --- | --- | --- |"]
     for row in comparison["per_case"]:

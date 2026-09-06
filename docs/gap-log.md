@@ -155,3 +155,19 @@ Four deterministic gates, in the order the taxonomy demands: **compile (T1,
 T2) → residue (T3) → lint (T4) → parity (T5)**. T6–T8 are the reason the
 gates are necessary but not sufficient — they justify the critic (5), the
 judge (6.4), the execution evals (11.2), and the human in the loop (7.2).
+
+## Addendum 2026-09-06 — measured in Phase 6.2/6.3 (T9)
+
+### T9 · Structured-output shape failure — no code at all
+The actor's reply for `ConversionResult` sometimes puts `notes` as one string
+instead of a list. Pydantic rejects it, `convert` records a conversion error,
+and the graph routes to `assemble` with no draft: no validation, no critic, no
+repair. Seen in 5 of 36 first drafts across the 6.2 baseline and both 6.3 arms
+(WindowsPage; IframeTest; AlertsPage, LoginPage, WindowsTest). It is the single
+largest source of failed rows and it is invisible to the reflection loop.
+*Gate:* none today. *Fix options (each is a converter change and needs its own
+green eval run, measured with `scripts/run_reflection_ab.py`):* coerce a string
+`notes` into a one-item list in the schema; use the JSON-schema structured-output
+method for the actor as the critic already does; or route a conversion error on
+attempt 1 back to `convert` while budget remains. Evidence:
+[phase-6.3-report.md](phase-6.3-report.md).

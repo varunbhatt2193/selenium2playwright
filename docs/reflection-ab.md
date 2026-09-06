@@ -82,8 +82,10 @@ The experiment name becomes `s2p-6.3-<model>-attempts<N>-<id>`.
 are a fair pair, and computes B minus A for every metric: the four gates, the
 "all four passed" count, the "graph report passed" count, wall-clock seconds,
 actor tokens, critic tokens, cost where LangSmith reports it, and the number of
-model calls. It also labels each of the 12 cases `same`, `improved`, or
-`regressed`, and writes a short markdown scorecard.
+model calls. It also labels each of the 12 cases `same`, `improved`,
+`regressed`, or `no draft in A/B` (the model's reply never parsed into code,
+so that row says nothing about the repair loop), and writes a short
+markdown scorecard.
 
 **`scripts/run_reflection_ab.py`** (new) — runs arm A, then arm B, then the
 comparison, into one folder under `out/6.3/`. Without `--run` it only writes
@@ -123,7 +125,33 @@ revision is what makes the result reviewable by someone else.
   many repairs arm B actually used. Most files pass on the first try, so the
   loop only costs extra on the files that needed it.
 
-## 6. What this does not prove
+## 6. What we measured (2026-09-06, Opus, 12 files)
+
+| | A: one attempt | B: reflection |
+| --- | --- | --- |
+| All four checks passed | 11 of 12 | 9 of 12 |
+| Graph report passed | 9 of 12 | 8 of 12 |
+| Actor model calls | 12 | 14 |
+| Actor tokens | 51,327 | 62,347 |
+| Wall-clock | 174.5 s | 174.2 s |
+
+At first glance reflection looks worse. The per-file table explains it. Four
+files across the two arms (one in A, three in B) never produced code at all:
+the model wrote `notes` as a sentence instead of a list, the reply failed to
+parse, and the graph went straight to assembly. Reflection cannot fix a file it
+never sees. That failure is random from run to run, and it is the biggest
+quality problem in the pipeline right now.
+
+Looking only at files that did produce a draft: every one passed all four
+checks on the first try in both arms. Reflection fired on two files in arm B
+and turned one of them from "needs review" into "passed". The price was two
+extra model calls and about 11,000 extra tokens.
+
+So the number that replaces "perfect" is: **9 to 11 files out of 12 pass all
+four static checks per run, and 1 to 3 first drafts out of 12 fail to parse.**
+Full evidence and links: [phase-6.3-report.md](phase-6.3-report.md).
+
+## 7. What this does not prove
 
 - The checks are static. A file can pass all four and still behave wrongly in a
   browser. Browser-based evals are a later phase.
@@ -132,7 +160,7 @@ revision is what makes the result reviewable by someone else.
 - Arm A still runs the critic. That is deliberate so both arms produce the same
   report shape, but it means arm A is not the cheapest possible pipeline.
 
-## 7. Check yourself
+## 8. Check yourself
 
 1. In arm A the critic says "revise". What does the graph do next, and which
    function decides that?
@@ -140,8 +168,10 @@ revision is what makes the result reviewable by someone else.
    command-line flag?
 3. The comparison says `comparable: False` with "configuration.model differs".
    Is the quality delta still meaningful? Why not?
-4. Arm B used two attempts on one file and one attempt on the other eleven.
-   Roughly how many extra model calls did reflection cost on this dataset?
+4. Arm B used two attempts on two files and one attempt on the other ten.
+   How many extra actor calls did reflection cost on this dataset?
+5. Three files in arm B produced no code because the reply did not parse.
+   Which edge in the graph decided that, and why did the repair loop not run?
 
 Answers are in the code comments and in [phase-6.3-report.md](phase-6.3-report.md).
 
