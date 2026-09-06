@@ -2,12 +2,10 @@
 
 ## Current position
 
-**Phase 6.3 is complete. 6.5 reflection-per-actor: Haiku done and verified;
-Sonnet arm A valid, arm B INVALID (Anthropic credits ran out mid-run, gap
-T10) and must be rerun after Varun tops up credits; then redraw
-`docs/reflection-shootout.svg` with three actors. After that: 6.4
-(LLM-as-judge), not started.** Sonnet status and the exact rerun commands:
-[phase-6.5-sonnet-report.md](phase-6.5-sonnet-report.md). Commit/push authorization persists. Read
+**Phase 6.3 is complete. 6.5 reflection-per-actor (Haiku, Sonnet, Opus
+actors, Opus critic) is complete and drawn in `docs/reflection-shootout.svg`
+(README). Next is 6.4 (LLM-as-judge); it has not started.** Start with
+[reflection-shootout.md](reflection-shootout.md). Commit/push authorization persists. Read
 [reflection-haiku-ab.md](reflection-haiku-ab.md) (plain English) and
 [phase-6.5-haiku-report.md](phase-6.5-haiku-report.md) (evidence) first;
 [reflection-ab.md](reflection-ab.md) / [phase-6.3-report.md](phase-6.3-report.md)
@@ -37,9 +35,15 @@ are the Opus A/B they build on.
   `docs/reflection-shootout-table.md`, embedded in README.
 - Tests: `tests/test_eval_shootout.py` (2), provider-error test in
   `test_reflection_ab.py`; 109 total.
-- Sonnet arm A: `facf5bdd-5725-4b1c-8764-9dba41d9ae0f`, 12/12 static, 9/12
-  passed, $0.317. Arm B `fc93d48b-91ad-4efc-9b1b-6b918d797fa5` invalid.
-  Receipt `docs/phase-6.5-sonnet-comparison-invalid.json`.
+- Sonnet, valid run at `52256a9` (third attempt; first hit a credit failure,
+  T10; second hung after the Mac slept, killed; run live experiments under
+  `caffeinate -i -s`): A `5773296b-6650-4850-a5a3-8d716adc5e1e`, B
+  `fedf9a3c-ac1a-4316-a8df-11fd6c94563a`; static 12/12 both; graph 11/12 →
+  10/12 (login-page: critic variance then TODOs); 3 repairs; cost $0.289 →
+  $0.404. Receipt `docs/phase-6.5-sonnet-comparison.json`; report
+  `docs/phase-6.5-sonnet-report.md`; artifacts
+  `out/6.5/ab-20260906T231129Z-98298800/`.
+- `docs/reflection-shootout.md` is the one-page reading of all three actors.
 
 ## Live evidence (revision `1c8edad`, clean)
 

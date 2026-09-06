@@ -1,72 +1,93 @@
-# Phase 6.5 (part 2) — Sonnet writes, Opus reviews: arm A valid, arm B invalid
+# Phase 6.5 (part 2) — Sonnet writes, Opus reviews
 
 Same A/B as the [Haiku run](phase-6.5-haiku-report.md) with
 `anthropic:claude-sonnet-5` as the actor and `anthropic:claude-opus-5` as the
-critic, revision `c48e5f6`, clean worktree, pinned dataset version
-`2026-09-06T03:05:09.476354+00:00`.
+critic in both arms. Only `max_attempts` differs (1 vs 3). Revision
+`52256a9`, clean worktree, pinned dataset version
+`2026-09-06T03:05:09.476354+00:00`, both arms complete locally and verified
+in LangSmith (12 roots, 96 feedback each), `comparable: true`.
 
-## What happened
+## The result
 
-Arm A (one attempt) completed and verified. Arm B (up to three attempts) ran
-all twelve rows, but during the last two the Anthropic account ran out of
-credits. Two actor calls returned:
+| Metric | A: Sonnet, one attempt | B: Sonnet, reflection | Delta |
+| --- | --- | --- | --- |
+| All four static gates passed | 12/12 | 12/12 | 0 |
+| Graph report `passed` | 11/12 (91.7%) | 10/12 (83.3%) | −1 |
+| Rows that used a repair lap | 0 | 3 (2 used two attempts, 1 used three) | +3 |
+| Actor model calls | 12 | 16 | +4 |
+| Actor tokens | 50,844 | 74,396 | +23,552 (×1.46) |
+| Critic tokens (Opus) | 55,688 | 75,976 | +20,288 (×1.36) |
+| Target wall-clock (sum) | 142.0 s | 209.0 s | +67.0 s (×1.47) |
+| LangSmith root cost | $0.289290 (12/12) | $0.404408 (12/12) | +$0.12 (×1.40) |
 
-```
-Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error',
-'message': 'Your credit balance is too low to access the Anthropic API. ...'}}
-```
+Per case (the other nine rows passed on attempt 1 in both arms):
 
-`windows-page` lost its third attempt (its attempt-2 draft was kept, still
-needs-review) and `windows-test` got no draft at all on attempt 1. LangSmith
-still verified the experiment, and the original comparison called it
-"comparable" with the headline "all-static 12/12 → 11/12, graph 9/12 → 8/12".
-That headline is wrong: it is a billing failure, not a model result. This is
-gap **T10** in [gap-log.md](gap-log.md); `eval_compare` now refuses an arm
-that contains a provider error, and the regenerated receipt says so:
+| Case | A: one attempt | B: reflection | Attribution |
+| --- | --- | --- | --- |
+| iframe-page | passed | critic revise on attempt 1, **passed** on attempt 2 | critic variance triggered a lap; the lap ended clean |
+| windows-page | needs-review (critic revise) | attempt 2: gates + critic pass, 2 `TODO(review)` → needs-review | reflection fixed the review; the ledger correctly keeps a human in |
+| login-page | passed | critic revise on attempt 1; attempt 3 passes gates + critic, 3 `TODO(review)` → needs-review | labelled `regressed`; see below |
 
-> Not comparable: arm B has provider errors (infrastructure, not model
-> quality) on windows-page, windows-test; rerun that arm.
+**Reading.** Sonnet's first drafts are as clean as Opus's: every one passed
+all four static gates and the critic accepted eleven of twelve. The loop
+fired on three rows. It never fixed a static failure because there were
+none; what it did was follow the critic's revision requests, and the repaired
+drafts came back with explicit `TODO(review)` notes on the locator choices
+(`#username` kept as CSS because the source gave no accessible name). Under
+the report rules a TODO means "needs review", so the fully-passed count went
+down by one even though the code did not get worse. That row is the same
+critic-variance effect seen in 6.3: with one attempt the critic passed the
+draft, with three it asked for a revision on an equivalent draft.
 
-**Arm B must be rerun once credits are restored.** Nothing below uses it.
+Compared with the other actors ([three-way table](reflection-shootout-table.md)):
+Sonnet alone (11/12) already matches Opus with reflection (11/12) at about
+half the cost ($0.29 vs ≥$0.54), and reflection adds cost without adding
+passes. On this dataset Sonnet is the cheapest actor that does not need the
+loop.
 
-## Arm A: Sonnet, one attempt (valid)
+## What was held fixed
 
-| Metric | Value |
+| Setting | Recorded value |
 | --- | --- |
-| All four static gates passed | 12/12 |
-| Graph report `passed` | 9/12 (needs-review: iframe-page, login-page, windows-page, all critic `revise`) |
-| Actor tokens / critic tokens | 50,933 / 56,831 |
-| Target wall-clock (sum) | 155.9 s |
-| LangSmith root cost | $0.316863 (12/12 rows) |
-| Experiment | [`s2p-6.5-claude-sonnet-5-critic-claude-opus-5-attempts1-fc66b840`](https://smith.langchain.com/o/32ac11b4-3e72-4765-a59b-5dc1bcd32cbe/datasets/33c80b1e-96bd-4b5b-a9c1-ca49d215828f/compare?selectedSessions=facf5bdd-5725-4b1c-8764-9dba41d9ae0f), ID `facf5bdd-5725-4b1c-8764-9dba41d9ae0f` |
-| Configuration SHA-256 | `efdc32455f94eb4ac23f3bc634929aa6adf4320942658b84ca2885a08f46ea42` |
+| Dataset | `selenium2playwright-v1-4920b5f319d8`, ID `33c80b1e-96bd-4b5b-a9c1-ca49d215828f` |
+| Collection SHA-256 | `4920b5f319d827a25a3d8f1a2f026c430e1fb20bdb897c6b9c3599f55b8aeb3d` |
+| Actor / critic | `anthropic:claude-sonnet-5` / `anthropic:claude-opus-5` (effort medium) |
+| Evaluators | `deterministic-v1`; concurrency 1; repetitions 1 |
 
-For scale: Opus alone was 12/12 static and 6/12 graph-passed; Haiku alone was
-9/12 and 2/12. Sonnet's first drafts are as clean as Opus's on the static
-gates and the critic accepted more of them. One run; treat as indicative.
+| Arm | Experiment | ID | Configuration SHA-256 |
+| --- | --- | --- | --- |
+| A: one attempt | [`s2p-6.5-claude-sonnet-5-critic-claude-opus-5-attempts1-10e199aa`](https://smith.langchain.com/o/32ac11b4-3e72-4765-a59b-5dc1bcd32cbe/datasets/33c80b1e-96bd-4b5b-a9c1-ca49d215828f/compare?selectedSessions=5773296b-6650-4850-a5a3-8d716adc5e1e) | `5773296b-6650-4850-a5a3-8d716adc5e1e` | `8453e3f3c714faade58f0afd34d111584f1b3721ca4ef4c380bb77c52b3353c0` |
+| B: reflection | [`s2p-6.5-claude-sonnet-5-critic-claude-opus-5-attempts3-58d0a7f4`](https://smith.langchain.com/o/32ac11b4-3e72-4765-a59b-5dc1bcd32cbe/datasets/33c80b1e-96bd-4b5b-a9c1-ca49d215828f/compare?selectedSessions=fedf9a3c-ac1a-4316-a8df-11fd6c94563a) | `fedf9a3c-ac1a-4316-a8df-11fd6c94563a` | `e072d908c650d1a6641dc32308b3072c31e85cdedc76b6aa29d533c73ea9f3c3` |
 
-## Arm B: Sonnet, reflection (invalid, kept for the record)
+[Side-by-side in LangSmith](https://smith.langchain.com/o/32ac11b4-3e72-4765-a59b-5dc1bcd32cbe/datasets/33c80b1e-96bd-4b5b-a9c1-ca49d215828f/compare?selectedSessions=5773296b-6650-4850-a5a3-8d716adc5e1e,fedf9a3c-ac1a-4316-a8df-11fd6c94563a).
 
-Experiment `s2p-6.5-claude-sonnet-5-critic-claude-opus-5-attempts3-1f892a3c`,
-ID `fc93d48b-91ad-4efc-9b1b-6b918d797fa5`, configuration `93190431c422…`.
-Before the credit failure, the ten unaffected rows matched arm A row for row
-(nine passed on attempt 1; iframe-page and login-page used all three
-attempts and stayed needs-review with one TODO each). Receipt with the
-refusal recorded: [phase-6.5-sonnet-comparison-invalid.json](phase-6.5-sonnet-comparison-invalid.json).
-Local artifacts (ignored): `out/6.5/ab-20260906T153717Z-45002cfe/`.
+![LangSmith comparison of the Sonnet one-attempt and reflection experiments](phase-6.5-sonnet-delta.jpg)
 
-## To finish this step
+## Two earlier attempts, both discarded
 
-```bash
-# after topping up credits, on a clean worktree
-.venv/bin/python scripts/run_reflection_ab.py --run --phase 6.5 \
-    --model anthropic:claude-sonnet-5 --critic-model anthropic:claude-opus-5
-# then redraw the diagram with all three actors
-.venv/bin/python scripts/render_actor_shootout.py \
-    Haiku=docs/phase-6.5-haiku-comparison.json \
-    Sonnet=docs/phase-6.5-sonnet-comparison.json \
-    Opus=docs/phase-6.3-comparison.json \
-    --svg docs/reflection-shootout.svg --md docs/reflection-shootout-table.md
-```
+1. **Credits ran out** (revision `c48e5f6`, arm A `facf5bdd-…`, arm B
+   `fc93d48b-…`). Two arm-B rows got `Error code: 400 … credit balance is
+   too low`. The comparison at the time called it comparable; gap **T10**
+   ([gap-log.md](gap-log.md)) made `eval_compare` refuse arms with provider
+   errors. Receipt kept as
+   [phase-6.5-sonnet-comparison-invalid.json](phase-6.5-sonnet-comparison-invalid.json).
+2. **Mac slept mid-run** (revision `52256a9`, arm A `fdf45f0d-…` verified,
+   arm B `bd57f0ac-…` stalled after row 3 with no open socket and 5 s of CPU
+   over 6.7 h). Killed. The successful run was started under `caffeinate -i -s`.
+   Artifacts: `out/6.5/discarded-hung-after-sleep-ab-20260906T162853Z-72be586f/`.
 
-The rerun repeats arm A as well, so both arms cite one revision.
+Both arm-A results from those attempts (12/12 static; 9/12 and 10/12
+passed) sit inside the spread of the valid run; none are used above.
+
+## What this does not prove
+
+- Static gates plus the critic's verdict, not a browser run.
+- One run per arm; the `login-page` swing is one row of critic variance.
+- No Sonnet-critic arm; the critic is Opus everywhere by design.
+
+## Evidence
+
+- Tracked: [phase-6.5-sonnet-comparison.json](phase-6.5-sonnet-comparison.json),
+  [phase-6.5-sonnet-delta.jpg](phase-6.5-sonnet-delta.jpg).
+- Local, ignored: `out/6.5/ab-20260906T231129Z-98298800/` (plan, journal,
+  report, cloud readback per arm, `comparison.md`, `run.log`).

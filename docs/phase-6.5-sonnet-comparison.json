@@ -1,0 +1,902 @@
+{
+  "schema_version": 1,
+  "comparable": true,
+  "issues": [],
+  "held_fixed": {
+    "dataset_id": "33c80b1e-96bd-4b5b-a9c1-ca49d215828f",
+    "dataset_version": "2026-09-06T03:05:09.476354+00:00",
+    "collection_sha256": "4920b5f319d827a25a3d8f1a2f026c430e1fb20bdb897c6b9c3599f55b8aeb3d",
+    "model": "anthropic:claude-sonnet-5",
+    "critic_model": "anthropic:claude-opus-5",
+    "git_revision": "52256a9c708aacd85668e5f385c9a47e4e480b08",
+    "evaluator_version": "deterministic-v1"
+  },
+  "arms": {
+    "one_attempt": {
+      "experiment": {
+        "name": "s2p-6.5-claude-sonnet-5-critic-claude-opus-5-attempts1-10e199aa",
+        "id": "5773296b-6650-4850-a5a3-8d716adc5e1e",
+        "url": "https://smith.langchain.com/o/32ac11b4-3e72-4765-a59b-5dc1bcd32cbe/datasets/33c80b1e-96bd-4b5b-a9c1-ca49d215828f/compare?selectedSessions=5773296b-6650-4850-a5a3-8d716adc5e1e",
+        "mode": "live_converter",
+        "elapsed_seconds": 144.45387420800398
+      },
+      "max_attempts": 1,
+      "model": "anthropic:claude-sonnet-5",
+      "critic_model": "anthropic:claude-opus-5",
+      "phase": "6.5",
+      "configuration_sha256": "8453e3f3c714faade58f0afd34d111584f1b3721ca4ef4c380bb77c52b3353c0",
+      "git_revision": "52256a9c708aacd85668e5f385c9a47e4e480b08",
+      "git_dirty": false,
+      "local_complete": true,
+      "provider_error_rows": [],
+      "cloud_status": "verified",
+      "scheduled": 12,
+      "passes": {
+        "compiles": 12,
+        "residue_free": 12,
+        "typed_lint_pass": 12,
+        "parity_pass": 12,
+        "all_static_passed": 12,
+        "graph_report_passed": 11
+      },
+      "percent": {
+        "compiles": 100.0,
+        "residue_free": 100.0,
+        "typed_lint_pass": 100.0,
+        "parity_pass": 100.0,
+        "all_static_passed": 100.0,
+        "graph_report_passed": 91.67
+      },
+      "attempt_counts": {
+        "1": 12
+      },
+      "with_draft": {
+        "rows": 12,
+        "no_draft_rows": 0,
+        "all_static_passed": 12,
+        "graph_report_passed": 11,
+        "repaired_rows": 0
+      },
+      "actor_calls": {
+        "total": 12,
+        "known_subtotal": 12,
+        "known_rows": 12,
+        "missing_rows": 0
+      },
+      "target_seconds": {
+        "total": "141.984798789984778",
+        "known_subtotal": "141.984798789984778",
+        "known_rows": 12,
+        "missing_rows": 0
+      },
+      "actor_total_tokens": {
+        "total": "50844",
+        "known_subtotal": "50844",
+        "known_rows": 12,
+        "missing_rows": 0
+      },
+      "critic_total_tokens": {
+        "total": "55688",
+        "known_subtotal": "55688",
+        "known_rows": 12,
+        "missing_rows": 0
+      },
+      "langsmith_root_cost_usd": {
+        "total": "0.2892895",
+        "known_subtotal": "0.2892895",
+        "known_rows": 12,
+        "missing_rows": 0
+      },
+      "rows": {
+        "alerts-page": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 16.143853832996683,
+          "actor_tokens": 4504,
+          "critic_tokens": 4922,
+          "cost_usd": "0.0498625"
+        },
+        "alerts-test": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 8.437548832996981,
+          "actor_tokens": 4860,
+          "critic_tokens": 5082,
+          "cost_usd": "0.021713"
+        },
+        "dynamic-loading-page": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 10.344410833000438,
+          "actor_tokens": 3709,
+          "critic_tokens": 4057,
+          "cost_usd": "0.016102"
+        },
+        "dynamic-loading-test": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 7.948033000000578,
+          "actor_tokens": 4166,
+          "critic_tokens": 4377,
+          "cost_usd": "0.016184"
+        },
+        "iframe-page": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 15.31621595800243,
+          "actor_tokens": 3946,
+          "critic_tokens": 4595,
+          "cost_usd": "0.02623"
+        },
+        "iframe-test": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 7.957186666993948,
+          "actor_tokens": 4143,
+          "critic_tokens": 4356,
+          "cost_usd": "0.015849"
+        },
+        "login-page": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 13.885873040999286,
+          "actor_tokens": 4002,
+          "critic_tokens": 4549,
+          "cost_usd": "0.02424"
+        },
+        "login-test": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 8.038588208000874,
+          "actor_tokens": 4399,
+          "critic_tokens": 4632,
+          "cost_usd": "0.018237"
+        },
+        "upload-page": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 12.03105245900224,
+          "actor_tokens": 3965,
+          "critic_tokens": 4320,
+          "cost_usd": "0.019321"
+        },
+        "upload-test": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 8.578825999997207,
+          "actor_tokens": 4626,
+          "critic_tokens": 4866,
+          "cost_usd": "0.021157"
+        },
+        "windows-page": {
+          "graph_status": "needs-review",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 22.759476957995503,
+          "actor_tokens": 4185,
+          "critic_tokens": 5298,
+          "cost_usd": "0.040627"
+        },
+        "windows-test": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 10.54373299999861,
+          "actor_tokens": 4339,
+          "critic_tokens": 4634,
+          "cost_usd": "0.019767"
+        }
+      }
+    },
+    "reflective": {
+      "experiment": {
+        "name": "s2p-6.5-claude-sonnet-5-critic-claude-opus-5-attempts3-58d0a7f4",
+        "id": "fedf9a3c-ac1a-4316-a8df-11fd6c94563a",
+        "url": "https://smith.langchain.com/o/32ac11b4-3e72-4765-a59b-5dc1bcd32cbe/datasets/33c80b1e-96bd-4b5b-a9c1-ca49d215828f/compare?selectedSessions=fedf9a3c-ac1a-4316-a8df-11fd6c94563a",
+        "mode": "live_converter",
+        "elapsed_seconds": 210.71079504200316
+      },
+      "max_attempts": 3,
+      "model": "anthropic:claude-sonnet-5",
+      "critic_model": "anthropic:claude-opus-5",
+      "phase": "6.5",
+      "configuration_sha256": "e072d908c650d1a6641dc32308b3072c31e85cdedc76b6aa29d533c73ea9f3c3",
+      "git_revision": "52256a9c708aacd85668e5f385c9a47e4e480b08",
+      "git_dirty": false,
+      "local_complete": true,
+      "provider_error_rows": [],
+      "cloud_status": "verified",
+      "scheduled": 12,
+      "passes": {
+        "compiles": 12,
+        "residue_free": 12,
+        "typed_lint_pass": 12,
+        "parity_pass": 12,
+        "all_static_passed": 12,
+        "graph_report_passed": 10
+      },
+      "percent": {
+        "compiles": 100.0,
+        "residue_free": 100.0,
+        "typed_lint_pass": 100.0,
+        "parity_pass": 100.0,
+        "all_static_passed": 100.0,
+        "graph_report_passed": 83.33
+      },
+      "attempt_counts": {
+        "1": 9,
+        "2": 2,
+        "3": 1
+      },
+      "with_draft": {
+        "rows": 12,
+        "no_draft_rows": 0,
+        "all_static_passed": 12,
+        "graph_report_passed": 10,
+        "repaired_rows": 3
+      },
+      "actor_calls": {
+        "total": 16,
+        "known_subtotal": 16,
+        "known_rows": 12,
+        "missing_rows": 0
+      },
+      "target_seconds": {
+        "total": "209.033248957988690",
+        "known_subtotal": "209.033248957988690",
+        "known_rows": 12,
+        "missing_rows": 0
+      },
+      "actor_total_tokens": {
+        "total": "74396",
+        "known_subtotal": "74396",
+        "known_rows": 12,
+        "missing_rows": 0
+      },
+      "critic_total_tokens": {
+        "total": "75976",
+        "known_subtotal": "75976",
+        "known_rows": 12,
+        "missing_rows": 0
+      },
+      "langsmith_root_cost_usd": {
+        "total": "0.404408",
+        "known_subtotal": "0.404408",
+        "known_rows": 12,
+        "missing_rows": 0
+      },
+      "rows": {
+        "alerts-page": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 14.790115165997122,
+          "actor_tokens": 4509,
+          "critic_tokens": 4982,
+          "cost_usd": "0.027815"
+        },
+        "alerts-test": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 10.773672333001741,
+          "actor_tokens": 4877,
+          "critic_tokens": 5102,
+          "cost_usd": "0.022015"
+        },
+        "dynamic-loading-page": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 8.084197834003135,
+          "actor_tokens": 3756,
+          "critic_tokens": 3968,
+          "cost_usd": "0.013359"
+        },
+        "dynamic-loading-test": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 8.891927208998823,
+          "actor_tokens": 4217,
+          "critic_tokens": 4428,
+          "cost_usd": "0.016965"
+        },
+        "iframe-page": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 2,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 30.90013054099836,
+          "actor_tokens": 9111,
+          "critic_tokens": 9366,
+          "cost_usd": "0.057138"
+        },
+        "iframe-test": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 9.52931499999977,
+          "actor_tokens": 4112,
+          "critic_tokens": 4410,
+          "cost_usd": "0.017525"
+        },
+        "login-page": {
+          "graph_status": "needs-review",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 3,
+          "all_static": true,
+          "todos": 3,
+          "target_seconds": 46.0579561669947,
+          "actor_tokens": 16034,
+          "critic_tokens": 14833,
+          "cost_usd": "0.096646"
+        },
+        "login-test": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 8.127151665998099,
+          "actor_tokens": 4422,
+          "critic_tokens": 4655,
+          "cost_usd": "0.018598"
+        },
+        "upload-page": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 13.290376249999099,
+          "actor_tokens": 3975,
+          "critic_tokens": 4461,
+          "cost_usd": "0.022738"
+        },
+        "upload-test": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 10.15838754199649,
+          "actor_tokens": 4629,
+          "critic_tokens": 4869,
+          "cost_usd": "0.021186"
+        },
+        "windows-page": {
+          "graph_status": "needs-review",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 2,
+          "all_static": true,
+          "todos": 2,
+          "target_seconds": 37.583487208001316,
+          "actor_tokens": 10432,
+          "critic_tokens": 10264,
+          "cost_usd": "0.070266"
+        },
+        "windows-test": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 10.846532042000035,
+          "actor_tokens": 4322,
+          "critic_tokens": 4638,
+          "cost_usd": "0.020157"
+        }
+      }
+    }
+  },
+  "delta": {
+    "passes": {
+      "compiles": 0,
+      "residue_free": 0,
+      "typed_lint_pass": 0,
+      "parity_pass": 0,
+      "all_static_passed": 0,
+      "graph_report_passed": -1
+    },
+    "percent_points": {
+      "compiles": 0.0,
+      "residue_free": 0.0,
+      "typed_lint_pass": 0.0,
+      "parity_pass": 0.0,
+      "all_static_passed": 0.0,
+      "graph_report_passed": -8.33
+    },
+    "target_seconds": {
+      "total": "67.048450168003912",
+      "ratio": "1.472"
+    },
+    "actor_total_tokens": {
+      "total": "23552",
+      "ratio": "1.463"
+    },
+    "critic_total_tokens": {
+      "total": "20288",
+      "ratio": "1.364"
+    },
+    "langsmith_root_cost_usd": {
+      "total": "0.1151185",
+      "ratio": "1.398"
+    },
+    "actor_calls": {
+      "total": 4
+    }
+  },
+  "per_case": [
+    {
+      "case_id": "alerts-page",
+      "one_attempt": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 16.143853832996683,
+        "actor_tokens": 4504,
+        "critic_tokens": 4922,
+        "cost_usd": "0.0498625"
+      },
+      "reflective": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 14.790115165997122,
+        "actor_tokens": 4509,
+        "critic_tokens": 4982,
+        "cost_usd": "0.027815"
+      },
+      "change": "same",
+      "repairs_used": 0
+    },
+    {
+      "case_id": "alerts-test",
+      "one_attempt": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 8.437548832996981,
+        "actor_tokens": 4860,
+        "critic_tokens": 5082,
+        "cost_usd": "0.021713"
+      },
+      "reflective": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 10.773672333001741,
+        "actor_tokens": 4877,
+        "critic_tokens": 5102,
+        "cost_usd": "0.022015"
+      },
+      "change": "same",
+      "repairs_used": 0
+    },
+    {
+      "case_id": "dynamic-loading-page",
+      "one_attempt": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 10.344410833000438,
+        "actor_tokens": 3709,
+        "critic_tokens": 4057,
+        "cost_usd": "0.016102"
+      },
+      "reflective": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 8.084197834003135,
+        "actor_tokens": 3756,
+        "critic_tokens": 3968,
+        "cost_usd": "0.013359"
+      },
+      "change": "same",
+      "repairs_used": 0
+    },
+    {
+      "case_id": "dynamic-loading-test",
+      "one_attempt": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 7.948033000000578,
+        "actor_tokens": 4166,
+        "critic_tokens": 4377,
+        "cost_usd": "0.016184"
+      },
+      "reflective": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 8.891927208998823,
+        "actor_tokens": 4217,
+        "critic_tokens": 4428,
+        "cost_usd": "0.016965"
+      },
+      "change": "same",
+      "repairs_used": 0
+    },
+    {
+      "case_id": "iframe-page",
+      "one_attempt": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 15.31621595800243,
+        "actor_tokens": 3946,
+        "critic_tokens": 4595,
+        "cost_usd": "0.02623"
+      },
+      "reflective": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 2,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 30.90013054099836,
+        "actor_tokens": 9111,
+        "critic_tokens": 9366,
+        "cost_usd": "0.057138"
+      },
+      "change": "same",
+      "repairs_used": 1
+    },
+    {
+      "case_id": "iframe-test",
+      "one_attempt": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 7.957186666993948,
+        "actor_tokens": 4143,
+        "critic_tokens": 4356,
+        "cost_usd": "0.015849"
+      },
+      "reflective": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 9.52931499999977,
+        "actor_tokens": 4112,
+        "critic_tokens": 4410,
+        "cost_usd": "0.017525"
+      },
+      "change": "same",
+      "repairs_used": 0
+    },
+    {
+      "case_id": "login-page",
+      "one_attempt": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 13.885873040999286,
+        "actor_tokens": 4002,
+        "critic_tokens": 4549,
+        "cost_usd": "0.02424"
+      },
+      "reflective": {
+        "graph_status": "needs-review",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 3,
+        "all_static": true,
+        "todos": 3,
+        "target_seconds": 46.0579561669947,
+        "actor_tokens": 16034,
+        "critic_tokens": 14833,
+        "cost_usd": "0.096646"
+      },
+      "change": "regressed",
+      "repairs_used": 2
+    },
+    {
+      "case_id": "login-test",
+      "one_attempt": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 8.038588208000874,
+        "actor_tokens": 4399,
+        "critic_tokens": 4632,
+        "cost_usd": "0.018237"
+      },
+      "reflective": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 8.127151665998099,
+        "actor_tokens": 4422,
+        "critic_tokens": 4655,
+        "cost_usd": "0.018598"
+      },
+      "change": "same",
+      "repairs_used": 0
+    },
+    {
+      "case_id": "upload-page",
+      "one_attempt": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 12.03105245900224,
+        "actor_tokens": 3965,
+        "critic_tokens": 4320,
+        "cost_usd": "0.019321"
+      },
+      "reflective": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 13.290376249999099,
+        "actor_tokens": 3975,
+        "critic_tokens": 4461,
+        "cost_usd": "0.022738"
+      },
+      "change": "same",
+      "repairs_used": 0
+    },
+    {
+      "case_id": "upload-test",
+      "one_attempt": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 8.578825999997207,
+        "actor_tokens": 4626,
+        "critic_tokens": 4866,
+        "cost_usd": "0.021157"
+      },
+      "reflective": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 10.15838754199649,
+        "actor_tokens": 4629,
+        "critic_tokens": 4869,
+        "cost_usd": "0.021186"
+      },
+      "change": "same",
+      "repairs_used": 0
+    },
+    {
+      "case_id": "windows-page",
+      "one_attempt": {
+        "graph_status": "needs-review",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 22.759476957995503,
+        "actor_tokens": 4185,
+        "critic_tokens": 5298,
+        "cost_usd": "0.040627"
+      },
+      "reflective": {
+        "graph_status": "needs-review",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 2,
+        "all_static": true,
+        "todos": 2,
+        "target_seconds": 37.583487208001316,
+        "actor_tokens": 10432,
+        "critic_tokens": 10264,
+        "cost_usd": "0.070266"
+      },
+      "change": "same",
+      "repairs_used": 1
+    },
+    {
+      "case_id": "windows-test",
+      "one_attempt": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 10.54373299999861,
+        "actor_tokens": 4339,
+        "critic_tokens": 4634,
+        "cost_usd": "0.019767"
+      },
+      "reflective": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 10.846532042000035,
+        "actor_tokens": 4322,
+        "critic_tokens": 4638,
+        "cost_usd": "0.020157"
+      },
+      "change": "same",
+      "repairs_used": 0
+    }
+  ],
+  "case_changes": {
+    "same": 11,
+    "regressed": 1
+  },
+  "headline": "all-static pass 12/12 -> 12/12 (100.0% -> 100.0%); graph passed 11/12 -> 10/12"
+}

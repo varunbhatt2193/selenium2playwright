@@ -7,50 +7,70 @@
 <rect x="780" y="22" width="14" height="14" fill="#2f6fdb" rx="2"/><text x="800" y="34" class="legend">reflection (≤3)</text>
 <text x="40" y="76" class="title">Fully passed graph report (of 12)</text>
 <line x1="40" y1="280" x2="480" y2="280" class="axis"/>
-<text x="150.0" y="300" class="label">Haiku</text>
-<rect x="79.6" y="251.9" width="66.4" height="28.1" fill="#b9c4d0" rx="3"/>
-<text x="112.8" y="246.9" class="value">2</text>
-<rect x="150.0" y="153.3" width="66.4" height="126.7" fill="#2f6fdb" rx="3"/>
-<text x="183.2" y="148.3" class="value">9</text>
-<text x="370.0" y="300" class="label">Opus</text>
-<rect x="299.6" y="195.6" width="66.4" height="84.4" fill="#b9c4d0" rx="3"/>
-<text x="332.8" y="190.6" class="value">6</text>
-<rect x="370.0" y="125.2" width="66.4" height="154.8" fill="#2f6fdb" rx="3"/>
-<text x="403.2" y="120.2" class="value">11</text>
+<text x="113.33333333333333" y="300" class="label">Haiku</text>
+<rect x="66.4" y="251.9" width="42.9" height="28.1" fill="#b9c4d0" rx="3"/>
+<text x="87.9" y="246.9" class="value">2</text>
+<rect x="113.3" y="153.3" width="42.9" height="126.7" fill="#2f6fdb" rx="3"/>
+<text x="134.8" y="148.3" class="value">9</text>
+<text x="260.0" y="300" class="label">Sonnet</text>
+<rect x="213.1" y="125.2" width="42.9" height="154.8" fill="#b9c4d0" rx="3"/>
+<text x="234.5" y="120.2" class="value">11</text>
+<rect x="260.0" y="139.3" width="42.9" height="140.7" fill="#2f6fdb" rx="3"/>
+<text x="281.5" y="134.3" class="value">10</text>
+<text x="406.66666666666663" y="300" class="label">Opus</text>
+<rect x="359.7" y="195.6" width="42.9" height="84.4" fill="#b9c4d0" rx="3"/>
+<text x="381.2" y="190.6" class="value">6</text>
+<rect x="406.7" y="125.2" width="42.9" height="154.8" fill="#2f6fdb" rx="3"/>
+<text x="428.1" y="120.2" class="value">11</text>
 <text x="540" y="76" class="title">All four static gates passed (of 12)</text>
 <line x1="540" y1="280" x2="980" y2="280" class="axis"/>
-<text x="650.0" y="300" class="label">Haiku</text>
-<rect x="579.6" y="153.3" width="66.4" height="126.7" fill="#b9c4d0" rx="3"/>
-<text x="612.8" y="148.3" class="value">9</text>
-<rect x="650.0" y="111.1" width="66.4" height="168.9" fill="#2f6fdb" rx="3"/>
-<text x="683.2" y="106.1" class="value">12</text>
-<text x="870.0" y="300" class="label">Opus</text>
-<rect x="799.6" y="111.1" width="66.4" height="168.9" fill="#b9c4d0" rx="3"/>
-<text x="832.8" y="106.1" class="value">12</text>
-<rect x="870.0" y="111.1" width="66.4" height="168.9" fill="#2f6fdb" rx="3"/>
-<text x="903.2" y="106.1" class="value">12</text>
+<text x="613.3333333333334" y="300" class="label">Haiku</text>
+<rect x="566.4" y="153.3" width="42.9" height="126.7" fill="#b9c4d0" rx="3"/>
+<text x="587.9" y="148.3" class="value">9</text>
+<rect x="613.3" y="111.1" width="42.9" height="168.9" fill="#2f6fdb" rx="3"/>
+<text x="634.8" y="106.1" class="value">12</text>
+<text x="760.0" y="300" class="label">Sonnet</text>
+<rect x="713.1" y="111.1" width="42.9" height="168.9" fill="#b9c4d0" rx="3"/>
+<text x="734.5" y="106.1" class="value">12</text>
+<rect x="760.0" y="111.1" width="42.9" height="168.9" fill="#2f6fdb" rx="3"/>
+<text x="781.5" y="106.1" class="value">12</text>
+<text x="906.6666666666666" y="300" class="label">Opus</text>
+<rect x="859.7" y="111.1" width="42.9" height="168.9" fill="#b9c4d0" rx="3"/>
+<text x="881.2" y="106.1" class="value">12</text>
+<rect x="906.7" y="111.1" width="42.9" height="168.9" fill="#2f6fdb" rx="3"/>
+<text x="928.1" y="106.1" class="value">12</text>
 <text x="40" y="346" class="title">Rows that used a repair lap (of 12)</text>
 <line x1="40" y1="550" x2="480" y2="550" class="axis"/>
-<text x="150.0" y="570" class="label">Haiku</text>
-<rect x="79.6" y="550.0" width="66.4" height="0.0" fill="#b9c4d0" rx="3"/>
-<text x="112.8" y="545.0" class="value">0</text>
-<rect x="150.0" y="437.4" width="66.4" height="112.6" fill="#2f6fdb" rx="3"/>
-<text x="183.2" y="432.4" class="value">8</text>
-<text x="370.0" y="570" class="label">Opus</text>
-<rect x="299.6" y="550.0" width="66.4" height="0.0" fill="#b9c4d0" rx="3"/>
-<text x="332.8" y="545.0" class="value">0</text>
-<rect x="370.0" y="521.9" width="66.4" height="28.1" fill="#2f6fdb" rx="3"/>
-<text x="403.2" y="516.9" class="value">2</text>
+<text x="113.33333333333333" y="570" class="label">Haiku</text>
+<rect x="66.4" y="550.0" width="42.9" height="0.0" fill="#b9c4d0" rx="3"/>
+<text x="87.9" y="545.0" class="value">0</text>
+<rect x="113.3" y="437.4" width="42.9" height="112.6" fill="#2f6fdb" rx="3"/>
+<text x="134.8" y="432.4" class="value">8</text>
+<text x="260.0" y="570" class="label">Sonnet</text>
+<rect x="213.1" y="550.0" width="42.9" height="0.0" fill="#b9c4d0" rx="3"/>
+<text x="234.5" y="545.0" class="value">0</text>
+<rect x="260.0" y="507.8" width="42.9" height="42.2" fill="#2f6fdb" rx="3"/>
+<text x="281.5" y="502.8" class="value">3</text>
+<text x="406.66666666666663" y="570" class="label">Opus</text>
+<rect x="359.7" y="550.0" width="42.9" height="0.0" fill="#b9c4d0" rx="3"/>
+<text x="381.2" y="545.0" class="value">0</text>
+<rect x="406.7" y="521.9" width="42.9" height="28.1" fill="#2f6fdb" rx="3"/>
+<text x="428.1" y="516.9" class="value">2</text>
 <text x="540" y="346" class="title">LangSmith cost, USD (Opus critic in every bar; dashed = partial total)</text>
 <line x1="540" y1="550" x2="980" y2="550" class="axis"/>
-<text x="650.0" y="570" class="label">Haiku</text>
-<rect x="579.6" y="474.3" width="66.4" height="75.7" fill="#b9c4d0" rx="3"/>
-<text x="612.8" y="469.3" class="value">$0.36</text>
-<rect x="650.0" y="403.8" width="66.4" height="146.2" fill="#2f6fdb" rx="3"/>
-<text x="683.2" y="398.8" class="value">$0.69</text>
-<text x="870.0" y="570" class="label">Opus</text>
-<rect x="799.6" y="440.7" width="66.4" height="109.3" fill="#b9c4d0" rx="3"/>
-<text x="832.8" y="435.7" class="value">$0.52</text>
-<rect x="870.0" y="435.2" width="66.4" height="114.8" fill="none" stroke="#2f6fdb" stroke-width="2" stroke-dasharray="5,4" rx="3"/>
-<text x="903.2" y="430.2" class="value">≥$0.54 (11 rows)</text>
+<text x="613.3333333333334" y="570" class="label">Haiku</text>
+<rect x="566.4" y="474.3" width="42.9" height="75.7" fill="#b9c4d0" rx="3"/>
+<text x="587.9" y="469.3" class="value">$0.36</text>
+<rect x="613.3" y="403.8" width="42.9" height="146.2" fill="#2f6fdb" rx="3"/>
+<text x="634.8" y="398.8" class="value">$0.69</text>
+<text x="760.0" y="570" class="label">Sonnet</text>
+<rect x="713.1" y="488.6" width="42.9" height="61.4" fill="#b9c4d0" rx="3"/>
+<text x="734.5" y="483.6" class="value">$0.29</text>
+<rect x="760.0" y="464.2" width="42.9" height="85.8" fill="#2f6fdb" rx="3"/>
+<text x="781.5" y="459.2" class="value">$0.40</text>
+<text x="906.6666666666666" y="570" class="label">Opus</text>
+<rect x="859.7" y="440.7" width="42.9" height="109.3" fill="#b9c4d0" rx="3"/>
+<text x="881.2" y="435.7" class="value">$0.52</text>
+<rect x="906.7" y="435.2" width="42.9" height="114.8" fill="none" stroke="#2f6fdb" stroke-width="2" stroke-dasharray="5,4" rx="3"/>
+<text x="928.1" y="430.2" class="value">≥$0.54 (11 rows)</text>
 </svg>
