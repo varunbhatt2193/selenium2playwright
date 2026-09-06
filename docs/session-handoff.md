@@ -1,4 +1,4 @@
-# Restart here — 2026-09-06 (after the Haiku reflection A/B)
+# Restart here — 2026-09-06 (after the 6.5 reflection shootout)
 
 ## Current position
 

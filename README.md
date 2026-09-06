@@ -4,6 +4,8 @@
 
 > **Status: building in public.** Phase 5 of 12 implemented — **bounded reflection is working**. The graph converts, validates, and reviews code, then repairs it using the actual findings, for at most three conversion attempts (configurable down to one for evaluation). Assembly always reports the outcome and retains the latest available draft. A live seeded demo repaired a missing `await` on attempt 2: all four gates and the critic passed, while two locator TODOs correctly kept the final status at `needs-review`. See the [reflection walkthrough and demo](docs/reflection-loop.md).
 > Architecture & decisions: [plan.md](plan.md)
+> **In one line:** the agent checks and fixes its own work, and I measured that this self-correction lifts a cheap model from 2 of 12 correct conversions to 9 of 12, while a strong model rarely needs it, so the cost of AI review is spent only where it earns its keep.
+>
 > Complete: **Phase 6.5 — does the repair loop earn its extra calls?** The 6.3 A/B (one attempt vs up to three; only the attempt cap changes) was run per actor with the same Opus critic, on the same 12 pinned files, all arms verified in LangSmith.
 >
 > ![One attempt vs reflection per actor, same Opus critic](docs/reflection-shootout.svg)
