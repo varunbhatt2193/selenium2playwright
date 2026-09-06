@@ -173,3 +173,18 @@ string `notes`/`todos` into a list; field descriptions unchanged. Rerun of the
 method for the actor as the critic already does; or route a conversion error on
 attempt 1 back to `convert` while budget remains. Evidence:
 [phase-6.3-report.md](phase-6.3-report.md).
+
+## Addendum 2026-09-06 — measured in Phase 6.5 (T10)
+
+### T10 · Provider/billing failure counted as a quality row
+During the Sonnet-actor arm B the Anthropic account ran out of credits. Two
+rows received `Error code: 400 … credit balance is too low`: one on attempt 3
+(the earlier draft was kept) and one on attempt 1 (no draft at all). The graph
+handled both as ordinary conversion errors, LangSmith readback verified the
+experiment, and the comparison labelled the second row `no draft in B`, as if
+the model had failed. That is infrastructure, not conversion quality.
+**Fixed 2026-09-06:** `eval_compare` marks any row whose error starts with
+`Error code: ` (an HTTP error from the provider SDK) as a provider error and
+refuses the arm (`comparable: false`, "rerun that arm"). `eval_shootout`
+refuses to draw a receipt that is not comparable. The Sonnet arm B must be
+rerun after credits are restored; arm A is valid and kept.

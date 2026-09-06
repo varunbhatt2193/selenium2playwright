@@ -173,6 +173,20 @@ class AttemptCapEvaluationTests(unittest.TestCase):
         unverified["cloud_verification"] = {"status": "unverified"}
         self.assertIn("arm B cloud readback is unverified", compare_reports(self._report(self.single), unverified)["issues"])
 
+    def test_comparison_refuses_an_arm_with_provider_errors(self):
+        # Seen live on 2026-09-06: the account ran out of credits during arm B.
+        # A 400 from the SDK is not a model result, so the arm is refused.
+        broken = self._report(self.reflective)
+        for row in broken["rows"]:
+            if row["case_id"] == "windows-test":
+                row["outputs"]["report"]["errors"] = ["Error code: 400 - {'type': 'error', 'error': {'type': "
+                                                     "'invalid_request_error', 'message': 'Your credit balance is too low'}}"]
+        comparison = compare_reports(self._report(self.single), broken)
+        self.assertFalse(comparison["comparable"])
+        self.assertIn("arm B has provider errors (infrastructure, not model quality) on windows-test; rerun that arm",
+                      comparison["issues"])
+        self.assertEqual(comparison["arms"]["reflective"]["provider_error_rows"], ["windows-test"])
+
 
 if __name__ == "__main__":
     unittest.main()

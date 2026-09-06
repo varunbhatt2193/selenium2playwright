@@ -2,9 +2,12 @@
 
 ## Current position
 
-**Phase 6.3 is complete. The first part of 6.5 (reflection with a weak
-actor: Haiku writes, Opus reviews) is complete. Next is 6.4 (LLM-as-judge);
-it has not started.** Commit/push authorization persists. Read
+**Phase 6.3 is complete. 6.5 reflection-per-actor: Haiku done and verified;
+Sonnet arm A valid, arm B INVALID (Anthropic credits ran out mid-run, gap
+T10) and must be rerun after Varun tops up credits; then redraw
+`docs/reflection-shootout.svg` with three actors. After that: 6.4
+(LLM-as-judge), not started.** Sonnet status and the exact rerun commands:
+[phase-6.5-sonnet-report.md](phase-6.5-sonnet-report.md). Commit/push authorization persists. Read
 [reflection-haiku-ab.md](reflection-haiku-ab.md) (plain English) and
 [phase-6.5-haiku-report.md](phase-6.5-haiku-report.md) (evidence) first;
 [reflection-ab.md](reflection-ab.md) / [phase-6.3-report.md](phase-6.3-report.md)
@@ -23,6 +26,20 @@ are the Opus A/B they build on.
 - `eval_compare` carries `critic_model` and `phase`; `run_reflection_ab.py`
   gains `--critic-model` and `--phase` (output under `out/<phase>/`).
 - Tests: `tests/test_model_split.py` (7); 106 total.
+
+## Added after the Sonnet run (same day)
+
+- `eval_compare`: any row whose error starts with `Error code: ` (provider
+  HTTP error) marks the arm non-comparable ("rerun that arm").
+- `eval_shootout.py` + `scripts/render_actor_shootout.py`: SVG + markdown
+  table across actors from comparison receipts; refuses non-comparable
+  receipts and mixed critics. Output `docs/reflection-shootout.svg`,
+  `docs/reflection-shootout-table.md`, embedded in README.
+- Tests: `tests/test_eval_shootout.py` (2), provider-error test in
+  `test_reflection_ab.py`; 109 total.
+- Sonnet arm A: `facf5bdd-5725-4b1c-8764-9dba41d9ae0f`, 12/12 static, 9/12
+  passed, $0.317. Arm B `fc93d48b-91ad-4efc-9b1b-6b918d797fa5` invalid.
+  Receipt `docs/phase-6.5-sonnet-comparison-invalid.json`.
 
 ## Live evidence (revision `1c8edad`, clean)
 

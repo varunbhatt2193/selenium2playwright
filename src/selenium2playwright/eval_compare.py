@@ -16,6 +16,10 @@ from selenium2playwright.eval_evaluators import GATE_KEYS
 
 # Every configuration key except the one under test must match between arms.
 VARIABLE = {"max_attempts"}
+# An HTTP error from the provider SDK ("Error code: 400 ... credit balance",
+# 429, 5xx) is infrastructure, not model output. A row that hit one says
+# nothing about conversion quality, so the whole arm is refused (step 6.5).
+PROVIDER_ERROR = "Error code: "
 PASS_KEYS = [*GATE_KEYS.values(), "all_static_passed", "graph_report_passed"]
 MEASURES = ("target_seconds", "actor_total_tokens", "critic_total_tokens", "langsmith_root_cost_usd")
 
@@ -39,6 +43,8 @@ def arm_summary(report: dict) -> dict:
             # No draft = the actor's reply never parsed into code, so validation,
             # the critic, and any repair lap were all impossible for this row.
             "draft": bool(final.get("result")), "errors": [str(e)[:160] for e in final.get("errors") or []],
+            "provider_error": any(str(e).startswith(PROVIDER_ERROR) for e in final.get("errors") or [])
+            or str(row["outputs"].get("adapter_error") or "").startswith(PROVIDER_ERROR),
             "attempts": final.get("attempts"), "all_static": all(m["score"] == 1 for m in row["metrics"].values()),
             "todos": len((final.get("result") or {}).get("todos") or []) if final.get("result") else None,
             "target_seconds": row["outputs"].get("elapsed_seconds"),
@@ -59,6 +65,7 @@ def arm_summary(report: dict) -> dict:
         "configuration_sha256": report["plan"]["metadata"]["configuration_sha256"],
         "git_revision": config["git_revision"], "git_dirty": config["git_dirty"],
         "local_complete": report["local_integrity"]["complete"],
+        "provider_error_rows": sorted(case for case, r in rows.items() if r["provider_error"]),
         "cloud_status": report["cloud_verification"]["status"], "scheduled": n,
         "passes": passes, "percent": {k: round(100 * v / n, 2) if n else None for k, v in passes.items()},
         "attempt_counts": dict(sorted(Counter(attempts).items())), "with_draft": with_draft,
@@ -101,6 +108,9 @@ def compare_reports(single: dict, reflective: dict) -> dict:
             issues.append(f"arm {name} local evidence is incomplete")
         if arm["cloud_status"] != "verified":
             issues.append(f"arm {name} cloud readback is {arm['cloud_status']}")
+        if arm["provider_error_rows"]:
+            issues.append(f"arm {name} has provider errors (infrastructure, not model quality) on "
+                          f"{', '.join(arm['provider_error_rows'])}; rerun that arm")
     per_case = []
     for case_id in sorted(set(a["rows"]) & set(b["rows"])):
         ra, rb = a["rows"][case_id], b["rows"][case_id]

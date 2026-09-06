@@ -1,0 +1,917 @@
+{
+  "schema_version": 1,
+  "comparable": false,
+  "issues": [
+    "arm B has provider errors (infrastructure, not model quality) on windows-page, windows-test; rerun that arm"
+  ],
+  "held_fixed": {
+    "dataset_id": "33c80b1e-96bd-4b5b-a9c1-ca49d215828f",
+    "dataset_version": "2026-09-06T03:05:09.476354+00:00",
+    "collection_sha256": "4920b5f319d827a25a3d8f1a2f026c430e1fb20bdb897c6b9c3599f55b8aeb3d",
+    "model": "anthropic:claude-sonnet-5",
+    "critic_model": "anthropic:claude-opus-5",
+    "git_revision": "c48e5f69eabbee83633e30f23354829015a71ae1",
+    "evaluator_version": "deterministic-v1"
+  },
+  "arms": {
+    "one_attempt": {
+      "experiment": {
+        "name": "s2p-6.5-claude-sonnet-5-critic-claude-opus-5-attempts1-fc66b840",
+        "id": "facf5bdd-5725-4b1c-8764-9dba41d9ae0f",
+        "url": "https://smith.langchain.com/o/32ac11b4-3e72-4765-a59b-5dc1bcd32cbe/datasets/33c80b1e-96bd-4b5b-a9c1-ca49d215828f/compare?selectedSessions=facf5bdd-5725-4b1c-8764-9dba41d9ae0f",
+        "mode": "live_converter",
+        "elapsed_seconds": 157.88088970899844
+      },
+      "max_attempts": 1,
+      "model": "anthropic:claude-sonnet-5",
+      "critic_model": "anthropic:claude-opus-5",
+      "phase": "6.5",
+      "configuration_sha256": "efdc32455f94eb4ac23f3bc634929aa6adf4320942658b84ca2885a08f46ea42",
+      "git_revision": "c48e5f69eabbee83633e30f23354829015a71ae1",
+      "git_dirty": false,
+      "local_complete": true,
+      "provider_error_rows": [],
+      "cloud_status": "verified",
+      "scheduled": 12,
+      "passes": {
+        "compiles": 12,
+        "residue_free": 12,
+        "typed_lint_pass": 12,
+        "parity_pass": 12,
+        "all_static_passed": 12,
+        "graph_report_passed": 9
+      },
+      "percent": {
+        "compiles": 100.0,
+        "residue_free": 100.0,
+        "typed_lint_pass": 100.0,
+        "parity_pass": 100.0,
+        "all_static_passed": 100.0,
+        "graph_report_passed": 75.0
+      },
+      "attempt_counts": {
+        "1": 12
+      },
+      "with_draft": {
+        "rows": 12,
+        "no_draft_rows": 0,
+        "all_static_passed": 12,
+        "graph_report_passed": 9,
+        "repaired_rows": 0
+      },
+      "actor_calls": {
+        "total": 12,
+        "known_subtotal": 12,
+        "known_rows": 12,
+        "missing_rows": 0
+      },
+      "target_seconds": {
+        "total": "155.868555542016113",
+        "known_subtotal": "155.868555542016113",
+        "known_rows": 12,
+        "missing_rows": 0
+      },
+      "actor_total_tokens": {
+        "total": "50933",
+        "known_subtotal": "50933",
+        "known_rows": 12,
+        "missing_rows": 0
+      },
+      "critic_total_tokens": {
+        "total": "56831",
+        "known_subtotal": "56831",
+        "known_rows": 12,
+        "missing_rows": 0
+      },
+      "langsmith_root_cost_usd": {
+        "total": "0.3168625",
+        "known_subtotal": "0.3168625",
+        "known_rows": 12,
+        "missing_rows": 0
+      },
+      "rows": {
+        "alerts-page": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 16.628974999999627,
+          "actor_tokens": 4512,
+          "critic_tokens": 5009,
+          "cost_usd": "0.0519575"
+        },
+        "alerts-test": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 8.209237957998994,
+          "actor_tokens": 4839,
+          "critic_tokens": 5061,
+          "cost_usd": "0.021382"
+        },
+        "dynamic-loading-page": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 10.859650500002317,
+          "actor_tokens": 3738,
+          "critic_tokens": 4089,
+          "cost_usd": "0.016564"
+        },
+        "dynamic-loading-test": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 8.342961875001492,
+          "actor_tokens": 4183,
+          "critic_tokens": 4394,
+          "cost_usd": "0.016455"
+        },
+        "iframe-page": {
+          "graph_status": "needs-review",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 17.557341250001627,
+          "actor_tokens": 3948,
+          "critic_tokens": 4872,
+          "cost_usd": "0.033183"
+        },
+        "iframe-test": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 7.475410584003839,
+          "actor_tokens": 4130,
+          "critic_tokens": 4343,
+          "cost_usd": "0.015654"
+        },
+        "login-page": {
+          "graph_status": "needs-review",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 19.51341825000418,
+          "actor_tokens": 3992,
+          "critic_tokens": 4969,
+          "cost_usd": "0.034856"
+        },
+        "login-test": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 7.852201499998046,
+          "actor_tokens": 4385,
+          "critic_tokens": 4618,
+          "cost_usd": "0.018027"
+        },
+        "upload-page": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 14.989761999997427,
+          "actor_tokens": 4035,
+          "critic_tokens": 4545,
+          "cost_usd": "0.024254"
+        },
+        "upload-test": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 10.738799875005498,
+          "actor_tokens": 4587,
+          "critic_tokens": 4932,
+          "cost_usd": "0.023205"
+        },
+        "windows-page": {
+          "graph_status": "needs-review",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 22.4701895420003,
+          "actor_tokens": 4209,
+          "critic_tokens": 5316,
+          "cost_usd": "0.040597"
+        },
+        "windows-test": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 11.230607208002766,
+          "actor_tokens": 4375,
+          "critic_tokens": 4683,
+          "cost_usd": "0.020728"
+        }
+      }
+    },
+    "reflective": {
+      "experiment": {
+        "name": "s2p-6.5-claude-sonnet-5-critic-claude-opus-5-attempts3-1f892a3c",
+        "id": "fc93d48b-91ad-4efc-9b1b-6b918d797fa5",
+        "url": "https://smith.langchain.com/o/32ac11b4-3e72-4765-a59b-5dc1bcd32cbe/datasets/33c80b1e-96bd-4b5b-a9c1-ca49d215828f/compare?selectedSessions=fc93d48b-91ad-4efc-9b1b-6b918d797fa5",
+        "mode": "live_converter",
+        "elapsed_seconds": 232.39427599999908
+      },
+      "max_attempts": 3,
+      "model": "anthropic:claude-sonnet-5",
+      "critic_model": "anthropic:claude-opus-5",
+      "phase": "6.5",
+      "configuration_sha256": "93190431c422e02ce92798b35585059caa8f834d71dcc48e1188a5d84f00b425",
+      "git_revision": "c48e5f69eabbee83633e30f23354829015a71ae1",
+      "git_dirty": false,
+      "local_complete": true,
+      "provider_error_rows": [
+        "windows-page",
+        "windows-test"
+      ],
+      "cloud_status": "verified",
+      "scheduled": 12,
+      "passes": {
+        "compiles": 11,
+        "residue_free": 11,
+        "typed_lint_pass": 11,
+        "parity_pass": 11,
+        "all_static_passed": 11,
+        "graph_report_passed": 8
+      },
+      "percent": {
+        "compiles": 91.67,
+        "residue_free": 91.67,
+        "typed_lint_pass": 91.67,
+        "parity_pass": 91.67,
+        "all_static_passed": 91.67,
+        "graph_report_passed": 66.67
+      },
+      "attempt_counts": {
+        "1": 9,
+        "3": 3
+      },
+      "with_draft": {
+        "rows": 11,
+        "no_draft_rows": 1,
+        "all_static_passed": 11,
+        "graph_report_passed": 8,
+        "repaired_rows": 3
+      },
+      "actor_calls": {
+        "total": 18,
+        "known_subtotal": 18,
+        "known_rows": 12,
+        "missing_rows": 0
+      },
+      "target_seconds": {
+        "total": "230.94886233699799096",
+        "known_subtotal": "230.94886233699799096",
+        "known_rows": 12,
+        "missing_rows": 0
+      },
+      "actor_total_tokens": {
+        "total": null,
+        "known_subtotal": "75047",
+        "known_rows": 11,
+        "missing_rows": 1
+      },
+      "critic_total_tokens": {
+        "total": null,
+        "known_subtotal": "76305",
+        "known_rows": 11,
+        "missing_rows": 1
+      },
+      "langsmith_root_cost_usd": {
+        "total": null,
+        "known_subtotal": "0.424931",
+        "known_rows": 11,
+        "missing_rows": 1
+      },
+      "rows": {
+        "alerts-page": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 16.899394041996857,
+          "actor_tokens": 4500,
+          "critic_tokens": 4944,
+          "cost_usd": "0.026967"
+        },
+        "alerts-test": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 8.32007329199405,
+          "actor_tokens": 4807,
+          "critic_tokens": 5029,
+          "cost_usd": "0.020934"
+        },
+        "dynamic-loading-page": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 13.604381708995788,
+          "actor_tokens": 3735,
+          "critic_tokens": 4102,
+          "cost_usd": "0.016911"
+        },
+        "dynamic-loading-test": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 8.012670584001171,
+          "actor_tokens": 4158,
+          "critic_tokens": 4367,
+          "cost_usd": "0.016054"
+        },
+        "iframe-page": {
+          "graph_status": "needs-review",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 3,
+          "all_static": true,
+          "todos": 1,
+          "target_seconds": 49.60775366699818,
+          "actor_tokens": 15454,
+          "critic_tokens": 14856,
+          "cost_usd": "0.100113"
+        },
+        "iframe-test": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 9.954245875000197,
+          "actor_tokens": 4139,
+          "critic_tokens": 4443,
+          "cost_usd": "0.018064"
+        },
+        "login-page": {
+          "graph_status": "needs-review",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 3,
+          "all_static": true,
+          "todos": 1,
+          "target_seconds": 44.13722854200023,
+          "actor_tokens": 14836,
+          "critic_tokens": 14223,
+          "cost_usd": "0.091344"
+        },
+        "login-test": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 13.76948291699955,
+          "actor_tokens": 4355,
+          "critic_tokens": 4586,
+          "cost_usd": "0.017583"
+        },
+        "upload-page": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 13.427993542005424,
+          "actor_tokens": 3891,
+          "critic_tokens": 4364,
+          "cost_usd": "0.021201"
+        },
+        "upload-test": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 8.073047292004048,
+          "actor_tokens": 4601,
+          "critic_tokens": 4841,
+          "cost_usd": "0.020782"
+        },
+        "windows-page": {
+          "graph_status": "needs-review",
+          "draft": true,
+          "errors": [
+            "Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go"
+          ],
+          "provider_error": true,
+          "attempts": 3,
+          "all_static": true,
+          "todos": 2,
+          "target_seconds": 44.75213504199928,
+          "actor_tokens": 10571,
+          "critic_tokens": 10550,
+          "cost_usd": "0.074978"
+        },
+        "windows-test": {
+          "graph_status": "needs-review",
+          "draft": false,
+          "errors": [
+            "Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go"
+          ],
+          "provider_error": true,
+          "attempts": 1,
+          "all_static": false,
+          "todos": null,
+          "target_seconds": 0.39045583300321596,
+          "actor_tokens": null,
+          "critic_tokens": null,
+          "cost_usd": null
+        }
+      }
+    }
+  },
+  "delta": {
+    "passes": {
+      "compiles": -1,
+      "residue_free": -1,
+      "typed_lint_pass": -1,
+      "parity_pass": -1,
+      "all_static_passed": -1,
+      "graph_report_passed": -1
+    },
+    "percent_points": {
+      "compiles": -8.33,
+      "residue_free": -8.33,
+      "typed_lint_pass": -8.33,
+      "parity_pass": -8.33,
+      "all_static_passed": -8.33,
+      "graph_report_passed": -8.33
+    },
+    "target_seconds": {
+      "total": "75.08030679498187796",
+      "ratio": "1.482"
+    },
+    "actor_total_tokens": {
+      "total": null,
+      "known_subtotal": "24114",
+      "note": "one or both arms have missing rows; only the known subtotal is shown"
+    },
+    "critic_total_tokens": {
+      "total": null,
+      "known_subtotal": "19474",
+      "note": "one or both arms have missing rows; only the known subtotal is shown"
+    },
+    "langsmith_root_cost_usd": {
+      "total": null,
+      "known_subtotal": "0.1080685",
+      "note": "one or both arms have missing rows; only the known subtotal is shown"
+    },
+    "actor_calls": {
+      "total": 6
+    }
+  },
+  "per_case": [
+    {
+      "case_id": "alerts-page",
+      "one_attempt": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 16.628974999999627,
+        "actor_tokens": 4512,
+        "critic_tokens": 5009,
+        "cost_usd": "0.0519575"
+      },
+      "reflective": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 16.899394041996857,
+        "actor_tokens": 4500,
+        "critic_tokens": 4944,
+        "cost_usd": "0.026967"
+      },
+      "change": "same",
+      "repairs_used": 0
+    },
+    {
+      "case_id": "alerts-test",
+      "one_attempt": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 8.209237957998994,
+        "actor_tokens": 4839,
+        "critic_tokens": 5061,
+        "cost_usd": "0.021382"
+      },
+      "reflective": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 8.32007329199405,
+        "actor_tokens": 4807,
+        "critic_tokens": 5029,
+        "cost_usd": "0.020934"
+      },
+      "change": "same",
+      "repairs_used": 0
+    },
+    {
+      "case_id": "dynamic-loading-page",
+      "one_attempt": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 10.859650500002317,
+        "actor_tokens": 3738,
+        "critic_tokens": 4089,
+        "cost_usd": "0.016564"
+      },
+      "reflective": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 13.604381708995788,
+        "actor_tokens": 3735,
+        "critic_tokens": 4102,
+        "cost_usd": "0.016911"
+      },
+      "change": "same",
+      "repairs_used": 0
+    },
+    {
+      "case_id": "dynamic-loading-test",
+      "one_attempt": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 8.342961875001492,
+        "actor_tokens": 4183,
+        "critic_tokens": 4394,
+        "cost_usd": "0.016455"
+      },
+      "reflective": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 8.012670584001171,
+        "actor_tokens": 4158,
+        "critic_tokens": 4367,
+        "cost_usd": "0.016054"
+      },
+      "change": "same",
+      "repairs_used": 0
+    },
+    {
+      "case_id": "iframe-page",
+      "one_attempt": {
+        "graph_status": "needs-review",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 17.557341250001627,
+        "actor_tokens": 3948,
+        "critic_tokens": 4872,
+        "cost_usd": "0.033183"
+      },
+      "reflective": {
+        "graph_status": "needs-review",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 3,
+        "all_static": true,
+        "todos": 1,
+        "target_seconds": 49.60775366699818,
+        "actor_tokens": 15454,
+        "critic_tokens": 14856,
+        "cost_usd": "0.100113"
+      },
+      "change": "same",
+      "repairs_used": 2
+    },
+    {
+      "case_id": "iframe-test",
+      "one_attempt": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 7.475410584003839,
+        "actor_tokens": 4130,
+        "critic_tokens": 4343,
+        "cost_usd": "0.015654"
+      },
+      "reflective": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 9.954245875000197,
+        "actor_tokens": 4139,
+        "critic_tokens": 4443,
+        "cost_usd": "0.018064"
+      },
+      "change": "same",
+      "repairs_used": 0
+    },
+    {
+      "case_id": "login-page",
+      "one_attempt": {
+        "graph_status": "needs-review",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 19.51341825000418,
+        "actor_tokens": 3992,
+        "critic_tokens": 4969,
+        "cost_usd": "0.034856"
+      },
+      "reflective": {
+        "graph_status": "needs-review",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 3,
+        "all_static": true,
+        "todos": 1,
+        "target_seconds": 44.13722854200023,
+        "actor_tokens": 14836,
+        "critic_tokens": 14223,
+        "cost_usd": "0.091344"
+      },
+      "change": "same",
+      "repairs_used": 2
+    },
+    {
+      "case_id": "login-test",
+      "one_attempt": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 7.852201499998046,
+        "actor_tokens": 4385,
+        "critic_tokens": 4618,
+        "cost_usd": "0.018027"
+      },
+      "reflective": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 13.76948291699955,
+        "actor_tokens": 4355,
+        "critic_tokens": 4586,
+        "cost_usd": "0.017583"
+      },
+      "change": "same",
+      "repairs_used": 0
+    },
+    {
+      "case_id": "upload-page",
+      "one_attempt": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 14.989761999997427,
+        "actor_tokens": 4035,
+        "critic_tokens": 4545,
+        "cost_usd": "0.024254"
+      },
+      "reflective": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 13.427993542005424,
+        "actor_tokens": 3891,
+        "critic_tokens": 4364,
+        "cost_usd": "0.021201"
+      },
+      "change": "same",
+      "repairs_used": 0
+    },
+    {
+      "case_id": "upload-test",
+      "one_attempt": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 10.738799875005498,
+        "actor_tokens": 4587,
+        "critic_tokens": 4932,
+        "cost_usd": "0.023205"
+      },
+      "reflective": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 8.073047292004048,
+        "actor_tokens": 4601,
+        "critic_tokens": 4841,
+        "cost_usd": "0.020782"
+      },
+      "change": "same",
+      "repairs_used": 0
+    },
+    {
+      "case_id": "windows-page",
+      "one_attempt": {
+        "graph_status": "needs-review",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 22.4701895420003,
+        "actor_tokens": 4209,
+        "critic_tokens": 5316,
+        "cost_usd": "0.040597"
+      },
+      "reflective": {
+        "graph_status": "needs-review",
+        "draft": true,
+        "errors": [
+          "Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go"
+        ],
+        "provider_error": true,
+        "attempts": 3,
+        "all_static": true,
+        "todos": 2,
+        "target_seconds": 44.75213504199928,
+        "actor_tokens": 10571,
+        "critic_tokens": 10550,
+        "cost_usd": "0.074978"
+      },
+      "change": "same",
+      "repairs_used": 2
+    },
+    {
+      "case_id": "windows-test",
+      "one_attempt": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 11.230607208002766,
+        "actor_tokens": 4375,
+        "critic_tokens": 4683,
+        "cost_usd": "0.020728"
+      },
+      "reflective": {
+        "graph_status": "needs-review",
+        "draft": false,
+        "errors": [
+          "Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go"
+        ],
+        "provider_error": true,
+        "attempts": 1,
+        "all_static": false,
+        "todos": null,
+        "target_seconds": 0.39045583300321596,
+        "actor_tokens": null,
+        "critic_tokens": null,
+        "cost_usd": null
+      },
+      "change": "no draft in B",
+      "repairs_used": 0
+    }
+  ],
+  "case_changes": {
+    "same": 11,
+    "no draft in B": 1
+  },
+  "headline": "all-static pass 12/12 -> 11/12 (100.0% -> 91.67%); graph passed 9/12 -> 8/12"
+}
