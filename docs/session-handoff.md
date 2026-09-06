@@ -1,58 +1,56 @@
-# Restart here — 2026-09-06 (after 6.3 + T9 fix)
+# Restart here — 2026-09-06 (after the Haiku reflection A/B)
 
 ## Current position
 
-**Phase 6.3 is complete, including the T9 fix and rerun. Next is 6.4
-(LLM-as-judge); it has not started.** Commit/push authorization persists. Read
-[reflection-ab.md](reflection-ab.md) (plain English) and
-[phase-6.3-report.md](phase-6.3-report.md) (evidence for both A/B runs) first.
+**Phase 6.3 is complete. The first part of 6.5 (reflection with a weak
+actor: Haiku writes, Opus reviews) is complete. Next is 6.4 (LLM-as-judge);
+it has not started.** Commit/push authorization persists. Read
+[reflection-haiku-ab.md](reflection-haiku-ab.md) (plain English) and
+[phase-6.5-haiku-report.md](phase-6.5-haiku-report.md) (evidence) first;
+[reflection-ab.md](reflection-ab.md) / [phase-6.3-report.md](phase-6.3-report.md)
+are the Opus A/B they build on.
 
-## What 6.3 built
+## What the Haiku step built (commit `1c8edad`)
 
-- `reflection.resolve_attempt_cap`, `ConversionState.max_attempts` (1..3, default
-  3) filled by `intake`, read by `route_after_critic` and `assemble`; CLI
-  `--max-attempts`.
-- `eval_target.conversion_target(inputs, max_attempts=...)`, cap inside the hashed
-  plan configuration, `phase` label; `run_experiment` binds the plan's cap to the
-  real target with `functools.partial`; names `s2p-<phase>-<model>-attempts<N>`.
-- `eval_compare.py`: fairness checks, per-metric/per-case delta, "rows with a
-  draft" breakdown, labels `same` / `improved` / `regressed` / `no draft in A|B` /
-  `... without repair (variance)` (only a row that used a repair lap credits or
-  blames reflection). `scripts/run_reflection_ab.py`: preview / `--run` /
-  `--compare-only`.
-- **T9 fix** (`c9459f2`): `ConversionResult.notes`/`.todos` accept a single
-  string via a `mode="before"` validator; field descriptions unchanged.
-- Tests: `tests/test_reflection_ab.py` (9), `tests/test_schemas.py` (4); 99 total.
+- `env.critic_model_name()` / `env.model_names()`: `S2P_CRITIC_MODEL`, empty
+  means "same as `S2P_MODEL`"; `env.required()` covers every provider in use.
+- `llm.make_model(for_critic=True)` and `llm.prepare_messages(for_critic=True)`
+  resolve the critic's model; `graph.critic` uses the latter.
+- `eval_plan.configuration(..., critic_model)` hashes `critic_model`;
+  `build_plan(..., critic_model=)`; metadata `models` lists both.
+- `run_experiment` refuses a `S2P_CRITIC_MODEL` that disagrees with the plan
+  and adds `-critic-<model>` to the prefix only when it differs.
+- `eval_compare` carries `critic_model` and `phase`; `run_reflection_ab.py`
+  gains `--critic-model` and `--phase` (output under `out/<phase>/`).
+- Tests: `tests/test_model_split.py` (7); 106 total.
 
-## Live evidence
+## Live evidence (revision `1c8edad`, clean)
 
-Run 1 (before fix) at `653ba6df0df7a5c4331fba8ba76ef67e79f63799`: A
-`a8fead0a-b63c-4b38-ad34-18f9c5474d2e`, B `e4b095f6-f29e-4dc6-9c47-ee211014e7be`;
-all-static 11/12 vs 9/12, graph 9/12 vs 8/12; 1 and 3 no-draft rows (parse
-failure). Receipt `docs/phase-6.3-comparison-before-fix.json`.
+A `s2p-6.5-claude-haiku-4-5-20251001-critic-claude-opus-5-attempts1-cd1eedf0`
+/ `5cbc2e15-0208-494f-9fe8-9827faa72319` / config `d84e5fae…`; B
+`…-attempts3-6b251c97` / `332774ac-fe8f-4358-baa2-ae8aee0a74aa` / config
+`61ea0ba1…`. All-static 9/12 → 12/12 (compile 9 → 12, lint 11 → 12); graph
+passed 2/12 → 9/12; repairs used on 8 rows (5 two attempts, 3 three);
+7 improved with repair, 2 variance, 3 same, 0 regressed. Actor calls 12 → 23,
+actor tokens 42,510 → 95,328, critic tokens 62,374 → 119,489, wall-clock
+199 → 391 s, cost $0.357 → $0.689 (complete both arms). Three-way against
+6.3 run 2: Haiku+reflection (9/12) beats Opus alone (6/12), trails Opus +
+reflection (11/12), costs more. Receipt `docs/phase-6.5-haiku-comparison.json`;
+screenshot `docs/phase-6.5-haiku-delta.jpg`; artifacts
+`out/6.5/ab-20260906T085549Z-5764b5b4/` (ignored).
 
-Run 2 (after fix) at `c9459f21e9264c0446726bb54b01b9d46901c4a2`: A
-`s2p-6.3-claude-opus-5-attempts1-d44da1dd` / `d630ee69-6e27-46bb-b14a-36999db469cf`
-/ config `91c37545…`; B `s2p-6.3-claude-opus-5-attempts3-eda105ea` /
-`d52cc925-4038-4a44-89c2-e2bc7640755c` / config `e57e6aea…`. All-static 12/12
-both; graph 6/12 vs 11/12; repairs used 2 (dynamic-loading-page → passed;
-alerts-page → gates+critic pass, 2 TODOs); 4 rows improved with zero repairs
-(critic variance on POMs); actor +12,279 tokens, critic +8,964, wall-clock
-+27 s. All six needs-review rows in A are POMs. Receipt
-`docs/phase-6.3-comparison.json`; screenshot `docs/phase-6.3-delta.jpg`.
-Both runs: same dataset/version/collection as 6.2; local complete; cloud verified.
-Artifacts: `out/6.3/ab-20260906T083121Z-73fcdb15/` (run 2),
-`out/6.3/ab-20260906T081429Z-8a59b789/` (run 1), ignored.
+Discarded: `out/6.5/discarded-dirty-worktree-ab-20260906T085156Z-1b8daf8f/`
+(orphan LangSmith experiment `e931ca7e-…`), rejected by the runner because a
+doc file was created in the worktree mid-run. **Do not touch the repo while
+a live experiment is running.**
 
 ## Open observations for 6.4
 
-- The critic's verdict on POMs is unstable between runs (4 of 6 POMs flipped
-  revise→pass with no code change). A rubric-based judge (6.4) should be
-  calibrated against the goldens before its verdicts are trusted more than this.
-- LangSmith UI averages can drop rows from the denominator; quote verified
-  row counts from the receipts.
-- One cost row missing in run 2 arm B (partial cloud tokens); cost totals for
-  that arm are unavailable, known subtotal only.
+- Critic verdict on POMs is unstable between runs (4 of 6 in 6.3, 2 of 12
+  here). Calibrate the rubric judge against the goldens before trusting it.
+- The critic dominates cost when the actor is cheap; a Haiku-critic arm was
+  deliberately not run (two variables at once).
+- LangSmith UI averages can drop rows; quote the receipts.
 
 ## Working agreement and environment
 
@@ -63,6 +61,7 @@ authorization persists; check `gh auth status` is on `varunbhatt2193` before
 pushing. Repo `/Users/varunbhatt/Downloads/Selenium2Playwright`, main, remote
 `https://github.com/varunbhatt2193/selenium2playwright.git`. `.env`, `out/`,
 `roadmap.md`, `plan-review.md` stay ignored; never expose credentials.
-`S2P_MODEL` configures both graph models; eval CLIs default to Opus. Use the
-existing `.venv` and Node toolchains. Chrome computer-use worked for both
-screenshots (crop the sidebar with `sips`); close tabs when done.
+`S2P_MODEL` = actor, `S2P_CRITIC_MODEL` = critic (optional); eval CLIs
+default to Opus. Use the existing `.venv` and Node toolchains. Chrome
+computer-use works for LangSmith screenshots (crop the sidebar with `sips`,
+offset 208 px); close tabs when done.
