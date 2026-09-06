@@ -1,9 +1,10 @@
 # AI evaluations — theory and code before Phase 6
 
-Lesson delivered on 2026-09-05. Phase 5.2 is complete; Phase 6 implementation
-has not started. These snippets explain the next work and are not an installed
-evaluation runner. The user wants to understand the theory and code before
-advancing. Continue from the [restart notes](session-handoff.md).
+Lesson delivered on 2026-09-05 before Phase 6 implementation started. The user
+has since confirmed readiness; the first 6.1 increment and its review point are
+in [evaluation-dataset.md](evaluation-dataset.md). These introductory snippets
+remain teaching examples, not an installed evaluation runner. Continue from
+the [restart notes](session-handoff.md).
 
 An AI evaluation measures how well our application performs across a collection
 of tasks. For this project: how often does Selenium become useful, correct
@@ -206,6 +207,6 @@ goldens, then prepare the upload script. Completion means the dataset is visible
 in LangSmith. Step 6.2 adds evaluator functions and the first scored experiment;
 6.3 compares reflection, 6.4 adds a calibrated judge, and 6.5 compares models.
 
-The lesson was delivered, but user understanding/review has not been confirmed.
-Resume with this material available and follow the user's next instruction;
-do not automatically repeat the lecture or advance through multiple steps.
+The user has now confirmed readiness for Phase 6, with detailed theory before
+code and explanatory comments required. Follow the current review point in
+[the restart notes](session-handoff.md); do not automatically advance through steps.

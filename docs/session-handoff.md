@@ -2,16 +2,24 @@
 
 ## Current position
 
-Phase 5.2 is implemented, reviewed, committed, and pushed. The next implementation
-step is **6.1: the evaluation dataset**. The user requested theory and code first;
-that lesson was delivered and is preserved in [evaluation-primer.md](evaluation-primer.md).
-User understanding/review of the lesson has not yet been confirmed. No Phase 6
-dataset upload, evaluator module, experiment runner, or cloud experiment has been
-created. Do not mistake teaching snippets for implemented features.
+Phase 5.2 is implemented, reviewed, committed, and pushed. The user has now said
+they are ready for Phase 6 and requires detailed theory before code, explanatory
+comments in the repository, and detailed LangSmith reports.
 
-The latest request was to save, update, commit, and push the project before the
-user clears the session. Resume from these notes and the user's next instruction;
-there is no request to start Phase 6 automatically or repeat the entire lesson.
+**6.1 has started; the user approved committing the first increment and continuing.**
+`src/selenium2playwright/eval_dataset.py` contains a 109-line local snapshot
+builder: `DatasetCase` and `snapshot_example`. Read the detailed theory, code
+walkthrough, reporting design, and local probe evidence in
+[evaluation-dataset.md](evaluation-dataset.md). The earlier introductory lesson
+remains in [evaluation-primer.md](evaluation-primer.md).
+
+The builder captures source/companion/reference text and acceptance criteria,
+records review metadata, and fingerprints captured inputs/outputs. It rejects
+invalid paths and the target's own reference as a companion. It is not yet wired
+to the graph: a later target adapter must materialize snapshots for file intake.
+No expanded samples, upload script, evaluator module, runner, or cloud experiment
+has been created. Continue with the coverage matrix and manifest,
+then source/golden pairs and upload. Do not advance into 6.2 before 6.1 is complete.
 
 ## Working agreement
 
@@ -22,6 +30,8 @@ there is no request to start Phase 6 automatically or repeat the entire lesson.
   completion check. Multiple explained patches can make up one step.
 - Preserve the user's review point; delivered explanations do not establish that
   the user has understood or approved the next increment.
+- Phase 6 specifically requires detailed theory before each code increment,
+  explanatory code comments, and detailed, evidence-backed LangSmith reports.
 - Report progress during longer work and follow existing commit/push authorization.
 - Once the evaluation baseline exists, prompt/playbook changes need a green eval.
 
@@ -35,9 +45,11 @@ is the broader architecture; its milestone order predates the early eval phase.
 - `ee8fa85`: Step 4.5, graph validation and scorecard.
 - `0d5ad94`: Step 5.1, structured critic grounded in source and validation evidence.
 - `a57076f`: Step 5.2, bounded repair loop and final conversion report.
-- Last full verification: **36 offline tests passed** before the 5.2 commit.
-  Subsequent work only saved documentation; no application code has changed.
-- The latest lesson's local compiler probe returned 1 for golden LoginPage, 0
+- Last full verification: **36 offline tests passed** after the first 6.1 snapshot
+  increment. Additional local probes checked snapshot contents, SDK format,
+  fingerprints, path rejection, and self-reference exclusion. These probes are
+  not persisted tests or a live evaluation; details are in evaluation-dataset.md.
+- The introductory lesson's local compiler probe returned 1 for golden LoginPage, 0
   for a `.fill()` to `.fil()` mutation, and 0 for empty code. No live model call
   or cloud evaluation was used for the lesson.
 
@@ -59,6 +71,7 @@ The full explanation is in [reflection-loop.md](reflection-loop.md).
 1. **6.1 Dataset:** grow samples to roughly five POMs and eight tests covering
    login, alerts, iframe, windows, upload, and dynamic loading on the-internet.
    Preserve source/companion contents and independent reviewed golden outputs.
+   Snapshot builder is implemented and approved; curation/upload remain.
    Prepare the LangSmith upload script. Done when the dataset is visible in the UI.
 2. **6.2 Deterministic evaluators:** reuse compile, residue, and typed lint checks
    in evaluator functions and run the first scored experiment. Preserve tool
