@@ -178,7 +178,8 @@ class SurfaceTests(unittest.TestCase):
 
     def test_every_command_is_registered_and_documented(self):
         command = typer.main.get_command(cli.app)
-        self.assertEqual(sorted(command.commands), ["convert", "forget", "memories", "remember", "threads"])
+        self.assertEqual(sorted(command.commands),
+                         ["convert", "forget", "memories", "remember", "scan", "threads"])
         for name, sub in command.commands.items():
             self.assertTrue((sub.help or "").strip(), f"{name} has no help text")
 

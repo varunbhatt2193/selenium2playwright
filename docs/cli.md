@@ -180,7 +180,10 @@ first time you can see all of it without scrolling.
   in step 8.2, through the graph's context schema — see [config.md](config.md).
   In 8.1 the model still came from `S2P_MODEL` in `.env`.
 - **Not a suite runner.** One file (plus already-converted companions) per
-  invocation. Walking a directory in waves is Phase 9.
+  invocation. Walking a directory in waves is Phase 9 — step 9.1 added a sixth
+  subcommand, `s2p scan <folder>`, which reads a suite and prints the conversion
+  plan without calling a model; see [suite-scan.md](suite-scan.md). Converting
+  that plan is 9.2 and 9.3.
 - **Not a new agent.** Same graph, same prompts, same four gates, same critic.
   Every eval and every earlier phase's numbers still stand, because nothing
   below `cli.py` changed.

@@ -57,7 +57,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 
-from selenium2playwright import env, graph, memory, risk
+from selenium2playwright import env, graph, memory, risk, suite
 from selenium2playwright import store as memory_store
 from selenium2playwright.llm import check_model, embedding_dims, make_embeddings
 from selenium2playwright.one_shot import format_usage
@@ -559,6 +559,69 @@ def convert(
     if thread:
         show_thread(final, db, thread)
     raise typer.Exit(present(final, out, diff, as_json))
+
+
+@app.command()
+def scan(
+    root: Annotated[Path, typer.Argument(
+        exists=True, file_okay=False,
+        help="the Selenium suite folder to read")],
+    out: Annotated[Optional[Path], typer.Option(
+        "--out", "-o", help="write the manifest JSON here as well")] = None,
+    as_json: Annotated[bool, typer.Option(
+        "--json", help="print the manifest JSON to stdout instead of a table")] = False,
+) -> None:
+    """Read a suite folder and print the conversion plan. No model is called.
+
+    This is the step before `convert` ever runs on a folder: what is in here,
+    what can be converted, and in what order. The table is for a person; --json
+    is the same plan as data, which is what step 9.2 dispatches from.
+    """
+    manifest = suite.scan(root)
+    payload = json.dumps(suite.manifest_json(manifest), indent=2)
+    if as_json:
+        print(payload)
+    else:
+        show_manifest(manifest)
+    if out is not None:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(payload + "\n", encoding="utf-8")
+        say(f"[wrote {out}]")
+    raise typer.Exit(0 if manifest.convertible else 1)
+
+
+def show_manifest(manifest: suite.Manifest) -> None:
+    """The plan as a table: one section per wave, then what we are not converting.
+
+    Waves are printed in the order they will run, because that order is the
+    single most important thing on this screen — everything in wave 1 can be
+    converted at the same time, and nothing in wave 2 may start until wave 1 is
+    done.
+    """
+    counts = manifest.counts()
+    say(f"Suite {manifest.root} · {len(manifest.files)} source file(s) · "
+        f"{counts['convert']} to convert, {counts['copy']} to copy, {counts['skip']} skipped")
+    by_path = {f.path: f for f in manifest.files}
+
+    table = Table(show_header=True, header_style="bold", box=None, pad_edge=False)
+    for column in ("wave", "file", "kind", "lines", "needs first"):
+        table.add_column(column, overflow="fold")
+    for number, wave in enumerate(manifest.waves, 1):
+        for path in wave:
+            item = by_path[path]
+            needs = ", ".join(item.imports) or "—"
+            table.add_row(str(number), path, item.kind, str(item.lines), needs)
+    if manifest.waves:
+        console.print(table)
+    for item in manifest.files:
+        if item.action != suite.CONVERT:
+            verb = "copy" if item.action == suite.COPY else "skip"
+            say(f"  {verb} {item.path} — {item.reason}",
+                style="" if item.action == suite.COPY else MUTED)
+    for note in manifest.notes:
+        say(f"  note: {note}", style=MUTED)
+    if not manifest.convertible:
+        say("Nothing to convert in this folder.", style=FAIL_STYLE)
 
 
 @app.command()

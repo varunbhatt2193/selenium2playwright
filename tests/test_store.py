@@ -39,6 +39,19 @@ GOLDEN = (ROOT / "samples/playwright-golden/pages/LoginPage.ts").read_text()
 PASS = Critique(verdict="pass", fixes=[])
 
 TESTIDS = "Use getByTestId for form fields, the login username and password inputs included"
+
+
+def unwrapped(text: str) -> str:
+    """stderr with rich's box drawing and line wrapping taken back out.
+
+    Typer prints a usage error inside a bordered panel sized to the terminal, so
+    the same sentence breaks in a different place at 80 columns than at 140 and
+    a plain `assertIn` on a phrase passes or fails depending on who is running
+    the tests. Collapsing the borders and the whitespace asserts on the message
+    instead of on the window it was printed in.
+    """
+    return " ".join(text.replace("│", " ").replace("╭", " ").replace("╮", " ")
+                    .replace("╰", " ").replace("╯", " ").replace("─", " ").split())
 OFFTOPIC = "Our CI publishes the HTML report to S3 after every nightly run"
 
 
@@ -387,14 +400,14 @@ class CommandLineTests(StoreHarness):
     def test_no_recall_and_remember_together_is_a_usage_error(self):
         code, _, err = self.cli("convert", "--no-recall", "--remember", TESTIDS)
         self.assertEqual(code, 2)
-        self.assertIn("cannot be combined", err)
+        self.assertIn("cannot be combined", unwrapped(err))
 
     def test_writing_a_memory_with_broken_embeddings_is_refused_not_silent(self):
         """A memory stored without a vector could never be found again."""
         with patch.object(cli, "make_embeddings", side_effect=RuntimeError("no OPENAI_API_KEY")):
             code, _, err = self.cli("remember", TESTIDS)
         self.assertEqual(code, 2)
-        self.assertIn("could never be recalled", err)
+        self.assertIn("could never be recalled", unwrapped(err))
 
     def test_reading_with_broken_embeddings_degrades_out_loud(self):
         with patch.object(cli, "make_embeddings", side_effect=RuntimeError("no OPENAI_API_KEY")):
