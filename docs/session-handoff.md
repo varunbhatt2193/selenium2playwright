@@ -28,6 +28,38 @@ Read [docs/guardrails.md](guardrails.md) before changing `guard.py` or
 `limits.py` — it lists four bugs that only running it could find, including a
 rate limiter that refused *everything* and looked exactly like one that worked.
 
+## Open threads (decisions waiting on Varun, 2026-09-07)
+
+**Set an Anthropic workspace spend limit.** Not done yet, and it is the only
+*hard* cap on model spend that exists — our $5/day budget is a traffic governor
+enforced by our own Redis counter, and the owner key bypasses it entirely, so
+CLI runs, evals and suite runs are not counted. `.env` already has
+`ANTHROPIC_WORKSPACE_ID`, so a limit set at Console → Settings → Workspaces →
+Limits caps *this project* and nothing else. Suggested $30–50/month.
+
+**OpenAI free daily tokens — checked, and worth $0 as configured.** The
+data-sharing programme covers chat/reasoning models (gpt-5, gpt-4.1, gpt-4o, o1,
+o3 and the mini variants); embeddings are **not** on the list, and this project
+uses OpenAI only for `text-embedding-3-small`. Varun will confirm on his own
+dashboard (platform.openai.com/usage/chat-completions, group by "service tier",
+look for "data sharing incentive tier"). The opportunity, if he wants it: point
+`S2P_MODEL`/`S2P_CRITIC_MODEL` at `openai:gpt-4.1-mini` for the demo and the
+public model spend goes to roughly zero — ~12,500 tokens per conversion against
+a 2.5M–10M/day allowance is 200–800 conversions/day free, far above our 41/day
+cap. **Do not switch blind.** The Phase 6 shootout only measured Claude models,
+and its one weak-model data point is a warning: Haiku at 1 attempt fully passed
+2/12 where Sonnet passed 11/12 (reflection rescued it to 9/12). Run
+`scripts/run_reflection_ab.py` with the OpenAI mini model as actor first and
+decide against the same table as everything else.
+
+**Budget tuning.** `S2P_COST_PER_RUN` is 0.12, a deliberate 2–4× overestimate
+(measured: $0.024–$0.058/file). Once there is a week of real traffic, replace it
+with the measured median from LangSmith so the dollar figure means what it says.
+
+**Untracked and not mine:** `.github/` (dependabot + codeql) and
+`docs/github-security.md` are Varun's own, deliberately left out of the 10.2/10.4
+commits.
+
 **Next is 10.3, the Streamlit playground** — the last piece before the link can
 go out, because `s2p.fly.dev` is a JSON API and a hiring manager who opens it
 sees `{"detail":"Not Found"}`. It needs `S2P_DEMO_KEY` server-side, an
