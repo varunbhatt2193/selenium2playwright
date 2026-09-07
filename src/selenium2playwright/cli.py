@@ -418,12 +418,13 @@ def run_config(models: dict[str, str], max_attempts: int) -> dict:
 
 
 def resolve_models(model: str, critic_model: str) -> dict[str, str]:
-    """Turn the model flags into full names, and refuse an unusable choice now.
+    """Turn the model settings into full names, and refuse an unusable one now.
 
-    The check runs only for a model named on the command line. A default run is
-    left alone on purpose: it is env.check()'s job to report a misconfigured
-    .env, and making every conversion build a client would break every offline
-    test and every scripted run that never calls a provider.
+    Every run is checked, not just one that names a model on the command line:
+    the commonest way to arrive here is a fresh machine whose only key belongs
+    to a different provider than the default, and finding that out from an
+    authentication error after intake — as exit 1, a *conversion* verdict — is
+    the wrong answer to a configuration question.
 
     llm.check_model does the asking, so a provider this project has never heard
     of gets its own client's answer — a missing integration package, a key under
@@ -433,11 +434,20 @@ def resolve_models(model: str, critic_model: str) -> dict[str, str]:
         names = env.resolve_roles(model, critic_model)
     except ValueError as exc:
         raise typer.BadParameter(str(exc)) from exc
-    for role, flag in (("actor", model), ("critic", critic_model)):
-        problem = check_model(names[role]) if flag else ""
+    for name in dict.fromkeys(names.values()):  # once per distinct model
+        problem = check_model(name)
         if problem:
-            raise typer.BadParameter(problem)
+            raise typer.BadParameter(problem + alternatives())
     return names
+
+
+def alternatives() -> str:
+    """"…and here is what this machine could run instead", when anything is keyed."""
+    ready = env.keyed_providers()
+    if not ready:
+        return ""
+    return (f" Keys are set here for {', '.join(ready)} — run with --model {ready[0]}:<model>,"
+            f" or put S2P_MODEL={ready[0]}:<model> in .env.")
 
 
 @app.command()

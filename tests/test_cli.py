@@ -33,7 +33,10 @@ class CliHarness(unittest.TestCase):
     """A scripted model plus the real gates, driven through cli.run()."""
 
     def setUp(self):
-        tracing = patch.dict(os.environ, {"LANGSMITH_TRACING": "false", "LANGCHAIN_TRACING_V2": "false"})
+        tracing = patch.dict(os.environ, {"LANGSMITH_TRACING": "false", "LANGCHAIN_TRACING_V2": "false",
+                                          # Shaped like a key, worth nothing: the CLI now builds the configured
+                                          # model before running, and no test may need a real credential.
+                                          "ANTHROPIC_API_KEY": "sk-ant-offline-test"})
         tracing.start()
         self.addCleanup(tracing.stop)
         self.tmp = TemporaryDirectory()

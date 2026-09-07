@@ -35,13 +35,18 @@ persists. The 150-line / one-file-at-a-time rule was removed by Varun on
 - `cli.py`: `--model`, `--critic-model`, `--json`; `run_config()` puts the same
   choices on the trace as tags + metadata; `json_report()` + `emit()` (one
   stdout writer for every exit path, refusals included).
-- `tests/test_config.py` (20, incl. cross-provider). **223 offline tests pass.**
+- `tests/test_config.py` (22, incl. cross-provider). **225 offline tests pass.**
 - Live check: `--model haiku --critic-model opus` on `LoginPage.ts` — 2/3
   attempts, 4/4 gates + critic PASS, exit 1 on two `baseURL` TODOs; LangSmith
   showed two Haiku actor spans and two Opus critic spans with `.env` untouched.
 
 ## Cross-provider work (same day, after 8.2)
 
+- The preflight runs on **every** convert, not only when `--model` is given: a
+  machine whose only key is OpenAI now gets exit 2 and `cli.alternatives()`
+  ("keys are set here for openai — run with --model openai:<model>") instead of
+  exit 1 after a failed authentication. Every test harness now sets a fake
+  `ANTHROPIC_API_KEY`, so the offline suite no longer depends on a real `.env`.
 - `llm.check_model(name)` — the preflight: `env.key_missing` first (friendly,
   no imports), then **build the client** (local, no network) so the provider
   itself reports a missing integration package (message rewritten to
@@ -59,7 +64,9 @@ persists. The 150-line / one-file-at-a-time rule was removed by Varun on
 - Live: `openai:gpt-5.4` alone on `LoginPage.ts` (4/4 + critic PASS, exit 0) and
   `openai:gpt-5.4` actor + `anthropic:claude-sonnet-5` critic on
   `login.spec.ts` (4/4 + critic PASS, exit 0) — two vendors in one graph, the
-  Anthropic critic still getting its 3,301-token cache read.
+  Anthropic critic still getting its 3,301-token cache read. Third run with no
+  Anthropic key in the process at all (`S2P_MODEL=openai:gpt-5.4`): 4/4 + critic
+  PASS, exit 1 on four honest locator TODOs.
 - Not checked before a run: the model *name* (needs a network call). Optional
   providers stay out of `pyproject.toml`; the error names the `uv add`.
 

@@ -150,6 +150,23 @@ def resolve_roles(model: str = "", critic_model: str = "") -> dict[str, str]:
     return {"actor": actor, "critic": critic}
 
 
+# Providers listed for embeddings only: having one of these keys says nothing
+# about being able to run a conversion, so they are never suggested as a model.
+EMBEDDINGS_ONLY = {"voyage"}
+
+
+def keyed_providers() -> list[str]:
+    """Providers whose key is set on this machine right now — what it can actually run.
+
+    Used to turn "ANTHROPIC_API_KEY is not set" into advice: someone who has an
+    OpenAI key and no Anthropic key should be told the one flag that works, not
+    left to find out that the default model belongs to a company they have no
+    account with.
+    """
+    return [name for name, (var, _) in PROVIDER_KEYS.items()
+            if name not in EMBEDDINGS_ONLY and os.environ.get(var)]
+
+
 def key_missing(name: str) -> str:
     """"" when this model's provider key is present and plausible, else why not.
 
@@ -168,9 +185,9 @@ def key_missing(name: str) -> str:
     var, prefix = PROVIDER_KEYS[who]
     value = os.environ.get(var, "")
     if not value:
-        return f"{name} needs {var}, which is not set (see .env.example)"
+        return f"{name} needs {var}, which is not set (see .env.example)."
     if prefix and not value.startswith(prefix):
-        return f"{var} is set, but does not look like a {prefix}… key: {masked(value)}"
+        return f"{var} is set, but does not look like a {prefix}… key: {masked(value)}."
     return ""
 
 

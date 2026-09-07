@@ -235,6 +235,24 @@ class OtherProviderTests(ConfiguredHarness):
         # The actor never asks for it, on any provider.
         self.assertEqual(llm.structured_kwargs("openai:gpt-5.4"), {"include_raw": True})
 
+    def test_a_machine_with_only_an_openai_key_is_told_the_flag_that_works(self):
+        """The default model belongs to Anthropic; the advice must fit the machine."""
+        with patch.dict(os.environ, {}, clear=True):
+            os.environ["OPENAI_API_KEY"] = "sk-test"
+            self.assertIn("--model openai:<model>", cli.alternatives())
+            with patch.object(graph, "make_model") as never:
+                code, out, err = self.run_cli("convert", str(SOURCE), "--no-diff")
+        # A configuration problem, so exit 2 before any work — not exit 1, which
+        # would mean "we tried to convert this and the result needs review".
+        self.assertEqual((code, out), (2, ""))
+        self.assertIn("ANTHROPIC_API_KEY", err)
+        self.assertIn("openai", err)
+        never.assert_not_called()
+
+    def test_nothing_is_suggested_when_no_provider_key_is_set_at_all(self):
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(cli.alternatives(), "")
+
     def methods_used(self, model_name):
         """Run one conversion on this model and report how each schema was requested."""
         with self.replies([ConversionResult(code=GOLDEN)], [PASS]) as scripted:

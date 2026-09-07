@@ -47,7 +47,10 @@ class ScriptedModel(unittest.TestCase):
     """Shared harness: queue up drafts and reviews, capture the prompts sent."""
 
     def setUp(self):
-        env = patch.dict(os.environ, {"LANGSMITH_TRACING": "false", "LANGCHAIN_TRACING_V2": "false"})
+        env = patch.dict(os.environ, {"LANGSMITH_TRACING": "false", "LANGCHAIN_TRACING_V2": "false",
+                                      # Shaped like a key, worth nothing: the CLI now builds the configured
+                                      # model before running, and no test may need a real credential.
+                                      "ANTHROPIC_API_KEY": "sk-ant-offline-test"})
         env.start()
         self.addCleanup(env.stop)
         self.tmp = TemporaryDirectory()

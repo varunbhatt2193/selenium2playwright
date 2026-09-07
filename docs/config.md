@@ -199,6 +199,21 @@ file inside it at `report.result.code`.
 claim was only ever *exercised* on Anthropic for the graph itself, so it was
 checked properly and three things needed fixing.
 
+**Every run checks the model it is about to use, not just a named one.** The
+commonest case is a fresh machine whose only key belongs to a different
+provider than the default, and the old behaviour answered that configuration
+question with a *conversion* verdict: the run went through intake, called
+Anthropic, failed to authenticate, and exited **1** with an empty scorecard.
+Now it stops before any work, exits **2**, and says what this machine can
+actually do:
+
+```console
+$ s2p convert page.ts          # OpenAI key set, no Anthropic key, nothing configured
+Invalid value: anthropic:claude-sonnet-5 needs ANTHROPIC_API_KEY, which is not set
+(see .env.example). Keys are set here for openai — run with --model openai:<model>,
+or put S2P_MODEL=openai:<model> in .env.
+```
+
 **The preflight asks the provider, not a table.** `env.PROVIDER_KEYS` knows the
 key variable for fourteen providers (anthropic, openai, azure_openai,
 google_genai, groq, mistralai, deepseek, xai, together, fireworks, cohere,
@@ -241,11 +256,20 @@ Two live runs, on this repo's own samples:
 |---|---|---|---|
 | `LoginPage.ts` | `openai:gpt-5.4` | `openai:gpt-5.4` | 4/4 gates + critic PASS, 1 attempt, **exit 0** |
 | `login.spec.ts` (+ the converted POM) | `openai:gpt-5.4` | `anthropic:claude-sonnet-5` | 4/4 gates + critic PASS, 1 attempt, **exit 0** |
+| `LoginPage.ts`, **no Anthropic key in the process at all** | `openai:gpt-5.4` | `openai:gpt-5.4` | 4/4 gates + critic PASS, **exit 1** on four honest locator TODOs |
 
 The second one is the interesting one: **two vendors inside one graph**, the
 draft written by OpenAI and reviewed by Anthropic, with the Anthropic critic
 still getting its cache read (3,301 tokens) because the cache marker follows the
 model that will actually receive the messages, not the run.
+
+The third answers the practical question — *what if I only have an OpenAI key?*
+One line, `S2P_MODEL=openai:gpt-5.4` in `.env` (or `--model` per run), and
+everything works: the four gates, the critic loop, long-term memory (its
+embeddings default to OpenAI anyway), the scorecard and the exit codes. The
+model even behaved the way the playbook asks — it refused to invent semantic
+locators it could not verify and left four `TODO(review)` items instead, which
+is exactly why that run is an honest exit 1 rather than a 0.
 
 What is *not* checked before the run is the model **name** — `openai:gpt-5.9`
 builds a client happily and fails on the first call, because finding out costs
