@@ -1,4 +1,4 @@
-# Restart here — 2026-09-07 (10.2 done: it is live at https://s2p.fly.dev)
+# Restart here — 2026-09-07 (10.2 + 10.4 done: live at https://s2p.fly.dev, and now guarded)
 
 ## Current position
 
@@ -12,6 +12,27 @@ $19.50/month. `./deploy/fly/deploy.sh` deploys and redeploys;
 `./deploy/fly/cost.sh` shows what is running; `./deploy/fly/teardown.sh --yes`
 is the off switch — Fly has no spending cap, so that script *is* the cap. Read
 [deploy/fly/README.md](../deploy/fly/README.md) before touching any of it.
+
+**10.4 is done too: the URL is no longer open.** `POST /threads` with no token
+is 401. Two keys in `.env` (`S2P_API_KEY` = you, unlimited; `S2P_DEMO_KEY` =
+metered, inline text only, no server paths, no shared memory), a $5/day budget
+enforced in runs, 3/60s and 10/day per visitor, an alert at 80%, and a 👎 that
+queues its input into the `s2p-feedback-queue` dataset. Verify any deployment
+with:
+
+```bash
+uv run python scripts/check_guardrails.py --url https://s2p.fly.dev
+```
+
+Read [docs/guardrails.md](guardrails.md) before changing `guard.py` or
+`limits.py` — it lists four bugs that only running it could find, including a
+rate limiter that refused *everything* and looked exactly like one that worked.
+
+**Next is 10.3, the Streamlit playground** — the last piece before the link can
+go out, because `s2p.fly.dev` is a JSON API and a hiring manager who opens it
+sees `{"detail":"Not Found"}`. It needs `S2P_DEMO_KEY` server-side, an
+`X-S2P-Visitor` header per session, `GET /limits` for the budget line, and
+`POST /feedback` for the 👍/👎 buttons.
 
 The managed platform is the part that failed, and it is history now: 10.1 put
 the graphs behind `langgraph dev`; 10.2 made them *deployable*: the file travels

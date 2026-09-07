@@ -69,6 +69,19 @@ say "4/6  Regenerating the Dockerfile from langgraph.json"
 uv run langgraph dockerfile "$HERE/Dockerfile.generated" --config langgraph.json
 
 say "5/6  Secrets"
+# The demo is only safe because it has keys, so the deploy generates them rather
+# than trusting anyone to remember. Written into .env, which is both the local
+# developer's copy and — because the loop below forwards everything in it — the
+# source the deployment's secrets are read from. Generated once and never
+# rotated here: changing S2P_DEMO_KEY would silently lock out a playground that
+# is already configured with the old one.
+for KEYNAME in S2P_API_KEY S2P_DEMO_KEY; do
+  if ! grep -qE "^${KEYNAME}=" .env 2>/dev/null; then
+    printf '%s=%s\n' "$KEYNAME" "$(openssl rand -hex 32)" >> .env
+    echo "   generated $KEYNAME into .env (value not shown)"
+  fi
+done
+
 # Read once, passed straight to Fly, never printed. .env is the developer's copy;
 # Fly's secret store is the deployment's. Neither is ever in an image layer.
 [ -f "$HERE/.pgpassword" ] || { echo "Missing $HERE/.pgpassword — delete the Postgres secret and re-run"; exit 1; }

@@ -32,6 +32,12 @@
       "description": "A whole Selenium folder: scan it, convert every file in dependency waves (the convert graph as a subgraph, fanned out with Send), then compile the finished tree as one project and write the report. Inputs: root (required), out_root, only."
     }
   },
+  "auth": {
+    "path": "./src/selenium2playwright/guard.py:auth"
+  },
+  "http": {
+    "app": "./src/selenium2playwright/http_app.py:app"
+  },
   "env": ".env",
   "store": {
     "index": {

@@ -27,7 +27,14 @@ import os
 import sys
 from pathlib import Path
 
+from dotenv import load_dotenv
 from langgraph_sdk import get_sync_client
+
+# The URL and the key both live in .env now, and this script previously read
+# neither — it only ever worked because --url was passed by hand. Loading it
+# here is what makes `uv run python scripts/call_deployment.py file.ts` a
+# complete command.
+load_dotenv()
 
 # `langgraph up` puts the production image on this port; a LangSmith Deployment
 # gives you an https URL instead. Both speak the same API, and that is the point.
@@ -41,7 +48,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("source", type=Path, help="the Selenium file to convert, read locally")
     parser.add_argument("--url", default=DEFAULT_URL, help=f"deployment URL (default {DEFAULT_URL})")
     parser.add_argument("--api-key", default=None,
-                        help="LangSmith API key; defaults to LANGSMITH_API_KEY in the environment")
+                        help="the deployment's own key; defaults to S2P_API_KEY, "
+                             "then LANGSMITH_API_KEY, from the environment")
     parser.add_argument("--assistant", default="convert", help="graph name (convert or suite)")
     parser.add_argument("--out", type=Path, default=None, help="write the converted file here")
     parser.add_argument("--companion", type=Path, action="append", default=[],
@@ -85,7 +93,14 @@ def report_lines(state: dict) -> list[str]:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    client = get_sync_client(url=args.url, api_key=args.api_key)
+    # Step 10.4 gave the deployment its own front door. `S2P_API_KEY` is the
+    # owner key it checks — unlimited, every graph, server paths allowed — and
+    # it is a different thing from `LANGSMITH_API_KEY`, which is what the SDK
+    # would otherwise reach for and which the deployment does not accept.
+    # Falling back to it anyway, because a deployment with S2P_AUTH=off (a local
+    # `langgraph up`, say) does not care what the key is.
+    api_key = args.api_key or os.environ.get("S2P_API_KEY") or os.environ.get("LANGSMITH_API_KEY")
+    client = get_sync_client(url=args.url, api_key=api_key)
     print(f"→ {args.url}  ({args.assistant})", file=sys.stderr)
 
     thread_id = args.thread

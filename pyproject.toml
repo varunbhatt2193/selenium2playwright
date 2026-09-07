@@ -13,6 +13,7 @@ dependencies = [
     "langsmith>=0.12.1",
     "openevals>=0.2.0",
     "python-dotenv>=1.2.3",
+    "redis>=5.0",
     "rich>=14",
     "typer>=0.16",
 ]
