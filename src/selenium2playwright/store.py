@@ -119,8 +119,17 @@ def key_for(text: str) -> str:
 
 
 def indexed(store: BaseStore) -> bool:
-    """True when this store can rank by meaning; False when it can only list."""
-    return bool(getattr(store, "index_config", None))
+    """True when this store can rank by meaning; False when it can only list.
+
+    The store a node is handed is not always the store that holds the vectors.
+    LangGraph Platform (step 10.1) wraps its own store in a batching adapter
+    that forwards `search` but carries no `index_config` of its own, so asking
+    the object in front of us would answer "not indexed" and quietly demote
+    every recall to plain recency. Unwrap one layer before believing that.
+    """
+    inner = getattr(store, "_store", None)
+    return bool(getattr(store, "index_config", None)
+                or (inner is not None and getattr(inner, "index_config", None)))
 
 
 @contextmanager

@@ -36,3 +36,7 @@ out/
 # Thread databases (step 7.1) — checkpointed conversations: your source, every
 # draft, and your standing instructions. Working data, not repository content.
 .s2p/
+
+# `langgraph dev` state (step 10.1) — the local server's own checkpointer,
+# store and vectors, written next to the config it started from.
+.langgraph_api/

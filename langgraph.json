@@ -1,0 +1,22 @@
+{
+  "python_version": "3.12",
+  "dependencies": ["."],
+  "graphs": {
+    "convert": {
+      "path": "./src/selenium2playwright/server.py:convert_graph",
+      "description": "One TypeScript Selenium file to Playwright: intake, recall, risk review, then up to three convert/validate/critic laps before the report. Inputs: source_path (required, a path on the server), context_paths, output_path, refinement, ask_risks, user_id, remember, max_attempts."
+    },
+    "suite": {
+      "path": "./src/selenium2playwright/server.py:suite_graph",
+      "description": "A whole Selenium folder: scan it, convert every file in dependency waves (the convert graph as a subgraph, fanned out with Send), then compile the finished tree as one project and write the report. Inputs: root (required), out_root, only."
+    }
+  },
+  "env": ".env",
+  "store": {
+    "index": {
+      "embed": "./src/selenium2playwright/server.py:embed_memories",
+      "dims": 1536,
+      "fields": ["text"]
+    }
+  }
+}

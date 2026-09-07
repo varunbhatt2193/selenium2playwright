@@ -1,19 +1,22 @@
-# Restart here — 2026-09-07 (after 9.3, M4 shipped)
+# Restart here — 2026-09-07 (after 10.1)
 
 ## Current position
 
-**Phases 0–9 are complete. 🏁 M4 — the wow demo — shipped at 9.3: `s2p suite
-<folder> --out <dir>` scans a Selenium suite, converts every file through the
-same graph `s2p convert` uses (waves of independent files in parallel, one
-LangSmith trace), then compiles the finished tree as one project and writes a
-`conversion-report.md` next to the code. Next is Phase 10 — deploy, playground,
-monitor: 10.1 is `langgraph.json` + `langgraph dev` + poking the graph in
-Studio. It has not started.**
+**Phases 0–9 are complete and 10.1 is done. 🏁 M4 — the wow demo — shipped at
+9.3. Step 10.1 put the same graphs behind the LangGraph Platform server:
+`langgraph.json` + `src/selenium2playwright/server.py` + `uv run langgraph dev`,
+verified live over HTTP (a conversion, a two-wave suite run, a thread interrupt,
+and semantic recall through the platform's own store). Next is 10.2 — deploy to
+a LangSmith Deployment dev tier and call it from the laptop with
+`langgraph-sdk`. It has not started, and it has a prerequisite named in
+[local-platform.md](local-platform.md) §9: the graph's only input is a
+*server-side path*, so 10.2 must first accept inline source text or a cloud URL
+converts nothing.**
 
-Read [suite-report.md](suite-report.md), [suite-fanout.md](suite-fanout.md) and
-[suite-scan.md](suite-scan.md) first — that is all of Phase 9 — then
-[cli.md](cli.md) and [config.md](config.md), then
-[long-term-memory.md](long-term-memory.md),
+Read [local-platform.md](local-platform.md) first — that is 10.1 — then
+[suite-report.md](suite-report.md), [suite-fanout.md](suite-fanout.md) and
+[suite-scan.md](suite-scan.md) for all of Phase 9, then [cli.md](cli.md) and
+[config.md](config.md), then [long-term-memory.md](long-term-memory.md),
 [human-in-the-loop.md](human-in-the-loop.md) and
 [short-term-memory.md](short-term-memory.md).
 [phase-9.3-report.md](phase-9.3-report.md) is the live artifact the whole
@@ -25,9 +28,60 @@ plain-English walkthrough with check-yourself questions, then wait for his
 review. **Always end a turn that hands control back with an explicit "waiting on
 you" line** (asked 2026-09-06 — a pause must never be implied).
 
-**301 offline tests pass** (`uv run python -m unittest discover -s tests`, ~151 s
+**314 offline tests pass** (`uv run python -m unittest discover -s tests`, ~151 s
 — not `-t .`, and pytest is not installed). The suite is terminal-width
 independent from 40 to 200 columns as of 9.3.
+
+## What 10.1 built (`server.py`, `langgraph.json`)
+
+- **`langgraph.json`**: `dependencies: ["."]`, two graphs (`convert`, `suite`)
+  with human-facing `description`s, `env: ".env"`, and a `store.index` block
+  (`embed` -> our own function, `dims` 1536, `fields: ["text"]`) that is what
+  makes 7.3's semantic recall work over HTTP.
+- **`server.py`**: two **zero-argument** factories plus `embed_memories`.
+  Nothing else; the graphs are unchanged.
+- **`store.indexed()` unwraps one layer** (`_store`) — the real bug this step
+  found, see the sharp edges below.
+- `tests/test_platform.py` (13). `.langgraph_api/` gitignored.
+  `langgraph-cli[inmem]` added as the first `dev` dependency group.
+- **Live over HTTP on `langgraph dev`:** `POST /runs/wait` on `convert` —
+  3 attempts, 4/4 gates + critic pass, 6 honest locator TODOs, 16,649 tokens
+  with 5,380 cache-read. `suite` with `only: ["LoginPage.ts", "login.spec.ts"]`
+  — 2 waves in dependency order, both passed in 1 attempt, whole tree compiled,
+  `conversion-report.md` written. `ask_risks: true` on a thread returned the
+  dialogs `__interrupt__` with its three options. A memory written via
+  `PUT /store/items` searched back at 0.5224 and reached the `recall` node at
+  0.4986.
+
+## 10.1 sharp edges
+
+- **A graph factory's signature is its API, and it is read by annotation.**
+  `_classify_factory` allows 0-2 params, a `RunnableConfig` and a
+  `ServerRuntime`, identified by type hints. `build_graph(checkpointer, store)`
+  — two unannotated — raises at server start. `build_suite_graph(store)` — one
+  unannotated — **silently passes a RunnableConfig as the store**. Zero-argument
+  wrappers are the only unambiguous shape.
+- **The platform owns persistence.** Compile with no checkpointer and no store;
+  it injects both at run time. The local dev server *refuses* a graph that
+  brought its own. 7.1/7.3's optional `= None` parameters are what made this a
+  no-change deploy.
+- **`store.index.embed` wants a `texts -> vectors` function, not a factory.**
+  `ensure_embeddings` wraps any plain callable as the former. Pointing it at
+  `llm.make_embeddings` would be wrong in both directions.
+- **`dims` cannot be computed in JSON.** A test pins it to
+  `llm.EMBEDDING_DIMS[env.DEFAULT_EMBEDDINGS]` so a changed default fails in the
+  suite, not at run time. `S2P_EMBEDDINGS=off` conflicts with an index and now
+  raises naming both settings.
+- **The platform's store is a `BatchedStore` with no `index_config` attribute at
+  all**, so `indexed()` answered False and every platform recall would have
+  degraded to recency — no error, no failing test, a demo that looks fine. Only
+  running the graph somewhere else could surface it.
+- **Not fixed here, and 10.2's first job:** `source_path` is read on the
+  *server's* filesystem. Fine locally, meaningless in the cloud.
+- Studio's input form offers all 30 `ConversionState` keys (`total=False`); an
+  explicit `input_schema` would fix it but filters incoming keys, so it needs
+  the eval runner and 314 tests in view. Suite runs over HTTP get the platform's
+  default recursion limit of 25, not `cli.py`'s `2 * waves + 6`.
 
 ## What 9.3 built (`assemble.py`, the last step of M4)
 
