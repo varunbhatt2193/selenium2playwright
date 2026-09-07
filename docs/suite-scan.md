@@ -4,7 +4,7 @@
 > every file is, what can be converted, and in what **order** — a plan built
 > from the import graph, with no model called and no file written.
 
-This is the first step of Phase 9 (suite mode). Steps [9.2](../roadmap.md) and
+This is the first step of Phase 9 (suite mode). Steps [9.2](suite-fanout.md) and
 9.3 turn this plan into parallel conversions and one report; nothing here does
 any converting yet.
 

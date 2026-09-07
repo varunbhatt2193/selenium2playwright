@@ -57,7 +57,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 
-from selenium2playwright import env, graph, memory, risk, suite
+from selenium2playwright import env, graph, memory, risk, suite, suite_graph
 from selenium2playwright import store as memory_store
 from selenium2playwright.llm import check_model, embedding_dims, make_embeddings
 from selenium2playwright.one_shot import format_usage
@@ -86,6 +86,8 @@ ModelOption = Annotated[str, typer.Option(
     help=f"actor model for this run: {' | '.join(env.MODEL_ALIASES)}, or a full provider:model")]
 
 PASS_STYLE, FAIL_STYLE, MUTED = "bold green", "bold red", "dim"
+# Column-width shorthand for the suite table; the JSON keeps the full word.
+VERDICTS = {"needs-review": "REVIEW", "refused": "REFUSED", "failed": "FAILED"}
 DIFF_LIMIT = 240  # a whole-file rewrite is long; past this, read the file itself
 # Named and versioned so a consumer can check the shape it is reading rather
 # than guessing from the keys; a breaking change gets /v2, never a silent edit.
@@ -622,6 +624,170 @@ def show_manifest(manifest: suite.Manifest) -> None:
         say(f"  note: {note}", style=MUTED)
     if not manifest.convertible:
         say("Nothing to convert in this folder.", style=FAIL_STYLE)
+
+
+@app.command("suite")
+def convert_suite(
+    root: Annotated[Path, typer.Argument(
+        exists=True, file_okay=False, help="the Selenium suite folder to convert")],
+    out: Annotated[Path, typer.Option(
+        "--out", "-o", help="where the converted tree goes; created if it does not exist")],
+    only: Annotated[Optional[list[str]], typer.Option(
+        "--only", metavar="PATTERN",
+        help="convert just these files, e.g. --only 'pages/*.ts' --only LoginPage.ts")] = None,
+    parallel: Annotated[int, typer.Option(
+        "--parallel", min=1, max=16,
+        help="how many files of one wave to convert at the same time")] = 4,
+    max_attempts: Annotated[int, typer.Option(
+        "--max-attempts", min=1, max=MAX_ATTEMPTS,
+        help="conversion attempts per file: 1 = no repairs; 3 = draft plus two repairs")] = MAX_ATTEMPTS,
+    model: ModelOption = "",
+    critic_model: Annotated[str, typer.Option(
+        "--critic-model", metavar="NAME",
+        help="reviewer model; defaults to the actor unless S2P_CRITIC_MODEL says otherwise")] = "",
+    user: UserOption = memory_store.DEFAULT_USER,
+    recall: Annotated[bool, typer.Option(
+        "--recall/--no-recall", help="use long-term memory; --no-recall reads and writes nothing")] = True,
+    as_json: Annotated[bool, typer.Option(
+        "--json", help="put the whole run on stdout as one JSON document")] = False,
+    memory_db: MemoryDbOption = memory_store.DEFAULT_DB,
+) -> None:
+    """Convert a whole folder: page objects first, then the tests that import them.
+
+    `s2p scan` shows the plan; this runs it. Each wave of independent files is
+    dispatched in parallel and every file goes through the same graph `s2p
+    convert` uses, so the per-file result is the same result — there is just one
+    trace holding all of them (step 9.2).
+    """
+    if out.resolve() == root.resolve():
+        raise typer.BadParameter("--out must be a different folder from the suite being converted")
+    if root.resolve() in out.resolve().parents:
+        raise typer.BadParameter("--out must not be inside the suite being converted")
+    models = resolve_models(model, critic_model)
+    patterns = list(only or [])
+    # Scanned here rather than only inside the graph, so a folder with nothing
+    # to convert — or an --only that matches nothing — is answered before a
+    # model is built, and the plan node is handed the manifest instead of
+    # reading every file a second time.
+    planned = suite.scan(root)
+    chosen = [f for f in planned.convertible if suite_graph.selected(f.path, patterns)]
+    if not planned.convertible:
+        show_manifest(planned)
+        raise typer.Exit(1)
+    if not chosen:
+        raise typer.BadParameter(
+            f"--only matched none of the {len(planned.convertible)} convertible file(s); "
+            f"run `s2p scan {root}` to see them")
+    inputs = {"root": str(root), "out_root": str(out), "only": patterns, "manifest": planned}
+    run = suite_graph.SuiteSettings(model=models["actor"], critic_model=models["critic"],
+                                    max_attempts=max_attempts, user_id=user if recall else "")
+
+    with ExitStack() as stack:
+        store = None
+        if recall:
+            embeddings, dims = embeddings_for(writing=False)
+            store = stack.enter_context(memory_store.open_store(memory_db, embeddings, dims))
+        compiled = suite_graph.build_suite_graph(store)
+        say(f"Suite {root} → {out} · {len(chosen)} file(s) · {len(planned.waves)} wave(s) · "
+            f"{parallel} at a time · up to {max_attempts} attempt(s) each")
+        say(f"Models: actor {models['actor']}"
+            + ("" if models["critic"] == models["actor"] else f" · critic {models['critic']}"),
+            style=MUTED)
+        final = compiled.invoke(inputs, context=run, config=suite_run_config(
+            models, max_attempts, len(planned.waves), parallel))
+
+    raise typer.Exit(present_suite(final, out, as_json))
+
+
+def suite_run_config(models: dict[str, str], max_attempts: int, waves: int, parallel: int) -> dict:
+    """Trace tags and the two limits that keep a many-file run inside its bounds.
+
+    max_concurrency is what actually caps the fan-out: LangGraph will start
+    every Send in a wave at once otherwise, and a forty-file wave would open
+    forty connections to the provider. recursion_limit counts super-steps, and
+    each wave costs two of them (dispatch, then the join), so it grows with the
+    suite rather than being a number that works until it does not.
+    """
+    return {"run_name": "suite-graph",
+            "tags": ["step:9.2", f"model:{models['actor'].split(':')[-1]}", f"waves:{waves}"],
+            "metadata": {"actor_model": models["actor"], "critic_model": models["critic"],
+                         "max_attempts": max_attempts, "waves": waves, "parallel": parallel},
+            "max_concurrency": parallel,
+            "recursion_limit": 2 * waves + 6}
+
+
+def present_suite(final: dict, out: Path, as_json: bool) -> int:
+    """The run as a table, then the exit code it earned.
+
+    One row per file in plan order — which is not the order they finished in,
+    because they ran at the same time (suite_graph.ordered re-sorts them).
+    Exit 0 only when every file passed outright; a single needs-review is a 1,
+    for the same reason it is in `s2p convert`.
+    """
+    outcomes = suite_graph.ordered(final)
+    counts = suite_graph.totals(outcomes)
+    failed = len(outcomes) - counts["passed"]
+    exit_code = 0 if not failed else 1
+
+    # The table is printed either way, for the same reason `s2p convert` prints
+    # its scorecard under --json: stderr is for the person watching, stdout is
+    # the document, and the two never compete for the same stream.
+    console.print(suite_table(outcomes))
+    for outcome in outcomes:
+        for todo in outcome.todos:
+            say(f"  {outcome.path}: {todo}")
+        for error in outcome.errors:
+            say(f"  {outcome.path}: error: {error}", style=FAIL_STYLE)
+        if outcome.status in ("refused", "failed"):
+            say(f"  {outcome.path}: {outcome.reason}", style=FAIL_STYLE)
+    for path in final.get("copied", []):
+        say(f"  copied {path} unchanged", style=MUTED)
+    for item in final["manifest"].files:
+        if item.action == suite.SKIP:
+            say(f"  skipped {item.path} — {item.reason}", style=MUTED)
+    say(f"{len(outcomes)} file(s): " + " · ".join(f"{n} {name}" for name, n in counts.items() if n)
+        + f" in {final.get('elapsed', 0.0):.1f}s",
+        style=PASS_STYLE if not failed else "bold yellow")
+    for label, role in (("Conversion", "usage"), ("Critic", "critic_usage")):
+        usage = suite_graph.suite_usage(outcomes, role)
+        if usage:
+            say(f"{label} tokens (whole suite): {format_usage(usage)}", style=MUTED)
+    say(f"[wrote {out}]")
+    if as_json:
+        print(json.dumps(suite_graph.run_json(final, exit_code), indent=2))
+    return exit_code
+
+
+def suite_table(outcomes: list[suite_graph.FileOutcome]) -> Table:
+    """One row per file: what happened, which gates held, and how long it took."""
+    table = Table(show_header=True, header_style="bold", box=None, pad_edge=False)
+    for column in ("wave", "file", "result", "laps", "gates", "critic", "TODO", "secs"):
+        table.add_column(column, overflow="fold")
+    for outcome in outcomes:
+        table.add_row(
+            str(outcome.wave), outcome.path,
+            mark(outcome.ok, "PASS", VERDICTS.get(outcome.status, outcome.status.upper())),
+            str(outcome.attempts), gates_cell(outcome),
+            Text(outcome.critic.upper(), style=PASS_STYLE if outcome.critic == "pass" else FAIL_STYLE)
+            if outcome.critic else Text("—", style=MUTED),
+            str(len(outcome.todos)), f"{outcome.seconds:.0f}")
+    return table
+
+
+def gates_cell(outcome: suite_graph.FileOutcome) -> Text:
+    """`4/4` when they all held, otherwise the score and the gates that did not.
+
+    Naming only the failures keeps the column narrow enough that the filenames
+    beside it stay on one line, and puts the useful half of the answer — which
+    gate — where a reader is already looking.
+    """
+    if not outcome.gates:
+        return Text("—", style=MUTED)
+    failed = [gate for gate, ok in outcome.gates if not ok]
+    score = f"{len(outcome.gates) - len(failed)}/{len(outcome.gates)}"
+    if not failed:
+        return Text(score, style=PASS_STYLE)
+    return Text(f"{score} {' '.join(failed)}", style=FAIL_STYLE)
 
 
 @app.command()
