@@ -193,7 +193,67 @@ untouched. And `report.json` on stdout parsed in one line, with the converted
 file inside it at `report.result.code`.
 
 
-## 6. Sharp edges
+## 6. Any provider, not just Anthropic
+
+`--model` and `S2P_MODEL` have always claimed "any LangChain chat model". That
+claim was only ever *exercised* on Anthropic for the graph itself, so it was
+checked properly and three things needed fixing.
+
+**The preflight asks the provider, not a table.** `env.PROVIDER_KEYS` knows the
+key variable for fourteen providers (anthropic, openai, azure_openai,
+google_genai, groq, mistralai, deepseek, xai, together, fireworks, cohere,
+openrouter, perplexity, voyage) and gives a friendly message when one is
+missing. A provider it has *not* heard of used to be a hard refusal — "Add it
+to PROVIDER_KEYS in env.py" — which made "any model" untrue. Now `env` stays
+quiet and `llm.check_model` **builds the client** (local, no network) and lets
+the provider answer:
+
+```console
+$ s2p convert page.ts --model groq:llama-3.3-70b-versatile
+Invalid value: groq:llama-3.3-70b-versatile: Initializing ChatGroq requires the
+langchain-groq package. Please install it with `pip install langchain-groq`
+ — here: uv add langchain-groq
+
+$ s2p convert page.ts --model bogus:thing
+Invalid value: bogus:thing: Unable to infer model provider for model='bogus:thing'.
+Write it as provider:model, e.g. openai:gpt-5.4. Any LangChain provider works once
+its package is installed (see .env.example).
+```
+
+Optional providers are deliberately not dependencies: `langchain-anthropic` and
+`langchain-openai` ship with the project, and anything else is one `uv add`
+away — the error says which one.
+
+**The critic no longer hard-codes one vendor's trick.** It asked for
+`method="json_schema"` on every provider, which is an Anthropic requirement
+(forced tool choice fights adaptive thinking). That decision moved into
+`llm.structured_kwargs`, which asks for native JSON schema on the providers
+where it is known to work and otherwise uses the default tool-calling path
+every integration implements. The node is now provider-blind.
+
+**What is still vendor-specific lives in `llm.py` only** — three things: the
+Anthropic prompt-cache marker (`prepare_messages`), the critic's `effort` knob,
+and that JSON-schema list. Everything else speaks plain LangChain.
+
+Two live runs, on this repo's own samples:
+
+| run | actor | critic | result |
+|---|---|---|---|
+| `LoginPage.ts` | `openai:gpt-5.4` | `openai:gpt-5.4` | 4/4 gates + critic PASS, 1 attempt, **exit 0** |
+| `login.spec.ts` (+ the converted POM) | `openai:gpt-5.4` | `anthropic:claude-sonnet-5` | 4/4 gates + critic PASS, 1 attempt, **exit 0** |
+
+The second one is the interesting one: **two vendors inside one graph**, the
+draft written by OpenAI and reviewed by Anthropic, with the Anthropic critic
+still getting its cache read (3,301 tokens) because the cache marker follows the
+model that will actually receive the messages, not the run.
+
+What is *not* checked before the run is the model **name** — `openai:gpt-5.9`
+builds a client happily and fails on the first call, because finding out costs
+a network round trip. And the `--model` aliases are Anthropic-only shorthand;
+every other provider is named in full, which is the honest way round for a
+project that does not want to curate other people's model lists.
+
+## 7. Sharp edges
 
 1. **A context schema's defaults are not applied for you.** Invoke without
    `context=` and `runtime.context` is `None`, not `RunSettings()` — reading a
@@ -215,8 +275,16 @@ file inside it at `report.result.code`.
 5. **Aliases are shorthand, not a menu.** `MODEL_ALIASES` is four lines in
    `env.py`; the flag accepts any `provider:model`, so adding a provider is
    `uv add langchain-<provider>` and nothing here.
+6. **A key table can only ever be advice.** It cannot know Watsonx's variable
+   or your gateway's, so an unlisted provider is unverifiable, not invalid —
+   `env.required()` skips it, `env.unverifiable()` reports it, and
+   `uv run python -m selenium2playwright.env` prints it as a `•` line rather
+   than a `✗`.
+7. **A vendor-specific structured-output method is a bug on every other
+   vendor.** `method="json_schema"` sat in the critic node for three phases and
+   would have failed on any provider without it.
 
-## 7. What this is not
+## 8. What this is not
 
 - **Not a config file.** No `s2p.toml`, no profiles. Flags and `.env`, which is
   what a one-file CLI needs; a server will pass the same `RunSettings` per
@@ -226,7 +294,7 @@ file inside it at `report.result.code`.
 - **Not a new agent.** Same nodes, same prompts, same four gates, same critic.
   A run with no flags resolves exactly what it resolved yesterday.
 
-## 8. Five questions worth asking
+## 9. Six questions worth asking
 
 1. Why is the model context and not state — what breaks on turn 2 if you move it?
 2. `intake` reads the context, but `convert` reads the state. Why not have both
@@ -234,3 +302,4 @@ file inside it at `report.result.code`.
 3. Why does `--model opus` move the critic too, but `S2P_CRITIC_MODEL` survive it?
 4. What would `--json` have to change if the code were *not* inside the document?
 5. Why is a bare `--model gpt-4o` an error instead of a guessed provider?
+6. Why does `check_model` build a client instead of checking a table of key names?

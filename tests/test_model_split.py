@@ -31,9 +31,13 @@ class EnvModelSplitTests(unittest.TestCase):
     def test_required_keys_cover_every_provider_in_use(self):
         with patch.dict(os.environ, {"S2P_MODEL": HAIKU, "S2P_CRITIC_MODEL": "openai:gpt-5"}):
             self.assertEqual(set(env.required()), {"LANGSMITH_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"})
+        # A provider this project has no key advice for no longer stops the run:
+        # it is reported as unverifiable and validates its own key when it runs.
         with patch.dict(os.environ, {"S2P_MODEL": HAIKU, "S2P_CRITIC_MODEL": "mystery:model"}):
-            with self.assertRaisesRegex(ValueError, "S2P_CRITIC_MODEL='mystery:model'"):
-                env.required()
+            self.assertEqual(set(env.required()),
+                             {"LANGSMITH_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"})
+            self.assertEqual(env.unverifiable(),
+                             {"critic": "mystery:model", "judge": "mystery:model"})
 
     def test_make_model_and_cache_marker_follow_the_role(self):
         with patch.dict(os.environ, {"S2P_MODEL": HAIKU, "S2P_CRITIC_MODEL": "openai:gpt-5"}), \

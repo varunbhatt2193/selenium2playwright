@@ -11,6 +11,7 @@ through the graph's context schema, and beats the environment for that run.
 from __future__ import annotations
 
 import os
+import re
 
 from langchain.chat_models import init_chat_model
 from langchain.embeddings import init_embeddings
@@ -21,6 +22,13 @@ from langchain_core.prompt_values import PromptValue
 from langchain_core.runnables import Runnable, RunnableLambda, RunnablePassthrough
 
 from selenium2playwright import env
+
+# Providers whose native JSON-schema output the critic is known to work on.
+# Anthropic needs it (forced tool choice fights adaptive thinking, see critic);
+# OpenAI supports it and was verified live. Everywhere else the default path —
+# tool/function calling — is the one every integration implements, so an
+# unlisted provider gets that rather than an unsupported-method error.
+JSON_SCHEMA_PROVIDERS = {"anthropic", "openai"}
 
 # A converted test file is ~500-2,000 tokens; most providers default max_tokens
 # to ~1k, which would silently truncate it mid-file. 8k is safe headroom.
@@ -70,6 +78,57 @@ def _client_kwargs(provider: str) -> dict:
         # Identity-linked Anthropic keys must say which workspace a request acts in.
         return {"default_headers": {"anthropic-workspace-id": os.environ["ANTHROPIC_WORKSPACE_ID"]}}
     return {}
+
+
+def structured_kwargs(model_name: str | None = None, *, for_critic: bool = False) -> dict:
+    """with_structured_output options that work on the provider actually in use.
+
+    include_raw everywhere: the parsed object and the AIMessage it came from are
+    both needed (token counts, and an honest parse error instead of a None).
+    The critic additionally asks for native JSON-schema output where that is
+    known to work — a vendor detail, so it is decided here rather than in the
+    node, which is what lets the same graph run on any provider.
+    """
+    kwargs: dict = {"include_raw": True}
+    provider = resolve_name(model_name, for_critic=for_critic).split(":", 1)[0]
+    if for_critic and provider in JSON_SCHEMA_PROVIDERS:
+        kwargs["method"] = "json_schema"
+    return kwargs
+
+
+def check_model(name: str) -> str:
+    """"" when this model can actually be built here, else one line saying why not.
+
+    Two questions, cheapest first: does this project know a key variable for the
+    provider and is it set (env.key_missing, no imports), and then — the honest
+    one — can the client be constructed at all? Construction is local, costs
+    nothing, and is the only check that knows about *this* machine: it catches
+    an unsupported provider, an integration package that was never installed
+    (LangChain's error names the package to add), and a provider whose key lives
+    under a variable this project has never heard of.
+
+    What it cannot catch is a model *name* the provider will reject — that needs
+    a network call, so it stays where it always was: the first attempt.
+    """
+    problem = env.key_missing(name)
+    if problem:
+        return problem
+    try:
+        make_model(name)
+    except Exception as exc:  # ImportError, unsupported provider, missing key…
+        detail = " ".join(str(exc).split()) or type(exc).__name__
+        package = re.search(r"langchain[-_][a-z0-9_-]+", detail)
+        if isinstance(exc, ImportError) and package:
+            # LangChain says "pip install X"; this project is managed by uv.
+            detail += f" — here: uv add {package.group(0).replace('_', '-')}"
+        elif "Supported providers" in detail:
+            # Its list of ~28 providers is accurate and unreadable in a terminal
+            # box; the actionable half is the shape of the string.
+            detail = (detail.split("Supported providers")[0].strip()
+                      + " Write it as provider:model, e.g. openai:gpt-5.4. Any LangChain "
+                        "provider works once its package is installed (see .env.example).")
+        return f"{name}: {detail[:400]}"
+    return ""
 
 
 def prepare_messages(model_name: str | None = None, *, for_critic: bool = False) -> Runnable:

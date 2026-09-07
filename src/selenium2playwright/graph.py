@@ -61,7 +61,7 @@ from langgraph.types import interrupt
 from selenium2playwright import env, risk
 from selenium2playwright import store as memory_store
 from selenium2playwright.classify import Classification, classify
-from selenium2playwright.llm import make_model, prepare_messages
+from selenium2playwright.llm import make_model, prepare_messages, structured_kwargs
 from selenium2playwright.prompts import (build_critic_prompt, build_prompt, format_context,
                                          format_conventions, format_decisions, format_remembered)
 from selenium2playwright.reflection import (MAX_ATTEMPTS, collect_todos, refinement_feedback,
@@ -325,7 +325,8 @@ def convert(state: ConversionState) -> ConversionState:
         elif state.get("baseline") is not None:
             feedback = refinement_feedback(state["baseline"])
         actor = model_for(state, "actor")
-        structured_model = make_model(actor).with_structured_output(ConversionResult, include_raw=True)
+        structured_model = make_model(actor).with_structured_output(
+            ConversionResult, **structured_kwargs(actor))
         chain = (build_prompt(revision=feedback, decisions=guidance(state),
                               conventions=format_conventions(state.get("conventions", [])),
                               remembered=remembered(state))
@@ -389,8 +390,10 @@ def critic(state: ConversionState) -> ConversionState:
     usage = None
     try:
         reviewer = model_for(state, "critic")
+        # method="json_schema" only where the provider supports it: the choice
+        # lives in llm.py so this node runs unchanged on any of them.
         structured_model = make_model(reviewer, for_critic=True).with_structured_output(
-            Critique, method="json_schema", include_raw=True,
+            Critique, **structured_kwargs(reviewer, for_critic=True),
         )
         chain = (build_critic_prompt(conventions=format_conventions(state.get("conventions", [])),
                                      decisions=guidance(state), remembered=remembered(state))

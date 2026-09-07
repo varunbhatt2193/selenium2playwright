@@ -18,7 +18,7 @@ from unittest.mock import Mock, patch
 
 from test_cli import GOLDEN, PASS, REVISE, SOURCE, CliHarness
 
-from selenium2playwright import cli, env, graph
+from selenium2playwright import cli, env, graph, llm
 from selenium2playwright.schemas import ConversionResult
 
 OPUS, HAIKU = "anthropic:claude-opus-5", "anthropic:claude-haiku-4-5-20251001"
@@ -60,16 +60,31 @@ class ModelNameTests(unittest.TestCase):
             complaint = env.key_missing("openai:gpt-4o")
         self.assertIn("OPENAI_API_KEY", complaint)
         self.assertNotIn("wrong-paste-entirely", complaint)  # masked, per the secrets rule
-        self.assertIn("unknown provider", env.key_missing("bogus:whatever"))
+
+    def test_a_provider_this_file_has_no_advice_for_is_not_judged_here(self):
+        """Silence means "no advice", not "approved" — llm.check_model asks the provider."""
+        self.assertEqual(env.key_missing("ibm:granite-3"), "")       # not in PROVIDER_KEYS
+        self.assertEqual(env.key_missing("ollama:llama3.2"), "")     # local, needs no key
+        with patch.dict(os.environ, {"S2P_MODEL": "ibm:granite-3"}):
+            os.environ.pop("S2P_CRITIC_MODEL", None)
+            # Not knowing Watsonx's key variable must not stop the run…
+            self.assertNotIn("IBM", "".join(env.required()))
+            # …but it is said out loud rather than passed over in silence.
+            self.assertEqual(env.unverifiable()["actor"], "ibm:granite-3")
 
 
 class ConfiguredHarness(CliHarness):
     """The scripted model of test_cli, plus a record of the names it was asked for."""
 
+    #: Shaped like the real thing, worth nothing: the preflight builds a client
+    #: (no network), so a machine with no keys must still run these tests.
+    FAKE_KEYS = {"ANTHROPIC_API_KEY": "sk-ant-test", "OPENAI_API_KEY": "sk-test",
+                 "GROQ_API_KEY": "gsk_test"}
+
     def setUp(self):
         super().setUp()
         # A critic split in the developer's own .env must not decide a test.
-        split = patch.dict(os.environ, {})
+        split = patch.dict(os.environ, self.FAKE_KEYS)
         split.start()
         os.environ.pop("S2P_CRITIC_MODEL", None)
         self.addCleanup(split.stop)
@@ -140,11 +155,12 @@ class CliConfigTests(ConfiguredHarness):
 
     def test_an_unusable_model_is_refused_before_any_provider_call(self):
         for argv, expected in ((["--model", "gpt-4o"], "unknown model"),
-                               (["--model", "bogus:thing"], "unknown provider")):
+                               (["--model", "bogus:thing"], "Invalid value: bogus:thing")):
             with self.subTest(argv=argv), patch.object(graph, "make_model") as never:
                 code, out, err = self.run_cli("convert", str(SOURCE), *argv)
             self.assertEqual((code, out), (2, ""))
-            self.assertIn(expected, err)
+            # Click wraps its error box, so compare on collapsed whitespace.
+            self.assertIn(expected, " ".join(err.split()))
             never.assert_not_called()
 
     def test_a_named_model_with_no_key_fails_fast_and_names_the_variable(self):
@@ -185,6 +201,55 @@ class CliConfigTests(ConfiguredHarness):
         self.assertIsNone(document["report"])
         self.assertIn("webdriverio", document["refusal"])
         never.assert_not_called()
+
+
+class OtherProviderTests(ConfiguredHarness):
+    """OpenAI and the rest: nothing here may assume the provider is Anthropic."""
+
+    def test_a_usable_model_passes_the_preflight_without_touching_the_network(self):
+        for name in ("anthropic:claude-sonnet-5", "openai:gpt-5.4"):
+            with self.subTest(name=name):
+                self.assertEqual(llm.check_model(name), "")
+
+    def test_a_missing_integration_package_says_which_one_to_add(self):
+        """The common first failure on a new provider — and it is fixable in one line."""
+        problem = llm.check_model("groq:llama-3.3-70b-versatile")
+        self.assertIn("langchain-groq", problem)
+        self.assertIn("uv add langchain-groq", problem)
+
+    def test_a_provider_that_does_not_exist_says_what_a_model_string_looks_like(self):
+        """LangChain's own list of 28 providers is accurate and unreadable in a box."""
+        problem = llm.check_model("bogus:whatever")
+        self.assertIn("provider:model", problem)
+        self.assertNotIn("Supported providers", problem)
+        self.assertLess(len(problem), 300)
+
+    def test_the_critic_asks_for_json_schema_only_where_it_is_supported(self):
+        self.assertEqual(llm.structured_kwargs("openai:gpt-5.4", for_critic=True),
+                         {"include_raw": True, "method": "json_schema"})
+        self.assertEqual(llm.structured_kwargs("anthropic:claude-sonnet-5", for_critic=True),
+                         {"include_raw": True, "method": "json_schema"})
+        # An unlisted provider gets the default path every integration implements.
+        self.assertEqual(llm.structured_kwargs("groq:llama-3.3-70b-versatile", for_critic=True),
+                         {"include_raw": True})
+        # The actor never asks for it, on any provider.
+        self.assertEqual(llm.structured_kwargs("openai:gpt-5.4"), {"include_raw": True})
+
+    def methods_used(self, model_name):
+        """Run one conversion on this model and report how each schema was requested."""
+        with self.replies([ConversionResult(code=GOLDEN)], [PASS]) as scripted:
+            graph.build_graph().invoke({"source_path": str(SOURCE)},
+                                       context=graph.RunSettings(model=model_name))
+            return {call.args[0].__name__: call.kwargs
+                    for call in scripted.return_value.with_structured_output.call_args_list}
+
+    def test_the_same_graph_runs_on_any_provider_and_adapts_how_it_asks(self):
+        openai = self.methods_used("openai:gpt-5.4")
+        self.assertEqual(openai["ConversionResult"], {"include_raw": True})
+        self.assertEqual(openai["Critique"], {"include_raw": True, "method": "json_schema"})
+        # Same nodes, same edges, one different word in the request.
+        groq = self.methods_used("groq:llama-3.3-70b-versatile")
+        self.assertEqual(groq["Critique"], {"include_raw": True})
 
 
 if __name__ == "__main__":

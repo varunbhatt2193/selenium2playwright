@@ -31,13 +31,37 @@ DEFAULT_MODEL = "anthropic:claude-sonnet-5"
 DEFAULT_EMBEDDINGS = "openai:text-embedding-3-small"
 EMBEDDINGS_OFF = "off"
 
-# provider -> (env var, expected prefix). Prefix catches "right var, wrong paste".
+# provider -> (env var, expected prefix). The prefix catches "right variable,
+# wrong paste"; "" means this provider's keys have no stable shape to check.
+# These are LangChain's own variable names, so a key already set for another
+# LangChain project is found without being renamed.
+#
+# A provider that is NOT in this table is not an error. It means s2p has no key
+# advice to offer, so it steps aside and lets the provider's own client say what
+# is wrong (llm.check_model builds the model to find out). That is what keeps
+# "any LangChain chat model" true instead of "any model on this list".
 PROVIDER_KEYS = {
     "anthropic": ("ANTHROPIC_API_KEY", "sk-ant-"),  # console.anthropic.com -> API Keys
     "openai": ("OPENAI_API_KEY", "sk-"),  # platform.openai.com -> API keys
+    "azure_openai": ("AZURE_OPENAI_API_KEY", ""),  # portal.azure.com -> your deployment
     "google_genai": ("GOOGLE_API_KEY", "AIza"),  # aistudio.google.com -> Get API key
+    "groq": ("GROQ_API_KEY", "gsk_"),  # console.groq.com -> API Keys
+    "mistralai": ("MISTRAL_API_KEY", ""),  # console.mistral.ai -> API Keys
+    "deepseek": ("DEEPSEEK_API_KEY", "sk-"),  # platform.deepseek.com -> API keys
+    "xai": ("XAI_API_KEY", "xai-"),  # console.x.ai -> API Keys
+    "together": ("TOGETHER_API_KEY", ""),  # api.together.ai -> Settings -> API Keys
+    "fireworks": ("FIREWORKS_API_KEY", ""),  # fireworks.ai -> API Keys
+    "cohere": ("COHERE_API_KEY", ""),  # dashboard.cohere.com -> API keys
+    "openrouter": ("OPENROUTER_API_KEY", ""),  # openrouter.ai -> Keys
+    "perplexity": ("PPLX_API_KEY", ""),  # perplexity.ai -> Settings -> API
     "voyage": ("VOYAGE_API_KEY", "pa-"),  # dash.voyageai.com -> API Keys (embeddings only)
 }
+
+# Providers with no single API-key variable to check: a local server, or a cloud
+# credential chain (an AWS profile, Google ADC) that belongs to the machine
+# rather than to s2p. Nothing is missing when these have no key set.
+KEYLESS_PROVIDERS = {"ollama", "bedrock", "bedrock_converse", "google_vertexai",
+                     "google_anthropic_vertex"}
 
 ALWAYS_REQUIRED = {
     "LANGSMITH_API_KEY": "lsv2_",  # smith.langchain.com -> Settings -> API Keys
@@ -129,19 +153,23 @@ def resolve_roles(model: str = "", critic_model: str = "") -> dict[str, str]:
 def key_missing(name: str) -> str:
     """"" when this model's provider key is present and plausible, else why not.
 
-    Checked before a run that names a model on the command line, so a typo or an
-    unconfigured provider costs nothing instead of surfacing as an
-    authentication error a minute in. Never prints a key: the reason names the
-    variable, and any value it shows is masked.
+    Checked before a run that names a model on the command line, so a missing
+    key costs nothing instead of surfacing as an authentication error a minute
+    in. Never prints a key: the reason names the variable, and any value it
+    shows is masked.
+
+    An unlisted provider returns "" — silence here means "no advice", not
+    "approved". llm.check_model then asks the provider itself, which is the
+    only party that actually knows what it needs.
     """
     who = provider(name)
-    if who not in PROVIDER_KEYS:
-        return f"unknown provider {who!r} in {name!r}; known: {', '.join(PROVIDER_KEYS)}"
+    if who in KEYLESS_PROVIDERS or who not in PROVIDER_KEYS:
+        return ""
     var, prefix = PROVIDER_KEYS[who]
     value = os.environ.get(var, "")
     if not value:
         return f"{name} needs {var}, which is not set (see .env.example)"
-    if not value.startswith(prefix):
+    if prefix and not value.startswith(prefix):
         return f"{var} is set, but does not look like a {prefix}… key: {masked(value)}"
     return ""
 
@@ -159,22 +187,34 @@ def provider(name: str | None = None) -> str:
     return (name or model_name()).split(":", 1)[0]
 
 
-def required() -> dict[str, str]:
-    """Vars this configuration needs: LangSmith + a key for every provider in use."""
-    needed = dict(ALWAYS_REQUIRED)
+def configured_roles() -> dict[str, str]:
+    """Every role that names a model right now, including embeddings when on."""
     roles = model_names()
     if embeddings_name():
         roles["embeddings"] = embeddings_name()
-    for role, name in roles.items():
-        if provider(name) not in PROVIDER_KEYS:
-            variable = ROLE_VARIABLES[role]
-            raise ValueError(
-                f"Unknown provider {provider(name)!r} in {variable}={name!r}; "
-                f"known: {', '.join(PROVIDER_KEYS)}. Add it to PROVIDER_KEYS in env.py."
-            )
-        var, prefix = PROVIDER_KEYS[provider(name)]
-        needed[var] = prefix
+    return roles
+
+
+def required() -> dict[str, str]:
+    """Vars this configuration needs: LangSmith + a key for every provider we know.
+
+    A provider s2p has no key advice for contributes nothing here rather than
+    raising: refusing to start because a table in this file has not heard of
+    Groq would make "any LangChain chat model" a lie. Those roles come back
+    from unverifiable() instead, so check() can still say them out loud.
+    """
+    needed = dict(ALWAYS_REQUIRED)
+    for name in configured_roles().values():
+        if provider(name) in PROVIDER_KEYS and provider(name) not in KEYLESS_PROVIDERS:
+            var, prefix = PROVIDER_KEYS[provider(name)]
+            needed[var] = prefix
     return needed
+
+
+def unverifiable() -> dict[str, str]:
+    """role -> model, for providers whose key this file cannot check."""
+    return {role: name for role, name in configured_roles().items()
+            if provider(name) in KEYLESS_PROVIDERS or provider(name) not in PROVIDER_KEYS}
 
 
 def masked(value: str) -> str:
@@ -187,12 +227,15 @@ def check() -> bool:
     print(f"embeddings: {embeddings_name() or 'off (recall lists the most recent memories)'}")
     print(f"model: {model_name()}" + (f"  (critic: {critic_model_name()})" if critic_model_name() != model_name() else ""))
     ok = True
+    for role, name in unverifiable().items():
+        print(f"• {ROLE_VARIABLES[role]}={name} — no key check for this provider here; "
+              "it will validate its own credentials when the run starts")
     for name, prefix in required().items():
         value = os.environ.get(name, "")
         if not value:
             print(f"✗ {name}  missing — add it to .env (see .env.example)")
             ok = False
-        elif not value.startswith(prefix):
+        elif prefix and not value.startswith(prefix):
             print(f"✗ {name}  set, but doesn't look like a {prefix}… key: {masked(value)}")
             ok = False
         else:

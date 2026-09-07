@@ -35,10 +35,33 @@ persists. The 150-line / one-file-at-a-time rule was removed by Varun on
 - `cli.py`: `--model`, `--critic-model`, `--json`; `run_config()` puts the same
   choices on the trace as tags + metadata; `json_report()` + `emit()` (one
   stdout writer for every exit path, refusals included).
-- `tests/test_config.py` (14). **217 offline tests pass.**
+- `tests/test_config.py` (20, incl. cross-provider). **223 offline tests pass.**
 - Live check: `--model haiku --critic-model opus` on `LoginPage.ts` — 2/3
   attempts, 4/4 gates + critic PASS, exit 1 on two `baseURL` TODOs; LangSmith
   showed two Haiku actor spans and two Opus critic spans with `.env` untouched.
+
+## Cross-provider work (same day, after 8.2)
+
+- `llm.check_model(name)` — the preflight: `env.key_missing` first (friendly,
+  no imports), then **build the client** (local, no network) so the provider
+  itself reports a missing integration package (message rewritten to
+  `uv add langchain-x`) or an unsupported provider (LangChain's 28-name list is
+  replaced with the shape of a model string).
+- `env.PROVIDER_KEYS` now covers 14 providers, `KEYLESS_PROVIDERS` covers local
+  and credential-chain ones, and an unlisted provider is **unverifiable, not
+  invalid**: `required()` no longer raises, `unverifiable()` reports it, and
+  `env.check()` prints it as a `•` line.
+- `llm.structured_kwargs(name, for_critic)` — `method="json_schema"` only for
+  providers where it is known to work (anthropic, openai); everywhere else the
+  default tool-calling path. It used to be hard-coded in the critic node.
+- Vendor-specific behaviour is now exactly three things, all in `llm.py`: the
+  Anthropic cache marker, the critic `effort` knob, and that JSON-schema list.
+- Live: `openai:gpt-5.4` alone on `LoginPage.ts` (4/4 + critic PASS, exit 0) and
+  `openai:gpt-5.4` actor + `anthropic:claude-sonnet-5` critic on
+  `login.spec.ts` (4/4 + critic PASS, exit 0) — two vendors in one graph, the
+  Anthropic critic still getting its 3,301-token cache read.
+- Not checked before a run: the model *name* (needs a network call). Optional
+  providers stay out of `pyproject.toml`; the error names the `uv add`.
 
 ## 8.2 sharp edges
 

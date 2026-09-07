@@ -59,7 +59,7 @@ from rich.text import Text
 
 from selenium2playwright import env, graph, memory, risk
 from selenium2playwright import store as memory_store
-from selenium2playwright.llm import embedding_dims, make_embeddings
+from selenium2playwright.llm import check_model, embedding_dims, make_embeddings
 from selenium2playwright.one_shot import format_usage
 from selenium2playwright.reflection import MAX_ATTEMPTS
 from selenium2playwright.schemas import ConversionReport, ConversionResult
@@ -420,17 +420,21 @@ def run_config(models: dict[str, str], max_attempts: int) -> dict:
 def resolve_models(model: str, critic_model: str) -> dict[str, str]:
     """Turn the model flags into full names, and refuse an unusable choice now.
 
-    The key check runs only for a model named on the command line. A default
-    run is left alone on purpose: it is env.check()'s job to report a
-    misconfigured .env, and making every conversion depend on a key probe would
-    break every offline test and every scripted run that never calls a provider.
+    The check runs only for a model named on the command line. A default run is
+    left alone on purpose: it is env.check()'s job to report a misconfigured
+    .env, and making every conversion build a client would break every offline
+    test and every scripted run that never calls a provider.
+
+    llm.check_model does the asking, so a provider this project has never heard
+    of gets its own client's answer — a missing integration package, a key under
+    a variable env.py does not know — rather than a refusal from a table here.
     """
     try:
         names = env.resolve_roles(model, critic_model)
     except ValueError as exc:
         raise typer.BadParameter(str(exc)) from exc
     for role, flag in (("actor", model), ("critic", critic_model)):
-        problem = env.key_missing(names[role]) if flag else ""
+        problem = check_model(names[role]) if flag else ""
         if problem:
             raise typer.BadParameter(problem)
     return names
