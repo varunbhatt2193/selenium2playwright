@@ -1,15 +1,33 @@
-# Restart here — 2026-09-06 (after the 6.5 reflection shootout)
+# Restart here — 2026-09-07 (after 6.4, LLM-as-judge)
 
 ## Current position
 
-**Phase 6.3 is complete. 6.5 reflection-per-actor (Haiku, Sonnet, Opus
-actors, Opus critic) is complete and drawn in `docs/reflection-shootout.svg`
-(README). Next is 6.4 (LLM-as-judge); it has not started.** Start with
-[reflection-shootout.md](reflection-shootout.md). Commit/push authorization persists. Read
-[reflection-haiku-ab.md](reflection-haiku-ab.md) (plain English) and
-[phase-6.5-haiku-report.md](phase-6.5-haiku-report.md) (evidence) first;
-[reflection-ab.md](reflection-ab.md) / [phase-6.3-report.md](phase-6.3-report.md)
-are the Opus A/B they build on.
+**Phase 6 is complete (6.1–6.5). 6.4 shipped 2026-09-07: an `openevals` judge,
+calibrated against the goldens with two judge models, and a judge pass over the
+six saved reflection experiments. Next is Phase 7.1 (SqliteSaver checkpointer);
+it has not started.** Read [phase-6.4-report.md](phase-6.4-report.md) first,
+then [evaluation-judge.md](evaluation-judge.md) (theory + what changed).
+Commit/push authorization persists. The 150-line / one-file-at-a-time rule was
+removed by Varun on 2026-09-06: complete a step when asked, then one walkthrough.
+
+## What 6.4 built
+
+- `env.judge_model_name()` (`S2P_JUDGE_MODEL` → critic → actor); `model_names()` has three roles.
+- `eval_judge.py`: `IdiomaticJudge` wraps `create_llm_as_judge(prompt=RUBRIC, output_schema=SCORE_SCHEMA)`;
+  feedback keys `idiomatic_playwright` (1–5 or None) + `_status` (`scored`, `scored_from_reasoning`,
+  `no_output`, `judge_error`); `RUBRIC_SHA256` and `attempts` in `evaluator_info`; up to 3 tries.
+- `eval_calibration.py`: four mutations, `build_variants`, `score_variants`, `summarize`, markdown.
+- `eval_judge_pass.py`: `judge_experiment` (evaluate over an existing experiment), `arm_summary`,
+  `disagreements` (judge vs static), `cross_judge` (two judges), tables.
+- Scripts: `calibrate_judge.py`, `judge_experiment.py --comparison …`, `compare_judges.py`.
+- Receipts: `docs/phase-6.4-calibration-{opus,gpt54}.json`, `phase-6.4-judge-pass-{opus,gpt54}.json`,
+  `phase-6.4-judge-table-{opus,gpt54}.md`, `phase-6.4-judge-agreement.{json,md}`; journals in `out/6.4/`.
+- Judge feedback lives on the six experiments in LangSmith; evaluator traces go to the `evaluators` project.
+- Gap T11 (Anthropic `refusal` cut-off on long tool-call replies). `.env` now has an OpenAI key
+  (never read it); `S2P_JUDGE_MODEL=openai:gpt-5.4` is the recommended judge.
+- Tests: `tests/test_eval_judge.py` (11); 120 total.
+
+## Earlier state (6.5), kept for reference
 
 ## What the Haiku step built (commit `1c8edad`)
 

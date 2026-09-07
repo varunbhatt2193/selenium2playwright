@@ -24,9 +24,9 @@ class EnvModelSplitTests(unittest.TestCase):
     def test_critic_defaults_to_the_actor_unless_set(self):
         with patch.dict(os.environ, {"S2P_MODEL": HAIKU}, clear=False), patch.dict(os.environ):
             os.environ.pop("S2P_CRITIC_MODEL", None)
-            self.assertEqual(env.model_names(), {"actor": HAIKU, "critic": HAIKU})
+            self.assertEqual(env.model_names(), {"actor": HAIKU, "critic": HAIKU, "judge": HAIKU})
             os.environ["S2P_CRITIC_MODEL"] = OPUS
-            self.assertEqual(env.model_names(), {"actor": HAIKU, "critic": OPUS})
+            self.assertEqual(env.model_names(), {"actor": HAIKU, "critic": OPUS, "judge": OPUS})
 
     def test_required_keys_cover_every_provider_in_use(self):
         with patch.dict(os.environ, {"S2P_MODEL": HAIKU, "S2P_CRITIC_MODEL": "openai:gpt-5"}):

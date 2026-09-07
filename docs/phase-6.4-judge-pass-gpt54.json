@@ -1,0 +1,260 @@
+{
+  "schema_version": 1,
+  "measured_at_utc": "2026-09-07T01:11:07.477377+00:00",
+  "judge_version": "idiomatic-v1",
+  "judge_model": "openai:gpt-5.4",
+  "rubric_sha256": "0e7d219d6618904ce266e5e369d68a32824d25317fda290f10a418fdab0c3952",
+  "git_revision": "5eb0866deb9c7f057c26acd8d96f74e053d1c6ad",
+  "arms": [
+    {
+      "experiment": "s2p-6.5-claude-haiku-4-5-20251001-critic-claude-opus-5-attempts1-cd1eedf0",
+      "model": "anthropic:claude-haiku-4-5-20251001",
+      "critic_model": "anthropic:claude-opus-5",
+      "max_attempts": 1,
+      "phase": "6.5",
+      "all_static": 9,
+      "graph_passed": 2,
+      "scheduled": 12,
+      "judged": 12,
+      "scored": 12,
+      "unscored": {},
+      "recovered_from_reasoning": [],
+      "mean": 3.67,
+      "distribution": {
+        "3": 5,
+        "4": 6,
+        "5": 1
+      },
+      "scores_by_case": {
+        "alerts-page": 3,
+        "alerts-test": 4,
+        "dynamic-loading-page": 3,
+        "dynamic-loading-test": 4,
+        "iframe-page": 4,
+        "iframe-test": 4,
+        "login-page": 3,
+        "login-test": 5,
+        "upload-page": 3,
+        "upload-test": 4,
+        "windows-page": 3,
+        "windows-test": 4
+      },
+      "arm": "one_attempt",
+      "receipt": "docs/phase-6.5-haiku-comparison.json",
+      "disagreements": {
+        "static_pass_but_judge_le3": [
+          "alerts-page",
+          "login-page",
+          "upload-page"
+        ],
+        "static_fail_but_judge_ge4": [
+          "iframe-page"
+        ]
+      }
+    },
+    {
+      "experiment": "s2p-6.5-claude-haiku-4-5-20251001-critic-claude-opus-5-attempts3-6b251c97",
+      "model": "anthropic:claude-haiku-4-5-20251001",
+      "critic_model": "anthropic:claude-opus-5",
+      "max_attempts": 3,
+      "phase": "6.5",
+      "all_static": 12,
+      "graph_passed": 9,
+      "scheduled": 12,
+      "judged": 12,
+      "scored": 12,
+      "unscored": {},
+      "recovered_from_reasoning": [],
+      "mean": 3.92,
+      "distribution": {
+        "3": 3,
+        "4": 7,
+        "5": 2
+      },
+      "scores_by_case": {
+        "alerts-page": 3,
+        "alerts-test": 5,
+        "dynamic-loading-page": 4,
+        "dynamic-loading-test": 4,
+        "iframe-page": 3,
+        "iframe-test": 4,
+        "login-page": 3,
+        "login-test": 5,
+        "upload-page": 4,
+        "upload-test": 4,
+        "windows-page": 4,
+        "windows-test": 4
+      },
+      "arm": "reflective",
+      "receipt": "docs/phase-6.5-haiku-comparison.json",
+      "disagreements": {
+        "static_pass_but_judge_le3": [
+          "alerts-page",
+          "iframe-page",
+          "login-page"
+        ],
+        "static_fail_but_judge_ge4": []
+      }
+    },
+    {
+      "experiment": "s2p-6.5-claude-sonnet-5-critic-claude-opus-5-attempts1-10e199aa",
+      "model": "anthropic:claude-sonnet-5",
+      "critic_model": "anthropic:claude-opus-5",
+      "max_attempts": 1,
+      "phase": "6.5",
+      "all_static": 12,
+      "graph_passed": 11,
+      "scheduled": 12,
+      "judged": 12,
+      "scored": 12,
+      "unscored": {},
+      "recovered_from_reasoning": [],
+      "mean": 4.25,
+      "distribution": {
+        "4": 9,
+        "5": 3
+      },
+      "scores_by_case": {
+        "alerts-page": 4,
+        "alerts-test": 5,
+        "dynamic-loading-page": 4,
+        "dynamic-loading-test": 4,
+        "iframe-page": 4,
+        "iframe-test": 4,
+        "login-page": 5,
+        "login-test": 5,
+        "upload-page": 4,
+        "upload-test": 4,
+        "windows-page": 4,
+        "windows-test": 4
+      },
+      "arm": "one_attempt",
+      "receipt": "docs/phase-6.5-sonnet-comparison.json",
+      "disagreements": {
+        "static_pass_but_judge_le3": [],
+        "static_fail_but_judge_ge4": []
+      }
+    },
+    {
+      "experiment": "s2p-6.5-claude-sonnet-5-critic-claude-opus-5-attempts3-58d0a7f4",
+      "model": "anthropic:claude-sonnet-5",
+      "critic_model": "anthropic:claude-opus-5",
+      "max_attempts": 3,
+      "phase": "6.5",
+      "all_static": 12,
+      "graph_passed": 10,
+      "scheduled": 12,
+      "judged": 12,
+      "scored": 12,
+      "unscored": {},
+      "recovered_from_reasoning": [],
+      "mean": 4.17,
+      "distribution": {
+        "3": 1,
+        "4": 8,
+        "5": 3
+      },
+      "scores_by_case": {
+        "alerts-page": 4,
+        "alerts-test": 5,
+        "dynamic-loading-page": 4,
+        "dynamic-loading-test": 4,
+        "iframe-page": 5,
+        "iframe-test": 4,
+        "login-page": 3,
+        "login-test": 5,
+        "upload-page": 4,
+        "upload-test": 4,
+        "windows-page": 4,
+        "windows-test": 4
+      },
+      "arm": "reflective",
+      "receipt": "docs/phase-6.5-sonnet-comparison.json",
+      "disagreements": {
+        "static_pass_but_judge_le3": [
+          "login-page"
+        ],
+        "static_fail_but_judge_ge4": []
+      }
+    },
+    {
+      "experiment": "s2p-6.3-claude-opus-5-attempts1-d44da1dd",
+      "model": "anthropic:claude-opus-5",
+      "critic_model": null,
+      "max_attempts": 1,
+      "phase": null,
+      "all_static": 12,
+      "graph_passed": 6,
+      "scheduled": 12,
+      "judged": 12,
+      "scored": 12,
+      "unscored": {},
+      "recovered_from_reasoning": [],
+      "mean": 4.58,
+      "distribution": {
+        "4": 5,
+        "5": 7
+      },
+      "scores_by_case": {
+        "alerts-page": 5,
+        "alerts-test": 5,
+        "dynamic-loading-page": 4,
+        "dynamic-loading-test": 5,
+        "iframe-page": 4,
+        "iframe-test": 4,
+        "login-page": 5,
+        "login-test": 5,
+        "upload-page": 5,
+        "upload-test": 4,
+        "windows-page": 4,
+        "windows-test": 5
+      },
+      "arm": "one_attempt",
+      "receipt": "docs/phase-6.3-comparison.json",
+      "disagreements": {
+        "static_pass_but_judge_le3": [],
+        "static_fail_but_judge_ge4": []
+      }
+    },
+    {
+      "experiment": "s2p-6.3-claude-opus-5-attempts3-eda105ea",
+      "model": "anthropic:claude-opus-5",
+      "critic_model": null,
+      "max_attempts": 3,
+      "phase": null,
+      "all_static": 12,
+      "graph_passed": 11,
+      "scheduled": 12,
+      "judged": 12,
+      "scored": 12,
+      "unscored": {},
+      "recovered_from_reasoning": [],
+      "mean": 4.33,
+      "distribution": {
+        "4": 8,
+        "5": 4
+      },
+      "scores_by_case": {
+        "alerts-page": 4,
+        "alerts-test": 5,
+        "dynamic-loading-page": 4,
+        "dynamic-loading-test": 4,
+        "iframe-page": 4,
+        "iframe-test": 4,
+        "login-page": 5,
+        "login-test": 5,
+        "upload-page": 4,
+        "upload-test": 4,
+        "windows-page": 4,
+        "windows-test": 5
+      },
+      "arm": "reflective",
+      "receipt": "docs/phase-6.3-comparison.json",
+      "disagreements": {
+        "static_pass_but_judge_le3": [],
+        "static_fail_but_judge_ge4": []
+      }
+    }
+  ],
+  "folder": "out/6.4/judge-20260907T010612Z"
+}

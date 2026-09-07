@@ -49,9 +49,22 @@ def critic_model_name() -> str:
     return os.environ.get("S2P_CRITIC_MODEL") or model_name()
 
 
+def judge_model_name() -> str:
+    """The evaluation judge's model: S2P_JUDGE_MODEL, else the critic's, else the actor's.
+
+    The judge scores finished conversions from outside the graph (Phase 6.4).
+    It should usually be the strongest model you can afford, so its fallback
+    is the critic, which is already the "strong reviewer" setting.
+    """
+    return os.environ.get("S2P_JUDGE_MODEL") or critic_model_name()
+
+
+ROLE_VARIABLES = {"actor": "S2P_MODEL", "critic": "S2P_CRITIC_MODEL", "judge": "S2P_JUDGE_MODEL"}
+
+
 def model_names() -> dict[str, str]:
-    """Both configured models by role; the plan hashes exactly this pair."""
-    return {"actor": model_name(), "critic": critic_model_name()}
+    """Every configured model by role; the experiment plan hashes actor + critic."""
+    return {"actor": model_name(), "critic": critic_model_name(), "judge": judge_model_name()}
 
 
 def provider(name: str | None = None) -> str:
@@ -63,7 +76,7 @@ def required() -> dict[str, str]:
     needed = dict(ALWAYS_REQUIRED)
     for role, name in model_names().items():
         if provider(name) not in PROVIDER_KEYS:
-            variable = "S2P_MODEL" if role == "actor" else "S2P_CRITIC_MODEL"
+            variable = ROLE_VARIABLES[role]
             raise ValueError(
                 f"Unknown provider {provider(name)!r} in {variable}={name!r}; "
                 f"known: {', '.join(PROVIDER_KEYS)}. Add it to PROVIDER_KEYS in env.py."

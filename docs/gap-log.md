@@ -188,3 +188,30 @@ the model had failed. That is infrastructure, not conversion quality.
 refuses the arm (`comparable: false`, "rerun that arm"). `eval_shootout`
 refuses to draw a receipt that is not comparable. The Sonnet arm B must be
 rerun after credits are restored; arm A is valid and kept.
+
+## Addendum 2026-09-07 — measured in Phase 6.4 (T11)
+
+### T11 · Judge reply cut short by the provider (`stop_reason: refusal`)
+The 6.4 judge asks the model for a structured reply: reasoning first, then a
+1–5 score. With `anthropic:claude-opus-5` as the judge, the provider ended the
+tool call early with `stop_reason: "refusal"` on roughly two calls in five
+(21 of 51, 33 of 67 and 26 of 89 calls across the three Opus runs). Every cut
+landed mid-sentence inside ordinary rubric prose about locators and assertions,
+around 500–700 output tokens in; the files under review are the-internet demo
+tests with nothing sensitive in them. A cut reply has reasoning but no `score`,
+so openevals raised `KeyError: 'score'` and the row was lost.
+**Mitigated 2026-09-07:** the judge passes its own `output_schema` so openevals
+returns the raw reply; when the score field is missing the verdict is recovered
+from the model's mandatory closing sentence ("Thus, the score should be: N")
+and recorded with status `scored_from_reasoning`; a reply with neither is asked
+again, at most three times, and the attempt count is kept in `evaluator_info`.
+Residual with Opus: 6 of 48 calibration variants and 2 of 72 judge-pass rows
+still had no verdict after three attempts. The same rubric with
+`openai:gpt-5.4` as the judge: 0 cuts in 48 calibration calls and 0 in the
+judge pass, one attempt each, at about a fifth of the cost.
+*Gate:* the judge model is a setting (`S2P_JUDGE_MODEL`), the receipt records
+it with the rubric hash, and every summary counts `judge_error` and
+`scored_from_reasoning` rows instead of dropping them. Until the Anthropic
+cut-off is understood, the recommended judge is `openai:gpt-5.4`; a future
+increment can try `method="json_schema"` structured output (which the graph's
+critic already uses) to see whether text-mode replies escape the cut.
