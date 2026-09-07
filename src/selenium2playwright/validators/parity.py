@@ -17,10 +17,9 @@ import subprocess
 from collections import defaultdict, deque
 from pathlib import Path
 
-from selenium2playwright.prompts import REPO_ROOT
+from selenium2playwright.env import SANDBOX
 from selenium2playwright.schemas import Finding, ValidationReport
 
-SANDBOX = REPO_ROOT / "sandbox"
 
 
 def parity_check(source_files: dict[str, str], converted_files: dict[str, str]) -> ValidationReport:

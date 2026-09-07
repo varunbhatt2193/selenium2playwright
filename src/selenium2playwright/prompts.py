@@ -14,7 +14,8 @@ from pathlib import Path
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+from selenium2playwright.env import REPO_ROOT
+
 PLAYBOOK_PATH = REPO_ROOT / "docs" / "playbook.md"
 
 ROLE = (

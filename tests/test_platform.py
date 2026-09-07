@@ -1,4 +1,5 @@
-"""Step 10.1 — the local platform: langgraph.json, and the entry points it names.
+"""Steps 10.1 and 10.2 — the platform contract: langgraph.json, its entry points,
+and the inputs a server on another machine can actually accept.
 
 `langgraph dev` is a server that imports our graphs and serves them over HTTP.
 Nothing here talks to it: starting a server is not a unit test. What is testable
@@ -17,8 +18,10 @@ fails at server start (or, worse, does not fail at all):
     wraps it.
 """
 
+import importlib
 import inspect
 import json
+import os
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -31,6 +34,8 @@ from selenium2playwright import env, graph, llm, server, store, suite_graph
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = ROOT / "langgraph.json"
 CONFIG = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+# Where the image installs the pinned Node toolchain (step 10.2).
+CONTAINER_SANDBOX = "/opt/s2p-sandbox"
 
 
 def target(spec: str) -> tuple[Path, str]:
@@ -171,6 +176,170 @@ class WrappedStoreTests(unittest.TestCase):
 
     def test_the_unwrapping_is_one_layer_deep_and_asks_for_nothing_else(self):
         self.assertTrue(store.indexed(self.Indexed()))
+
+
+class DeployConfigTests(unittest.TestCase):
+    """Step 10.2 — what has to be true of the image before it is worth building."""
+
+    def test_no_description_contains_an_apostrophe(self):
+        # Not a style rule. The CLI writes the graph table into the Dockerfile as
+        # ENV LANGSERVE_GRAPHS='{...}', in single quotes, unescaped. One
+        # apostrophe in a description closes that string early and the build dies
+        # with "Syntax error - can't find = in <the next word>", pointing at
+        # nothing that looks like this file. Cost one build to find.
+        for name, spec in CONFIG["graphs"].items():
+            with self.subTest(graph=name):
+                self.assertNotIn("'", spec["description"])
+
+    def test_the_image_installs_the_toolchain_the_gates_shell_out_to(self):
+        lines = "\n".join(CONFIG["dockerfile_lines"])
+        # A deployment that cannot compile its own output can only *claim* the
+        # conversion worked, so Node and the pinned toolchain are not optional.
+        self.assertIn("node:22", lines)
+        self.assertIn("npm ci", lines)
+        # Installed to a fixed path, and the code told where to look — the
+        # directory a repo is cloned into is not something an image can know.
+        self.assertIn(f"ENV S2P_SANDBOX={CONTAINER_SANDBOX}", lines)
+
+    def test_it_copies_the_lockfile_before_the_rest_of_the_sandbox(self):
+        # npm ci needs both files, and copying them alone first is what keeps the
+        # install layer cached until the pinned versions actually change.
+        lines = CONFIG["dockerfile_lines"]
+        install = next(i for i, line in enumerate(lines) if "npm ci" in line)
+        lockfile = next(i for i, line in enumerate(lines) if "package-lock.json" in line)
+        self.assertLess(lockfile, install)
+        for required in ("sandbox/package.json", "sandbox/package-lock.json"):
+            self.assertIn(required, lines[lockfile])
+
+    def test_the_build_context_excludes_secrets_and_the_wrong_platforms_binaries(self):
+        ignored = (ROOT / ".dockerignore").read_text(encoding="utf-8").split()
+        # An image is copied, pulled and cached. A key baked into a layer is a
+        # key you cannot rotate out of the layers that already exist.
+        self.assertIn(".env", ignored)
+        # node_modules is built INSIDE the image, on Linux. A macOS tree copied
+        # in would shadow it with binaries for the wrong platform.
+        self.assertIn("node_modules/", ignored)
+
+
+class SandboxLocationTests(unittest.TestCase):
+    """The toolchain lives in the repo, unless something says otherwise."""
+
+    def reloaded(self, **environ) -> object:
+        with patch.dict(os.environ, environ, clear=False):
+            return importlib.reload(env)
+
+    def tearDown(self):
+        # Leave the module as the rest of the suite expects to find it.
+        importlib.reload(env)
+
+    def test_it_defaults_to_the_folder_in_this_repository(self):
+        fresh = self.reloaded(S2P_SANDBOX="")
+        self.assertEqual(fresh.SANDBOX, fresh.REPO_ROOT / "sandbox")
+        self.assertTrue((fresh.SANDBOX / "package.json").is_file())
+
+    def test_and_an_absolute_override_wins(self):
+        fresh = self.reloaded(S2P_SANDBOX=CONTAINER_SANDBOX)
+        self.assertEqual(fresh.SANDBOX, Path(CONTAINER_SANDBOX))
+
+
+
+class OneSandboxTests(unittest.TestCase):
+    """Four modules used to compute the toolchain path themselves. One does now.
+
+    Deliberately not in SandboxLocationTests: reloading env rebinds the name,
+    and identity is exactly what this asserts — an override that moved some of
+    the toolchain and not the rest would be worse than one that moved none.
+    """
+
+    def test_every_gate_reads_the_same_object(self):
+        from selenium2playwright import assemble
+        from selenium2playwright.validators import compile as compile_gate
+        from selenium2playwright.validators import lint, parity
+        for module in (compile_gate, lint, parity, assemble):
+            with self.subTest(module=module.__name__):
+                self.assertIs(module.SANDBOX, env.SANDBOX)
+
+
+class RemoteInputTests(unittest.TestCase):
+    """Step 10.2 — a server has none of your files, so a path is not an input."""
+
+    SOURCE = ROOT / "samples" / "selenium-suite" / "pages" / "LoginPage.ts"
+
+    def setUp(self):
+        self.text = self.SOURCE.read_text(encoding="utf-8")
+
+    def test_a_path_is_still_read_from_disk(self):
+        # Every phase before this one, and the eval runner, and most tests.
+        state = graph.intake({"source_path": str(self.SOURCE)})
+        self.assertEqual(state["source"], self.text)
+        self.assertTrue(state["classification"].supported)
+
+    def test_text_is_used_as_sent_and_the_path_becomes_only_a_name(self):
+        state = graph.intake({"source_path": "LoginPage.ts", "source_text": self.text})
+        self.assertEqual(state["source"], self.text)
+        # The name is written back, because the recall query, the scorecard and
+        # the report all ask the state what the file is called.
+        self.assertEqual(state["source_path"], "LoginPage.ts")
+        self.assertTrue(state["classification"].supported)
+
+    def test_text_with_no_name_at_all_still_converts(self):
+        state = graph.intake({"source_text": self.text})
+        self.assertEqual(state["source_path"], graph.PASTED_NAME)
+        self.assertTrue(state["classification"].supported)
+
+    def test_the_name_travels_into_the_things_that_ask_for_it(self):
+        # What a file *is* comes from its contents, not its name — but the name
+        # is in the long-term-memory query, the scorecard title and the report,
+        # so a paste box that sends "pasted.ts" for everything makes recall
+        # blurrier than it needs to be.
+        state = graph.intake({"source_path": "LoginPage.ts", "source_text": self.text})
+        query = store.recall_query(state["source_path"], state["classification"], state["source"])
+        self.assertIn("LoginPage.ts", query)
+
+    def test_companions_can_be_sent_as_text_too(self):
+        state = graph.intake({"source_path": "login.spec.ts", "source_text": self.text,
+                              "context_text": {"pages/LoginPage.ts": "export class LoginPage {}"}})
+        self.assertIn("export class LoginPage {}", state["context"])
+        # Keyed the way validate() and format_context() have always looked
+        # companions up — by resolved path, in both modes.
+        self.assertEqual(list(state["context_files"]),
+                         [str(Path("pages/LoginPage.ts").resolve())])
+
+    def test_neither_input_is_consumed_so_turn_two_needs_only_a_sentence(self):
+        # source_text belongs to the conversation the way source_path always
+        # has. Consuming it would leave a refine turn with no file at all.
+        first = {"source_path": "LoginPage.ts", "source_text": self.text}
+        state = graph.intake(first)
+        self.assertNotIn("source_text", state)
+        second = graph.intake({**first, **state, "refinement": "use getByTestId"})
+        self.assertEqual(second["source"], self.text)
+        self.assertEqual(second["conventions"], ["use getByTestId"])
+        self.assertEqual(second["turn"], 2)
+
+
+class SourceSizeTests(unittest.TestCase):
+    """One paste is one request, and a request has a size."""
+
+    def test_a_file_within_the_cap_is_classified_normally(self):
+        self.assertIsNone(graph.oversized("x" * graph.MAX_SOURCE_BYTES))
+
+    def test_an_oversized_one_leaves_by_the_same_door_as_a_cypress_file(self):
+        # A refusal, not an exception: one honest sentence, no model call, and
+        # no half-converted output — the refuse node already does all of that.
+        state = graph.intake({"source_text": "x" * (graph.MAX_SOURCE_BYTES + 1)})
+        self.assertFalse(state["classification"].supported)
+        self.assertEqual(graph.route_after_intake(state), "refuse")
+
+    def test_the_size_it_reports_never_reads_as_equal_to_the_limit(self):
+        refusal = graph.oversized("x" * (graph.MAX_SOURCE_BYTES + 1)).reason
+        self.assertIn("257 KB", refusal)
+        self.assertIn("256 KB", refusal)
+
+    def test_the_cap_counts_bytes_not_characters(self):
+        # A file of multi-byte characters is bigger than len() thinks it is.
+        wide = "é" * ((graph.MAX_SOURCE_BYTES // 2) + 1)
+        self.assertLess(len(wide), graph.MAX_SOURCE_BYTES)
+        self.assertIsNotNone(graph.oversized(wide))
 
 
 if __name__ == "__main__":

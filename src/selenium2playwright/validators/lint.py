@@ -22,10 +22,9 @@ import sys
 from pathlib import Path
 from uuid import uuid4
 
-from selenium2playwright.prompts import REPO_ROOT
+from selenium2playwright.env import SANDBOX
 from selenium2playwright.schemas import Finding, ValidationReport
 
-SANDBOX = REPO_ROOT / "sandbox"
 WORK = SANDBOX / "work"
 ESLINT = SANDBOX / "node_modules" / ".bin" / "eslint"
 CONFIG = SANDBOX / "eslint.config.mjs"

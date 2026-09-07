@@ -48,10 +48,9 @@ from datetime import datetime, timezone
 from difflib import SequenceMatcher
 from pathlib import Path
 
-from selenium2playwright.prompts import REPO_ROOT
+from selenium2playwright.env import SANDBOX
 from selenium2playwright.schemas import ValidationReport
 
-SANDBOX = REPO_ROOT / "sandbox"
 MEMBERS = SANDBOX / "members.cjs"
 PARITY = SANDBOX / "parity.cjs"
 

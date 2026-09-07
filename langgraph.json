@@ -1,10 +1,31 @@
 {
   "python_version": "3.12",
-  "dependencies": ["."],
+  "dependencies": [
+    "."
+  ],
+  "dockerfile_lines": [
+    "# The four gates shell out to a pinned TypeScript compiler, ESLint and two",
+    "# parse-only AST scripts. They are the product, not a dev convenience: a",
+    "# deployment that cannot compile its own output is a deployment that can only",
+    "# claim the conversion worked. So the image carries Node and the same pinned",
+    "# toolchain the repository does.",
+    "COPY --from=node:22-bookworm-slim /usr/local/bin/node /usr/local/bin/node",
+    "COPY --from=node:22-bookworm-slim /usr/local/lib/node_modules /usr/local/lib/node_modules",
+    "RUN ln -sf /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm",
+    "",
+    "# Installed to a fixed absolute path, because the folder a repository happens",
+    "# to be cloned into is not something an image can know. env.SANDBOX reads",
+    "# S2P_SANDBOX and finds it here. The lockfile is copied on its own first, so",
+    "# this layer is rebuilt only when the pinned versions actually change.",
+    "ENV S2P_SANDBOX=/opt/s2p-sandbox",
+    "COPY sandbox/package.json sandbox/package-lock.json /opt/s2p-sandbox/",
+    "RUN cd /opt/s2p-sandbox && npm ci --no-audit --no-fund",
+    "COPY sandbox/tsconfig.base.json sandbox/eslint.config.mjs sandbox/parity.cjs sandbox/members.cjs /opt/s2p-sandbox/"
+  ],
   "graphs": {
     "convert": {
       "path": "./src/selenium2playwright/server.py:convert_graph",
-      "description": "One TypeScript Selenium file to Playwright: intake, recall, risk review, then up to three convert/validate/critic laps before the report. Inputs: source_path (required, a path on the server), context_paths, output_path, refinement, ask_risks, user_id, remember, max_attempts."
+      "description": "One TypeScript Selenium file to Playwright: intake, recall, risk review, then up to three convert/validate/critic laps before the report. Send the file as text: source_text plus source_path as its name (e.g. LoginPage.ts), and context_text for already-converted companions. source_path/context_paths alone read that path on the SERVER filesystem instead, which only means anything when the server is your own machine. Also: output_path, refinement, ask_risks, user_id, remember, max_attempts."
     },
     "suite": {
       "path": "./src/selenium2playwright/server.py:suite_graph",
@@ -16,7 +37,9 @@
     "index": {
       "embed": "./src/selenium2playwright/server.py:embed_memories",
       "dims": 1536,
-      "fields": ["text"]
+      "fields": [
+        "text"
+      ]
     }
   }
 }

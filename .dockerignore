@@ -1,0 +1,29 @@
+# What the deployment image does NOT need (step 10.2). Docker reads this, not
+# .gitignore, so anything left out here would otherwise be baked into a layer.
+
+# Secrets. Never in an image: the deployment gets its keys as environment
+# variables, set on the deployment, not shipped inside it.
+.env
+.env.*
+!.env.example
+
+.git
+.venv
+__pycache__/
+*.py[oc]
+*.egg-info
+
+# Node dependencies are INSTALLED in the image from the lockfile, on Linux.
+# Copying a macOS tree in would shadow that with the wrong platform's binaries.
+node_modules/
+sandbox/work/
+
+# Local working state and scratch output — none of it is input to a conversion.
+out/
+.s2p/
+.langgraph_api/
+test-results/
+playwright-report/
+.DS_Store
+.idea/
+.vscode/

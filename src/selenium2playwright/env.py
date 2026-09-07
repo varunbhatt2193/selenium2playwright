@@ -11,12 +11,28 @@ from __future__ import annotations
 
 import os
 import sys
+from pathlib import Path
 
 from dotenv import load_dotenv
 
 # Copies .env values into the process environment, once, at import time.
 # override=False: a variable already exported in your shell wins over .env.
 load_dotenv(override=False)
+
+# This file, src/selenium2playwright/env.py, is two directories below the root.
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+# Where the pinned Node toolchain lives — the TypeScript compiler, ESLint and
+# the two parse-only AST scripts the four gates shell out to. It is part of the
+# repository, so the default is simply a folder in it.
+#
+# S2P_SANDBOX exists because a *container* is not a checkout (step 10.2). The
+# deployed image installs the same pinned toolchain once, at build time, into a
+# fixed absolute path — fixed because the directory the repository happens to be
+# cloned into is not something an image can know. Nothing else about the
+# validators changes: they still run the same pinned tsc against the same
+# tsconfig, which is the whole point of pinning them.
+SANDBOX = Path(os.environ.get("S2P_SANDBOX") or REPO_ROOT / "sandbox")
 
 # "provider:model" in init_chat_model syntax. The provider half decides which
 # API key must exist; the model half is passed through untouched.

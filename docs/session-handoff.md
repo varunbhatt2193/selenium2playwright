@@ -1,22 +1,29 @@
-# Restart here — 2026-09-07 (after 10.1)
+# Restart here — 2026-09-07 (after 10.2, one account setting short)
 
 ## Current position
 
-**Phases 0–9 are complete and 10.1 is done. 🏁 M4 — the wow demo — shipped at
-9.3. Step 10.1 put the same graphs behind the LangGraph Platform server:
-`langgraph.json` + `src/selenium2playwright/server.py` + `uv run langgraph dev`,
-verified live over HTTP (a conversion, a two-wave suite run, a thread interrupt,
-and semantic recall through the platform's own store). Next is 10.2 — deploy to
-a LangSmith Deployment dev tier and call it from the laptop with
-`langgraph-sdk`. It has not started, and it has a prerequisite named in
-[local-platform.md](local-platform.md) §9: the graph's only input is a
-*server-side path*, so 10.2 must first accept inline source text or a cloud URL
-converts nothing.**
+**Phases 0–9 complete, 10.1 done, 10.2 built and proven but NOT deployed. 🏁 M4
+shipped at 9.3. 10.1 put the graphs behind `langgraph dev`; 10.2 made them
+*deployable*: the file travels as text (`source_text`), and the image carries
+the pinned Node toolchain the four gates shell out to. Everything was verified
+against the REAL deployment image on the REAL stack (`langgraph build` +
+`langgraph up --image` + postgres + redis) — a file sent as text came back 4/4
+gates + critic pass with every gate running `tsc` inside the container.**
 
-Read [local-platform.md](local-platform.md) first — that is 10.1 — then
-[suite-report.md](suite-report.md), [suite-fanout.md](suite-fanout.md) and
-[suite-scan.md](suite-scan.md) for all of Phase 9, then [cli.md](cli.md) and
-[config.md](config.md), then [long-term-memory.md](long-term-memory.md),
+**THE ONE BLOCKER, and it is not technical:** `langgraph deploy list` says
+*"LangSmith Deployment is not enabled for this organization"* — an account/billing
+setting Varun turns on at smith.langchain.com/host/deployments. After that,
+10.2 finishes in two commands (in [deploy.md](deploy.md) §7) and 10.3 (the
+Streamlit playground against a cloud backend) can start. **Ask him whether he has
+enabled it before assuming 10.2 is still blocked.** If he would rather not pay
+yet, 10.3 can be built against `langgraph up` locally — the URL is the only
+difference.
+
+Read [deploy.md](deploy.md) and [local-platform.md](local-platform.md) first —
+that is all of Phase 10 so far — then [suite-report.md](suite-report.md),
+[suite-fanout.md](suite-fanout.md) and [suite-scan.md](suite-scan.md) for Phase
+9, then [cli.md](cli.md) and [config.md](config.md), then
+[long-term-memory.md](long-term-memory.md),
 [human-in-the-loop.md](human-in-the-loop.md) and
 [short-term-memory.md](short-term-memory.md).
 [phase-9.3-report.md](phase-9.3-report.md) is the live artifact the whole
@@ -28,9 +35,69 @@ plain-English walkthrough with check-yourself questions, then wait for his
 review. **Always end a turn that hands control back with an explicit "waiting on
 you" line** (asked 2026-09-06 — a pause must never be implied).
 
-**314 offline tests pass** (`uv run python -m unittest discover -s tests`, ~151 s
+**331 offline tests pass** (`uv run python -m unittest discover -s tests`, ~160 s
 — not `-t .`, and pytest is not installed). The suite is terminal-width
 independent from 40 to 200 columns as of 9.3.
+
+## What 10.2 built (deployability)
+
+- **`source_text` + `context_text`** on `ConversionState`, read by
+  `graph.read_inputs`. When text is sent, `source_path` is only a **name**;
+  everything downstream (classify, `recall_query`, scorecard, report) only ever
+  wanted the name, so nothing else in the graph changed. **Neither input is
+  consumed** — unlike `refinement`/`remember`, they are what the conversation is
+  *about*, so a refine turn still needs only a sentence. `PASTED_NAME` =
+  `pasted.ts` when no name is sent.
+- **`graph.oversized()` + `MAX_SOURCE_BYTES` (256 KB)** — returns a
+  `Classification(supported=False)` rather than raising, so an over-long paste
+  leaves through the `refuse` node. Counts **bytes**, not characters.
+- **`env.REPO_ROOT` + `env.SANDBOX`** (honours `S2P_SANDBOX`). `compile.py`,
+  `lint.py`, `parity.py` and `assemble.py` each used to compute
+  `REPO_ROOT / "sandbox"`; all four import the one object now, and `prompts.py`
+  imports `REPO_ROOT` from `env` instead of computing its own.
+- **`langgraph.json` `dockerfile_lines`** — Node 22 copied from
+  `node:22-bookworm-slim`, `npm ci` from the lockfile into `/opt/s2p-sandbox`,
+  `ENV S2P_SANDBOX` pointing at it. **`.dockerignore`** excluding `.env` and
+  `node_modules/`.
+- **`scripts/call_deployment.py`** — `langgraph-sdk`, reads the file locally,
+  sends the text, streams node names, prints the scorecard. `--url` is the only
+  thing that differs between a local container and a cloud deployment.
+  Deliberately a script, not an `s2p` subcommand: 10.3's playground is the real
+  remote front end.
+- `tests/test_platform.py` grew to **30** (deploy-config guards, sandbox
+  override, inline inputs, the size cap). **331 total.**
+- **Live:** image 1.6 GB, Node v22.23.2, tsc 5.9.3, ESLint v10.10.0 at
+  `/opt/s2p-sandbox`; all four gates ran in the container (a broken file failed
+  compile with a real tsc message); a full conversion over the SDK against
+  `s2p:10.2` + pgvector/pg16 + redis:6 → 3 attempts, 4/4 gates + critic pass,
+  1 honest locator TODO, `needs-review`, exit 1.
+
+## 10.2 sharp edges
+
+- **An apostrophe in a `langgraph.json` graph description breaks the build.**
+  The CLI writes `ENV LANGSERVE_GRAPHS='{...}'` single-quoted and unescaped;
+  "the SERVER's filesystem" closed the string and Docker said
+  `Syntax error - can't find = in "filesystem"`, pointing at nothing
+  recognisable. A test now forbids `'` in descriptions.
+- **`dockerfile_lines` are inserted after `FROM` and BEFORE
+  `ADD . /deps/<project>`.** They can install, but cannot run anything against
+  the repository. `COPY` still reaches the build context, which is what makes
+  the lockfile-first (cacheable) `npm ci` layer possible.
+- **`/deps/<project>` is named after the directory the build ran in** —
+  `Selenium2Playwright` here, `selenium2playwright` from a fresh clone. Hard-coding
+  either ships a build broken for everyone else; hence the fixed
+  `/opt/s2p-sandbox` plus `S2P_SANDBOX`.
+- **Never let `node_modules` into the build context.** It is installed inside
+  the image on Linux; a macOS tree copied in would shadow it with the wrong
+  platform's binaries.
+- **`.env` must be dockerignored.** A key baked into a layer cannot be rotated
+  out of the layers that already exist.
+- `langgraph up --image <tag>` runs an image you already built (with postgres +
+  redis) — that is the dress rehearsal, and it is where every problem above was
+  found. This laptop is **arm64**; `langgraph deploy` builds remotely for
+  linux/amd64 when it has to.
+- Docker Desktop must be running (`open -a Docker`); the daemon is not up by
+  default on this machine.
 
 ## What 10.1 built (`server.py`, `langgraph.json`)
 

@@ -60,12 +60,19 @@ from selenium2playwright.suite_graph import build_suite_graph
 def convert_graph():
     """One Selenium file -> one Playwright file: the graph `s2p convert` runs.
 
-    Inputs the caller supplies (`ConversionState`): `source_path` at minimum,
-    then optionally `context_paths`, `output_path`, `refinement`, `ask_risks`,
-    `user_id`, `remember`, `max_attempts`. Note that `source_path` is read on
-    the *server's* filesystem — running locally that is your own machine, which
-    is why this graph is genuinely usable in Studio today and why 10.2 has to
-    deal with inline source before a cloud deployment means anything.
+    Two ways to hand it a file, and over HTTP only one of them is real:
+
+        {"source_text": "import { By } ...", "source_path": "LoginPage.ts"}
+        {"source_path": "samples/selenium-suite/pages/LoginPage.ts"}
+
+    The first sends the bytes and uses `source_path` as a *name*; the second
+    reads that path on the **server's** filesystem, which is your own machine
+    under `langgraph dev` and a container with none of your files once this is
+    deployed (step 10.2). Companions work the same way: `context_text`
+    (name -> contents) or `context_paths`.
+
+    Also optional: `output_path`, `refinement`, `ask_risks`, `user_id`,
+    `remember`, `max_attempts`.
     """
     return build_graph()
 

@@ -117,8 +117,15 @@ class ConversionState(TypedDict, total=False):
     """
 
     # inputs — set by the caller
-    source_path: str
+    source_path: str  # where to read the file, OR just its name when source_text is given
     context_paths: list[str]
+    # step 10.2 — the same two inputs, sent as text instead of as paths. A
+    # deployed server has none of the caller's files, so a path is a promise it
+    # cannot keep; these are how a paste box, an HTTP client or Studio hands the
+    # graph a file it can actually read. Both persist on a thread exactly as
+    # their path-shaped twins do, so turn 2 of a refine needs neither again.
+    source_text: str  # the file's contents; "" means "read source_path from disk"
+    context_text: dict[str, str]  # companion name -> contents; {} means use context_paths
     output_path: str  # optional intended output location; anchors companion imports
     max_attempts: int  # optional lap budget, 1..MAX_ATTEMPTS; intake fills in the default (step 6.3)
     refinement: str  # this turn's new instruction from the user; "" on a first turn (step 7.1)
@@ -157,6 +164,77 @@ class ConversionState(TypedDict, total=False):
     report: ConversionReport | None
 
 
+# A pasted file is the first input this project takes from somewhere other than
+# the machine it runs on, so it is the first that needs a size of its own. The
+# cap is deliberately generous — the largest file in the sample suite is under
+# 4 KB — and it exists to bound one request, not to judge the code.
+MAX_SOURCE_BYTES = 256 * 1024
+
+# What to call a file nobody named. The extension is load-bearing: classify()
+# and the playbook both read it, and ".ts" is the honest default for a project
+# whose whole input domain is TypeScript.
+PASTED_NAME = "pasted.ts"
+
+
+def read_inputs(state: ConversionState) -> tuple[str, str, list[Path], dict[str, str]]:
+    """This turn's file and companions — from the caller when sent, else from disk.
+
+    Two ways in, and the difference is only where the bytes come from:
+
+      source_path="pages/LoginPage.ts"        read it, the way every phase
+                                              before 10.2 did
+      source_text="import { By } ..."         use it; source_path is then only a
+      source_path="LoginPage.ts"              *name*, for classify(), the recall
+                                              query, the prompt and the report
+
+    The second is what makes the graph deployable. A server in a data centre
+    has none of your files, so "read this path" is a promise it cannot keep;
+    everything downstream of here only ever wanted the file's name anyway,
+    which is why nothing else in the graph had to change.
+
+    Neither input is consumed. They belong to the conversation the way
+    source_path always has, so a refine turn that sends nothing but a sentence
+    still knows which file it is talking about — in either mode.
+    """
+    pasted = state.get("source_text") or ""
+    if pasted:
+        source, name = pasted, (state.get("source_path") or PASTED_NAME)
+    else:
+        # No text: the path is a real path, and it is re-read every turn rather
+        # than restored, because the file on disk is the truth.
+        name = state["source_path"]
+        source = Path(name).read_text(encoding="utf-8")
+    companions = dict(state.get("context_text") or {})
+    if not companions:
+        companions = {p: Path(p).read_text(encoding="utf-8")
+                      for p in state.get("context_paths", [])}
+    paths = [Path(p) for p in companions]
+    # Keyed by resolved path in both modes: validate() and format_context() have
+    # always looked companions up that way, and a bare name resolves against the
+    # working directory consistently on both sides of that lookup.
+    contents = {str(p.resolve()): companions[str(p)] for p in paths}
+    return source, name, paths, contents
+
+
+def oversized(source: str) -> Classification | None:
+    """A refusal for a file too big to be one request, or None to carry on.
+
+    Returned as a Classification rather than raised, so an over-long paste
+    leaves by the same door as a Cypress file: the refuse node, one honest
+    sentence, no model call and no half-converted output.
+    """
+    size = len(source.encode("utf-8"))
+    if size <= MAX_SOURCE_BYTES:
+        return None
+    return Classification(
+        automation="unknown", runner="none", language="unknown", supported=False,
+        # Rounded *up*, so the number the user is shown never reads as equal to
+        # the limit it just exceeded.
+        reason=(f"file is {-(-size // 1024)} KB; the limit for one request is "
+                f"{MAX_SOURCE_BYTES // 1024} KB — convert it a file at a time"),
+    )
+
+
 def intake(state: ConversionState, runtime: Runtime[RunSettings] | None = None) -> ConversionState:
     """Read the files off disk, then open a turn. No LLM.
 
@@ -184,9 +262,7 @@ def intake(state: ConversionState, runtime: Runtime[RunSettings] | None = None) 
     # injects it by parameter name either way.
     run = settings(runtime)
     cap = run.max_attempts if run.max_attempts is not None else state.get("max_attempts")
-    source = Path(state["source_path"]).read_text(encoding="utf-8")
-    paths = [Path(p) for p in state.get("context_paths", [])]
-    context_files = {str(p.resolve()): p.read_text(encoding="utf-8") for p in paths}
+    source, name, paths, context_files = read_inputs(state)
     context = format_context(paths, contents=context_files)
     previous = state.get("report")
     conventions = list(state.get("conventions", []))
@@ -194,7 +270,11 @@ def intake(state: ConversionState, runtime: Runtime[RunSettings] | None = None) 
     if refinement and refinement not in conventions:
         conventions.append(refinement)
     return {"source": source, "context": context, "context_files": context_files,
-            "classification": classify(source, state["source_path"]),
+            # source_path is written back because a paste may not have carried
+            # one, and everything downstream — the scorecard title, the recall
+            # query, the report — asks the state for the file's name.
+            "source_path": name,
+            "classification": oversized(source) or classify(source, name),
             "risks": risk.detect_risks(source),
             "max_attempts": resolve_attempt_cap(cap),
             "models": env.resolve_roles(run.model, run.critic_model),
