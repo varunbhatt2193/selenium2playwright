@@ -77,9 +77,27 @@ demo you give: **a spec pasted alone cannot compile**, because it imports a page
 object the server has never seen — send the already-converted companion in the
 companion box (the `login.spec.ts` sample button pre-fills it).
 
+**Decided 2026-09-07: the launch kit must include a SUITE demo video.** The
+playground converts one file at a time and will keep doing so until
+suite-in-the-browser is built — the suite graph's inputs are *server
+directories* (`root`, `out_root`), `guard.FORBIDDEN_INPUTS` refuses both for
+demo keys, and `limits.spend` counts run creations rather than files, so a
+12-file suite would tick the budget once while spending twelve conversions. So
+a screen recording of
+
+```bash
+uv run s2p suite ./samples/selenium-suite --out out/demo --parallel 4
+```
+
+— wave plan, parallel conversions, the table, the whole-tree compile, then
+`conversion-report.md` — is the only thing that answers "does this scale past
+one file?" for someone who cannot run the CLI. Pair it with
+[phase-9.3-report.md](phase-9.3-report.md), the real artifact it produces.
+Tracked in roadmap 11.3; written here too because roadmap.md is gitignored.
+
 **Phase 10 is complete. Next is Phase 11** — 11.1 hard-case sprint, 11.2
 execution evals in CI, 11.3 launch kit (drop the 🚧 banner, comparison table,
-cost numbers, demo video, LinkedIn assets). 11.3 is also where *hosting the
+cost numbers, **the suite demo video above**, LinkedIn assets). 11.3 is also where *hosting the
 playground itself* belongs: today the page runs on your laptop against the live
 backend, which is enough to demo and not enough to put in a CV link.
 
