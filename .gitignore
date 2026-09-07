@@ -40,3 +40,10 @@ out/
 # `langgraph dev` state (step 10.1) — the local server's own checkpointer,
 # store and vectors, written next to the config it started from.
 .langgraph_api/
+
+# Fly deployment (step 10.2) — the generated Dockerfile is derived from
+# langgraph.json on every deploy, and .pgpassword is the database password that
+# builds POSTGRES_URI. Fly's secret store is where it actually lives; this file
+# is the local copy needed to reassemble the URI, and is a secret like any other.
+deploy/fly/Dockerfile.generated
+deploy/fly/.pgpassword

@@ -20,18 +20,7 @@
     "ENV S2P_SANDBOX=/opt/s2p-sandbox",
     "COPY sandbox/package.json sandbox/package-lock.json /opt/s2p-sandbox/",
     "RUN cd /opt/s2p-sandbox && npm ci --no-audit --no-fund",
-    "COPY sandbox/tsconfig.base.json sandbox/eslint.config.mjs sandbox/parity.cjs sandbox/members.cjs /opt/s2p-sandbox/",
-    "",
-    "# The serverless tier of LangSmith Deployment sets CORE_API_GRPC_SIDECAR=1 but",
-    "# never starts the sidecar it promises. The image entrypoints read that variable,",
-    "# skip the bundled Go core-api-grpc, and the server then dies waiting for a gRPC",
-    "# answer on 127.0.0.1:50051 that never comes. Unsetting it restores the in-process",
-    "# topology `langgraph up` uses, where the Go core runs in this same container.",
-    "# DB_MIGRATION_BY_CORE_API is deliberately left alone: the managed Postgres does",
-    "# not grant us superuser, so Python cannot CREATE EXTENSION vector for the store",
-    "# index. The Go core still owns the schema, as the platform intends.",
-    "# Remove once the platform actually schedules the sidecar (bug reported).",
-    "RUN sed -i '1a unset CORE_API_GRPC_SIDECAR' /storage/entrypoint.sh /storage/queue_entrypoint.sh"
+    "COPY sandbox/tsconfig.base.json sandbox/eslint.config.mjs sandbox/parity.cjs sandbox/members.cjs /opt/s2p-sandbox/"
   ],
   "graphs": {
     "convert": {

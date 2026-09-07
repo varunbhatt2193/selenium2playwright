@@ -1,0 +1,36 @@
+# Redis for the deployed graphs — the run queue and the stream that carries node
+# updates back to a waiting client.
+#
+# Plain `redis:6`, the same image the local compose file uses. Upstash's managed
+# Redis would also serve here, but the server leans on pub/sub and streams over a
+# long-lived TCP connection, and matching the local stack exactly removes a
+# variable we would otherwise have to debug in the cloud.
+#
+# `--bind ::` matters: Fly's private network is IPv6, and redis defaults to
+# listening on 127.0.0.1 only. Bound to loopback it would answer nothing from
+# s2p-redis.internal, and the API container would fail its startup wait with no
+# obvious cause.
+#
+# `--appendonly no`: this holds in-flight run state, not the record of a
+# conversion. Threads and memories are in Postgres. Losing the queue on a restart
+# costs whatever was mid-flight, which is worth not paying for a volume.
+
+app = "s2p-redis"
+primary_region = "iad"
+
+[build]
+  image = "redis:6"
+
+[experimental]
+  cmd = ["redis-server", "--bind", "::", "--protected-mode", "no", "--appendonly", "no"]
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
+
+[[services]]
+  internal_port = 6379
+  protocol = "tcp"
+  auto_stop_machines = false
+  auto_start_machines = false
+  min_machines_running = 1

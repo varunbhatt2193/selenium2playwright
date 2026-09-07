@@ -1,0 +1,44 @@
+# Postgres for the deployed graphs — the checkpointer's threads and the store's
+# memories both live here.
+#
+# This is `pgvector/pgvector:pg16`, the same image `langgraph up` uses locally,
+# run as our own machine rather than a managed database. That is deliberate. The
+# server's migrations create three extensions — vector, ltree and btree_gin —
+# each guarded by `IF NOT EXISTS`, so they cost nothing when already present but
+# need superuser when they are not. Fly's Managed Postgres offers only vector and
+# PostGIS, so it would fail on ltree exactly the way LangSmith's managed Postgres
+# failed on vector (docs/deploy.md §9). Running the container ourselves makes us
+# superuser, and all three succeed.
+#
+# Not published to the internet: no [http_service], no public IP. Fly's private
+# network reaches it at s2p-postgres.internal, which is why PGHOST must be the
+# IPv6 wildcard rather than 127.0.0.1 — a process bound to loopback is invisible
+# to the other machines in the org.
+
+app = "s2p-postgres"
+primary_region = "iad"
+
+[build]
+  image = "pgvector/pgvector:pg16"
+
+[env]
+  POSTGRES_DB = "postgres"
+  POSTGRES_USER = "postgres"
+  PGDATA = "/var/lib/postgresql/data/pgdata"
+
+[mounts]
+  source = "s2p_pgdata"
+  destination = "/var/lib/postgresql/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"
+
+# One machine, always on. A database that scales to zero loses the connection
+# pool mid-conversion, and the run it was serving with it.
+[[services]]
+  internal_port = 5432
+  protocol = "tcp"
+  auto_stop_machines = false
+  auto_start_machines = false
+  min_machines_running = 1
