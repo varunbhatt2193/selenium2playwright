@@ -52,6 +52,7 @@ IN_MEMORY = ":memory:"
 # later. tests/test_memory.py pins both halves of that.
 CHECKPOINT_TYPES: tuple[tuple[str, str], ...] = (
     ("selenium2playwright.classify", "Classification"),
+    ("selenium2playwright.risk", "Risk"),
     ("selenium2playwright.schemas", "ConversionResult"),
     ("selenium2playwright.schemas", "Critique"),
     ("selenium2playwright.schemas", "Finding"),

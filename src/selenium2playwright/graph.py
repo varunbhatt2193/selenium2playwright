@@ -7,6 +7,10 @@
     uv run python -m selenium2playwright.graph --thread login LoginPage.ts --out out/LoginPage.ts
     uv run python -m selenium2playwright.graph --thread login --refine "use data-testid locators"
 
+    # step 7.2 — a risky pattern stops and asks; --answer answers without a prompt
+    uv run python -m selenium2playwright.graph --thread alerts AlertsPage.ts
+    uv run python -m selenium2playwright.graph --thread alerts AlertsPage.ts --answer dialogs=auto-dismiss
+
 Same work as one_shot.py, restructured as a graph so that (a) every step is a
 named node in the LangSmith trace and (b) the next steps — classify/refuse,
 validate, critic loop — are new nodes and edges, not a rewrite.
@@ -23,6 +27,11 @@ Vocabulary used here, from the LangGraph docs:
            filed under config["configurable"]["thread_id"]. Invoking the same
            thread again loads that state first, so the graph starts a turn
            already knowing what the last turn produced (see memory.py).
+  interrupt() — called inside a node, it stops the whole graph mid-run: the
+           state so far is already saved, and invoke() returns just the question.
+           The run continues only when someone invokes the same thread with
+           Command(resume=answer). The node is then re-run from its first line
+           and that interrupt() call returns the answer (see risk_review).
 """
 
 from __future__ import annotations
@@ -37,13 +46,14 @@ from typing import Literal, TypedDict
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
+from langgraph.types import Command, interrupt
 
-from selenium2playwright import memory
+from selenium2playwright import memory, risk
 from selenium2playwright.classify import Classification, classify
 from selenium2playwright.llm import make_model, prepare_messages
 from selenium2playwright.one_shot import report_ledger, report_usage
 from selenium2playwright.prompts import (build_critic_prompt, build_prompt, format_context,
-                                         format_conventions)
+                                         format_conventions, format_decisions)
 from selenium2playwright.reflection import (MAX_ATTEMPTS, collect_todos, refinement_feedback,
                                             resolve_attempt_cap, revision_feedback, sum_usage)
 from selenium2playwright.schemas import ConversionReport, ConversionResult, Critique, Finding, ValidationReport
@@ -66,6 +76,7 @@ class ConversionState(TypedDict, total=False):
     output_path: str  # optional intended output location; anchors companion imports
     max_attempts: int  # optional lap budget, 1..MAX_ATTEMPTS; intake fills in the default (step 6.3)
     refinement: str  # this turn's new instruction from the user; "" on a first turn (step 7.1)
+    ask_risks: bool  # pause for the human on a flagged pattern (step 7.2); needs a checkpointer
     # short-term memory (step 7.1) — written by intake, restored by the checkpointer
     turn: int  # how many times this thread has been invoked; 1 on a fresh thread
     conventions: list[str]  # every instruction this thread has been given, oldest first
@@ -75,6 +86,9 @@ class ConversionState(TypedDict, total=False):
     context: str  # already-converted companions, formatted for the prompt ("" if none)
     context_files: dict[str, str]  # absolute companion path -> contents captured at intake
     classification: Classification  # what the file is, and whether we can convert it
+    risks: list[risk.Risk]  # patterns with more than one correct conversion (step 7.2)
+    # filled by risk_review — the human's answers, kept for every later turn
+    decisions: dict[str, str]  # risk kind -> the answer, an option key or the user's own words
     # filled by convert OR refuse — exactly one of them runs
     status: Literal["converted", "refused", "failed"]
     result: ConversionResult | None
@@ -101,6 +115,10 @@ def intake(state: ConversionState) -> ConversionState:
     joins `conventions`, and everything belonging to the finished turn — draft,
     validation, review, attempt counter — is cleared so the turn starts honest.
     The source is re-read rather than restored: the file on disk is the truth.
+
+    Risks are re-detected from that same source for the same reason. Answers
+    (`decisions`) are not touched: like conventions they belong to the
+    conversation, so a question answered on turn 1 is not asked again on turn 2.
     """
     source = Path(state["source_path"]).read_text(encoding="utf-8")
     paths = [Path(p) for p in state.get("context_paths", [])]
@@ -113,6 +131,7 @@ def intake(state: ConversionState) -> ConversionState:
         conventions.append(refinement)
     return {"source": source, "context": context, "context_files": context_files,
             "classification": classify(source, state["source_path"]),
+            "risks": risk.detect_risks(source),
             "max_attempts": resolve_attempt_cap(state.get("max_attempts")),
             "turn": state.get("turn", 0) + 1, "conventions": conventions, "refinement": "",
             "baseline": previous.result if previous is not None else None,
@@ -121,9 +140,44 @@ def intake(state: ConversionState) -> ConversionState:
             "critic_usage": None, "report": None}
 
 
-def route_after_intake(state: ConversionState) -> Literal["convert", "refuse"]:
+def route_after_intake(state: ConversionState) -> Literal["risk_review", "refuse"]:
     """The branching decision. Reads state, returns the next node's name."""
-    return "convert" if state["classification"].supported else "refuse"
+    return "risk_review" if state["classification"].supported else "refuse"
+
+
+def risk_review(state: ConversionState) -> ConversionState:
+    """Step 7.2 — stop and ask the human about anything with two right answers.
+
+    One interrupt() per unanswered risk. Each one suspends the graph where it
+    stands; the front end (main() below, a web UI later) reads the question out
+    of the reply, gets an answer, and resumes the same thread with
+    Command(resume=answer).
+
+    Two properties make this safe, and both are why the node looks like this:
+    LangGraph re-runs the node from the top on every resume, so it must be pure
+    — no model call, no file write, nothing that must not happen twice — and it
+    must ask its questions in the same order every time, because resumed answers
+    are matched to interrupt() calls by position.
+
+    ask_risks is off by default. Without it (every Phase 0-6 run and the whole
+    eval suite) the risks are still detected and reported, but nothing pauses
+    and nothing is added to the prompt: unanswered means the playbook decides,
+    exactly as before. interrupt() also requires a checkpointer, which is why
+    the CLI only turns this on for a --thread run.
+    """
+    if not state.get("ask_risks"):
+        return {}
+    answers = dict(state.get("decisions", {}))
+    for flagged in state.get("risks", []):
+        if flagged.kind in answers:
+            continue
+        answers[flagged.kind] = str(interrupt(risk.question(flagged)) or "").strip()
+    return {"decisions": answers}
+
+
+def guidance(state: ConversionState) -> str:
+    """The human's answers as prompt text; "" when there was nothing to ask."""
+    return format_decisions(risk.decision_lines(state.get("risks", []), state.get("decisions", {})))
 
 
 def refuse(state: ConversionState) -> ConversionState:
@@ -149,7 +203,8 @@ def convert(state: ConversionState) -> ConversionState:
         elif state.get("baseline") is not None:
             feedback = refinement_feedback(state["baseline"])
         structured_model = make_model().with_structured_output(ConversionResult, include_raw=True)
-        chain = (build_prompt(revision=feedback, conventions=format_conventions(state.get("conventions", [])))
+        chain = (build_prompt(revision=feedback, decisions=guidance(state),
+                              conventions=format_conventions(state.get("conventions", [])))
                  | prepare_messages() | structured_model)
         response = chain.invoke(
             {"file_path": state["source_path"], "source": state["source"], "context": state["context"]}
@@ -228,7 +283,8 @@ def critic(state: ConversionState) -> ConversionState:
         structured_model = make_model(for_critic=True).with_structured_output(
             Critique, method="json_schema", include_raw=True,
         )
-        chain = (build_critic_prompt(conventions=format_conventions(state.get("conventions", [])))
+        chain = (build_critic_prompt(conventions=format_conventions(state.get("conventions", [])),
+                                     decisions=guidance(state))
                  | prepare_messages(for_critic=True) | structured_model)
         evidence = "\n\n".join(
             f"{'PASS' if r.passed else 'FAIL'} {r.render()}"
@@ -328,6 +384,7 @@ def build_graph(checkpointer: BaseCheckpointSaver | None = None):
     """
     builder = StateGraph(ConversionState)
     builder.add_node("intake", intake)
+    builder.add_node("risk_review", risk_review)
     builder.add_node("convert", convert)
     builder.add_node("refuse", refuse)
     builder.add_node("validate", validate)
@@ -337,7 +394,8 @@ def build_graph(checkpointer: BaseCheckpointSaver | None = None):
     # After intake, ask route_after_intake which node comes next. The mapping
     # {returned name: node name} is what lets LangGraph draw the branch.
     builder.add_conditional_edges("intake", route_after_intake,
-                                  {"convert": "convert", "refuse": "refuse"})
+                                  {"risk_review": "risk_review", "refuse": "refuse"})
+    builder.add_edge("risk_review", "convert")
     builder.add_conditional_edges("convert", route_after_convert,
                                   {"validate": "validate", "assemble": "assemble"})
     builder.add_edge("validate", "critic")
@@ -357,6 +415,63 @@ def report_thread(state: ConversionState, db: Path, thread_id: str) -> None:
         print(f"  standing instruction {number}: {convention}", file=sys.stderr)
 
 
+def report_risks(state: ConversionState) -> None:
+    """What was flagged and what was decided — never a silent choice."""
+    flagged = state.get("risks", [])
+    if not flagged:
+        return
+    decisions = state.get("decisions", {})
+    print(f"Risk review: {len(flagged)} pattern(s) with more than one correct conversion",
+          file=sys.stderr)
+    for item in flagged:
+        kind = risk.RISKS[item.kind]
+        where = f"{kind.title} (line {item.line}"
+        where += f", {item.count} occurrences)" if item.count > 1 else ")"
+        if item.kind in decisions:
+            answer = decisions[item.kind] or kind.default.key
+            print(f"  {where} → {answer}", file=sys.stderr)
+        else:
+            print(f"  {where} — not asked; converted with the playbook default. "
+                  f"Rerun with --thread to be asked, or --answer {item.kind}=<key>.", file=sys.stderr)
+
+
+def ask_human(payload: dict, interactive: bool) -> str:
+    """Put one interrupt's question to the user; return their answer verbatim.
+
+    Everything goes to stderr, and so does the input prompt, because stdout is
+    reserved for the converted TypeScript. An empty answer means "the default",
+    which is also what a run with no terminal gets — stated out loud, never
+    silently.
+    """
+    print(f"\nPaused — {payload['title']}", file=sys.stderr)
+    print(f"  found: {payload['evidence']}", file=sys.stderr)
+    print(f"  why you: {payload['why']}", file=sys.stderr)
+    print(f"  {payload['question']}", file=sys.stderr)
+    for number, option in enumerate(payload["options"], 1):
+        default = " [default]" if option["key"] == payload["default"] else ""
+        print(f"    {number}) {option['key']} — {option['label']}{default}", file=sys.stderr)
+    if not interactive:
+        print(f"  no terminal to ask on; using the default ({payload['default']}). "
+              f"Choose with --answer {payload['kind']}=<key>.", file=sys.stderr)
+        return ""
+    print("  answer (number, key, your own words, or Enter for the default): ", end="", file=sys.stderr)
+    answer = input().strip()
+    if answer.isdigit() and 1 <= int(answer) <= len(payload["options"]):
+        return payload["options"][int(answer) - 1]["key"]
+    return answer
+
+
+def parse_answers(values: list[str], parser: argparse.ArgumentParser) -> dict[str, str]:
+    """--answer dialogs=auto-dismiss ... into {kind: answer}, for scripted runs."""
+    answers = {}
+    for value in values:
+        kind, separator, text = value.partition("=")
+        if not separator or kind not in risk.RISKS:
+            parser.error(f"--answer must be KIND=ANSWER, KIND one of: {', '.join(risk.RISKS)}")
+        answers[kind] = text.strip()
+    return answers
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Convert, validate, and repair Selenium TypeScript in up to three attempts")
@@ -369,6 +484,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--thread", help="conversation id; saves this turn and resumes the last one (step 7.1)")
     parser.add_argument("--refine", default="", metavar="INSTRUCTION",
                         help='a standing instruction for this thread, e.g. "use data-testid locators"')
+    parser.add_argument("--answer", action="append", default=[], metavar="KIND=ANSWER",
+                        help="answer a risk question up front, e.g. --answer dialogs=auto-dismiss")
+    parser.add_argument("--no-ask", action="store_true",
+                        help="never pause on a flagged pattern; report it and use the playbook default")
     parser.add_argument("--db", type=Path, default=memory.DEFAULT_DB, help="thread database file")
     parser.add_argument("--list-threads", action="store_true", help="print saved thread ids in --db and exit")
     args = parser.parse_args(argv)
@@ -392,7 +511,10 @@ def main(argv: list[str] | None = None) -> int:
         inputs["output_path"] = str(args.out)
     if args.refine:
         inputs["refinement"] = args.refine
-    config = {"run_name": "conversion-graph", "tags": ["step:7.1", "prompt:v1", "critic:v1"],
+    answers = parse_answers(args.answer, parser)
+    # Pausing needs a checkpointer to pause into, so only a --thread run can ask.
+    inputs["ask_risks"] = bool(args.thread) and not args.no_ask
+    config = {"run_name": "conversion-graph", "tags": ["step:7.2", "prompt:v1", "critic:v1"],
               "recursion_limit": 3 * MAX_ATTEMPTS + 5}
 
     with ExitStack() as stack:
@@ -400,15 +522,36 @@ def main(argv: list[str] | None = None) -> int:
         graph = build_graph(checkpointer)
         if args.thread:
             config = memory.thread_config(args.thread, **config)
-            if args.source is None and not memory.thread_state(graph, args.thread).get("source_path"):
+            saved = memory.thread_state(graph, args.thread)
+            if args.source is None and not saved.get("source_path"):
                 parser.error(f"thread {args.thread!r} has no saved conversion yet; "
                              "pass a source file to start it")
+            # Merge, do not replace: an answer given on turn 1 still stands.
+            if answers or saved.get("decisions"):
+                inputs["decisions"] = {**saved.get("decisions", {}), **answers}
+        elif answers:
+            inputs["decisions"] = answers
         final = graph.invoke(inputs, config=config)
+        # A paused invoke returns whatever it managed to write plus the question,
+        # and no report: the run is suspended on the thread, not finished. Answer,
+        # resume the same thread, repeat — at most one pause per risk kind,
+        # because risk_review asks each question exactly once.
+        interactive = sys.stdin.isatty()
+        for _ in range(len(risk.RISKS)):
+            if "__interrupt__" not in final:
+                break
+            answer = ask_human(final["__interrupt__"][0].value, interactive)
+            final = graph.invoke(Command(resume=answer), config=config)
+        if "__interrupt__" in final:
+            print("Still waiting on an answer after every question; nothing was converted.",
+                  file=sys.stderr)
+            return 2
 
     if args.thread:
         report_thread(final, args.db, args.thread)
     c = final["classification"]
     print(f"[{c.automation} · {c.runner} · {c.language}] {c.reason}", file=sys.stderr)
+    report_risks(final)
     if final["status"] == "refused":
         print(f"✗ not converted: {final['refusal']}", file=sys.stderr)
         return 2

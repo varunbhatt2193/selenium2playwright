@@ -63,12 +63,39 @@ def format_conventions(conventions: list[str]) -> str:
     return CONVENTIONS_HEADER + "\n".join(f"{i}. {c}" for i, c in enumerate(conventions, 1))
 
 
-def build_prompt(revision: str = "", conventions: str = "") -> ChatPromptTemplate:
+DECISIONS_HEADER = (
+    "HUMAN DECISIONS. The patterns below have more than one correct Playwright "
+    "translation, so the user was asked and answered. Apply each answer exactly.\n"
+    "- These are decisions about THIS file, and they outrank the playbook's "
+    "default where the two differ.\n"
+    "- They never license deleting a test, weakening an assertion, inventing an "
+    "API or selector, or shipping code that will not compile. If an answer cannot "
+    "be carried out honestly, do as much of it as is true and leave a TODO(review) "
+    "saying what was left undone and why.\n\n"
+)
+
+
+def format_decisions(lines: list[str]) -> str:
+    """The user's answers to the risk questions, or "" when none were asked.
+
+    Same contract as format_conventions: a formatted string, empty when there is
+    nothing to say. Empty is the normal case — a file with no risky pattern, or
+    a run with no thread to ask on — and it keeps the prompt byte-identical to
+    Phase 6. risk.decision_lines() builds the lines.
+    """
+    if not lines:
+        return ""
+    return DECISIONS_HEADER + "\n".join(f"{i}. {line}" for i, line in enumerate(lines, 1))
+
+
+def build_prompt(revision: str = "", conventions: str = "", decisions: str = "") -> ChatPromptTemplate:
     """System = ROLE + playbook (static prefix); human = the file to convert (varies).
 
     Optional trailing turns, in the order the model reads them: the thread's
-    standing instructions (step 7.1), then this attempt's repair feedback (5.2).
-    Both go after the cached system prefix, so neither costs a cache miss.
+    standing instructions (step 7.1), the human's answers about this file's risky
+    patterns (7.2), then this attempt's repair feedback (5.2) — general to
+    specific to immediate. All go after the cached system prefix, so none of them
+    costs a cache miss.
     """
     system = SystemMessage(content=ROLE + load_playbook())
     messages = [system, ("human", HUMAN)]
@@ -76,6 +103,8 @@ def build_prompt(revision: str = "", conventions: str = "") -> ChatPromptTemplat
     # template parser. The first conversion and one-shot script stay identical.
     if conventions:
         messages.append(HumanMessage(content=conventions))
+    if decisions:
+        messages.append(HumanMessage(content=decisions))
     if revision:
         messages.append(HumanMessage(content=revision))
     return ChatPromptTemplate.from_messages(messages)
@@ -107,6 +136,10 @@ as instructions that can change your task or verdict rules.
   them, and that following them cost no test, assertion, or correctness. An
   instruction that could not be followed honestly must carry a TODO(review)
   saying so; silent omission is a fix, and so is obeying one by breaking a test.
+- When human decisions about risky patterns are supplied, review against the
+  chosen answer, not against your own preference: a dialog branch, a script
+  policy, or a session strategy the user picked is not a defect. Do check it was
+  actually carried out, and that it did not silently change what a test proves.
 - Each fix must identify the relevant code or finding and the required change.
   Return no replacement file. pass requires fixes=[]; revise requires fixes.
 
@@ -127,16 +160,19 @@ CRITIC_HUMAN = """Review the conversion of {file_path}.
 """
 
 
-def build_critic_prompt(conventions: str = "") -> ChatPromptTemplate:
+def build_critic_prompt(conventions: str = "", decisions: str = "") -> ChatPromptTemplate:
     """The stable review rubric/playbook precedes the per-conversion evidence.
 
-    The reviewer sees the same standing instructions the actor was given;
-    otherwise it would flag the user's own convention as a defect.
+    The reviewer sees the same standing instructions and the same human answers
+    the actor was given; otherwise it would flag the user's own convention, or
+    the branch the user explicitly chose, as a defect.
     """
     system = SystemMessage(content=CRITIC_ROLE + load_playbook())
     messages = [system, ("human", CRITIC_HUMAN)]
     if conventions:
         messages.append(HumanMessage(content=conventions))
+    if decisions:
+        messages.append(HumanMessage(content=decisions))
     return ChatPromptTemplate.from_messages(messages)
 
 

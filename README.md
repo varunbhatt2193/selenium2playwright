@@ -2,7 +2,7 @@
 
 **An AI agent that converts TypeScript Selenium test suites to Playwright** — a single test, a page object, or the whole suite — built on LangGraph + Claude, with a self-correcting loop that validates its own output before you ever see it.
 
-> **Status: building in public.** Phase 5 of 12 implemented — **bounded reflection is working**. The graph converts, validates, and reviews code, then repairs it using the actual findings, for at most three conversion attempts (configurable down to one for evaluation). Assembly always reports the outcome and retains the latest available draft. A live seeded demo repaired a missing `await` on attempt 2: all four gates and the critic passed, while two locator TODOs correctly kept the final status at `needs-review`. See the [reflection walkthrough and demo](docs/reflection-loop.md).
+> **Status: building in public.** Phases 0-6 of 12 complete and Phase 7 (memory + human-in-the-loop) underway — **bounded reflection is working**. The graph converts, validates, and reviews code, then repairs it using the actual findings, for at most three conversion attempts (configurable down to one for evaluation). Assembly always reports the outcome and retains the latest available draft. A live seeded demo repaired a missing `await` on attempt 2: all four gates and the critic passed, while two locator TODOs correctly kept the final status at `needs-review`. See the [reflection walkthrough and demo](docs/reflection-loop.md).
 > Architecture & decisions: [plan.md](plan.md)
 > **In one line:** the agent checks and fixes its own work, and I measured that this self-correction lifts a cheap model from 2 of 12 correct conversions to 9 of 12, while a strong model rarely needs it, so the cost of AI review is spent only where it earns its keep.
 >
@@ -12,9 +12,11 @@
 >
 > ![One attempt vs reflection per actor, same Opus critic](docs/reflection-shootout.svg)
 >
-> **Haiku:** 2/12 → 9/12 fully passed, 8 files repaired, every compile failure fixed, ×1.9 cost. **Sonnet:** 11/12 → 10/12, nothing static to fix, one critic-variance swing. **Opus:** 6/12 → 11/12, 2 real repairs, 4 variance rows. Reflection earns its cost when first drafts are often wrong; when they are already clean it mostly re-argues the critic, and the Opus critic is the bill. Sonnet alone matches Opus-with-reflection at about half the price. [One-page explanation](docs/reflection-shootout.md); numbers in [reflection-shootout-table.md](docs/reflection-shootout-table.md); walkthroughs: [Haiku](docs/reflection-haiku-ab.md), [Opus](docs/reflection-ab.md); reports: [Haiku](docs/phase-6.5-haiku-report.md), [Sonnet](docs/phase-6.5-sonnet-report.md), [Opus](docs/phase-6.3-report.md). All 136 offline tests pass.
+> **Haiku:** 2/12 → 9/12 fully passed, 8 files repaired, every compile failure fixed, ×1.9 cost. **Sonnet:** 11/12 → 10/12, nothing static to fix, one critic-variance swing. **Opus:** 6/12 → 11/12, 2 real repairs, 4 variance rows. Reflection earns its cost when first drafts are often wrong; when they are already clean it mostly re-argues the critic, and the Opus critic is the bill. Sonnet alone matches Opus-with-reflection at about half the price. [One-page explanation](docs/reflection-shootout.md); numbers in [reflection-shootout-table.md](docs/reflection-shootout-table.md); walkthroughs: [Haiku](docs/reflection-haiku-ab.md), [Opus](docs/reflection-ab.md); reports: [Haiku](docs/phase-6.5-haiku-report.md), [Sonnet](docs/phase-6.5-sonnet-report.md), [Opus](docs/phase-6.3-report.md). All 161 offline tests pass.
 >
-> Complete: **Phase 7.1 — a conversion is now a conversation.** A SQLite checkpointer gives every run a `thread_id`, so a second turn can be one sentence: `--thread login --refine "use getByTestId for every form field"` — no file path, no previous output, nothing re-pasted. Standing instructions accumulate on the thread and travel with *every* later model call, including repair laps, so the loop can't quietly undo your convention; the critic sees them too, so it reviews against your rule instead of flagging it. In the live two-turn run the agent applied the rule to the three fields that had ids and **refused to invent one** for the submit button that had none — keeping the faithful CSS locator with a `TODO(review)` saying why. Your instruction wins on style, never on truth. [Walkthrough + live diff](docs/short-term-memory.md). **Next: 7.2, human-in-the-loop `interrupt()`.** [Session restart notes](docs/session-handoff.md).
+> Complete: **Phase 7.1 — a conversion is now a conversation.** A SQLite checkpointer gives every run a `thread_id`, so a second turn can be one sentence: `--thread login --refine "use getByTestId for every form field"` — no file path, no previous output, nothing re-pasted. Standing instructions accumulate on the thread and travel with *every* later model call, including repair laps, so the loop can't quietly undo your convention; the critic sees them too, so it reviews against your rule instead of flagging it. In the live two-turn run the agent applied the rule to the three fields that had ids and **refused to invent one** for the submit button that had none — keeping the faithful CSS locator with a `TODO(review)` saying why. Your instruction wins on style, never on truth. [Walkthrough + live diff](docs/short-term-memory.md). [Session restart notes](docs/session-handoff.md).
+>
+> Complete: **Phase 7.2 — the agent asks before it guesses.** Four gates and a critic catch code that is *wrong*; nothing catches code that is merely *not what you meant*. A deterministic detector flags the three Selenium patterns with more than one correct Playwright translation — browser dialogs, injected `executeScript`, and a session shared across tests by a `before` hook — and the graph calls LangGraph's `interrupt()` to **suspend itself mid-run** and ask, before spending a token on a guess. Your answer resumes the thread (`Command(resume=...)`), goes to the actor *and* the critic, and is remembered for every later turn. Live proof: the same alerts page converted twice, same model, differing only in the answer — `handler-first` produced `page.once("dialog", ...)` registered before the click, `expect-event` produced `Promise.all([waitForEvent("dialog"), click()])`; 30 lines differ, both passed 4/4 gates and the critic, and the first needed a repair lap because a synchronous dialog handler cannot await. [Walkthrough + live diff](docs/human-in-the-loop.md). **Next: 7.3, long-term memory (the Store).**
 >
 > 🗺️ **[Interactive architecture diagram](https://claude.ai/code/artifact/877b27e1-3cc2-4f84-802f-091419bf27c1)** — the whole system on one page: the pipeline, the reflection loop, memory, evals, and the v2 AgentCore path. *(Source: [docs/architecture.html](docs/architecture.html))*
 
@@ -24,7 +26,7 @@ Migrating a Selenium suite to Playwright is mechanical enough to automate, but r
 
 ## The graph today
 
-Generated from the compiled graph with `build_graph().get_graph().draw_mermaid()`. Dotted edges choose the next node: intake converts or refuses; the critic requests another conversion or assembly. A failed conversion also goes to assembly, preserving any earlier draft. The three-attempt limit is enforced by the graph's routing.
+Generated from the compiled graph with `build_graph().get_graph().draw_mermaid()`. Dotted edges choose the next node: intake reviews or refuses; the critic requests another conversion or assembly. A failed conversion also goes to assembly, preserving any earlier draft. The three-attempt limit is enforced by the graph's routing. `risk_review` is where the graph stops to ask you about a pattern with more than one correct conversion — it suspends the run rather than guessing.
 
 ```mermaid
 ---
@@ -35,6 +37,7 @@ config:
 graph TD;
 	__start__([<p>__start__</p>]):::first
 	intake(intake)
+	risk_review(risk_review)
 	convert(convert)
 	refuse(refuse)
 	validate(validate)
@@ -46,8 +49,9 @@ graph TD;
 	convert -.-> validate;
 	critic -.-> assemble;
 	critic -.-> convert;
-	intake -.-> convert;
 	intake -.-> refuse;
+	intake -.-> risk_review;
+	risk_review --> convert;
 	validate --> critic;
 	assemble --> __end__;
 	refuse --> __end__;
@@ -56,7 +60,7 @@ graph TD;
 	classDef last fill:#bfb6fc
 ```
 
-Try it: `uv run python -m selenium2playwright.graph samples/selenium-suite/pages/LoginPage.ts` prints the latest converted TypeScript to stdout and the final report to stderr. Add `--thread <id>` to save the conversation, then refine it later with `--thread <id> --refine "…"` and nothing else. A run permits up to three conversion and three critic invocations. Exit codes: 0 = all gates and critic pass with no open TODOs, 1 = `needs-review`, 2 = unsupported input or invalid CLI arguments. See the [companion-file example](docs/validation-node.md#run-a-conversion) or run the [seeded reflection demo](docs/reflection-loop.md#live-demo).
+Try it: `uv run python -m selenium2playwright.graph samples/selenium-suite/pages/LoginPage.ts` prints the latest converted TypeScript to stdout and the final report to stderr. Add `--thread <id>` to save the conversation, then refine it later with `--thread <id> --refine "…"` and nothing else; a threaded run also pauses to ask about risky patterns (`--answer dialogs=auto-dismiss` answers up front, `--no-ask` never asks). A run permits up to three conversion and three critic invocations. Exit codes: 0 = all gates and critic pass with no open TODOs, 1 = `needs-review`, 2 = unsupported input or invalid CLI arguments. See the [companion-file example](docs/validation-node.md#run-a-conversion) or run the [seeded reflection demo](docs/reflection-loop.md#live-demo).
 
 ## Why an agent — and not just Claude in a repo?
 
@@ -79,7 +83,7 @@ For a one-off file, Claude in a repo is genuinely fine. An agent earns its exist
 - [x] **M1** — LangGraph pipeline: classify → convert (with honest refusals)
 - [x] **M2** — deterministic validators + reflection loop
 - [x] **Evals** — 12 pinned files, four exact gates + a calibrated LLM judge. Sonnet, one attempt: 12/12 static, 11/12 graph, judge 4.4/5 at $0.29; Haiku needs the repair loop (2→9/12); Opus first drafts judge 4.9/5. Details in [phase-6.4-report.md](docs/phase-6.4-report.md) and [reflection-shootout.md](docs/reflection-shootout.md)
-- [ ] **M3** — conversation memory ([threads + checkpointer done](docs/short-term-memory.md)) + human-in-the-loop for risky patterns
+- [ ] **M3** — conversation memory ([threads + checkpointer done](docs/short-term-memory.md)) + [human-in-the-loop for risky patterns done](docs/human-in-the-loop.md)
 - [ ] **M4** — whole-suite conversion: page objects first, then tests, in parallel
 - [ ] **M5** — deployed playground you can try
 

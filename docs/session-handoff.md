@@ -1,13 +1,61 @@
-# Restart here — 2026-09-06 (after 7.1, short-term memory)
+# Restart here — 2026-09-06 (after 7.2, human-in-the-loop)
 
 ## Current position
 
-**Phase 7.1 is complete: `SqliteSaver` + `thread_id`, two-turn refinement
-working live. Next is 7.2 (HITL `interrupt()`); it has not started.**
-Read [short-term-memory.md](short-term-memory.md) first — theory, the sharp
-edge, and the live diff. Commit/push authorization persists. The 150-line /
+**Phase 7.2 is complete: a risky pattern suspends the run with `interrupt()`,
+your answer resumes it, and the answer changes the output — proved live. Next is
+7.3 (long-term memory, the Store); it has not started.**
+Read [human-in-the-loop.md](human-in-the-loop.md) first, then
+[short-term-memory.md](short-term-memory.md) (7.2 is built on 7.1's
+checkpointer). Commit/push authorization persists. The 150-line /
 one-file-at-a-time rule was removed by Varun on 2026-09-06: complete a step
 when asked, then one walkthrough.
+
+## What 7.2 built
+
+- `risk.py`: `Risk(kind, line, snippet, count)`, the `RISKS` catalogue (three
+  kinds — `dialogs`, `javascript-execution`, `shared-session` — each with a
+  question and three answer options written as guidance sentences for the
+  model), `detect_risks` (regex, deterministic, one question per kind),
+  `question()` (interrupt payload), `resolve()`, `decision_lines()`.
+- `graph.risk_review` between `intake` and `convert`: one `interrupt()` per
+  unanswered risk. New state keys `ask_risks` (off by default), `risks`,
+  `decisions`. `decisions` persists on the thread like `conventions` and is
+  rendered into the actor *and* critic prompts by `prompts.format_decisions`.
+- CLI: pauses only on a `--thread` run; `--answer KIND=ANSWER`, `--no-ask`; a
+  run with no terminal prints that it used the default instead of guessing
+  silently. `Risk` added to `memory.CHECKPOINT_TYPES`.
+- `samples/risky/secure-area.spec.ts` — non-eval fixture for the two kinds the
+  pinned suite does not contain. Of the 12 eval files only AlertsPage.ts flags.
+- `scripts/demo_hitl.py`, artifacts + receipt in `out/7.2/`.
+- Tests: `tests/test_risk.py` (25); 161 total.
+
+## 7.2 sharp edges (not in gap-log; LangGraph behaviour, not our bugs)
+
+- A **paused `invoke()` returns what that invocation wrote plus
+  `__interrupt__`, and no report** — not the finished state. Loop on
+  `"__interrupt__" in result`.
+- **Resume values are matched to `interrupt()` calls by position.** Two
+  questions in one node only stay correct because `detect_risks` is pure and
+  ordered. Never make the question list depend on anything that can change
+  between a pause and a resume.
+- `state.next` returned `()` after a *second* interrupt while the task was
+  still pending with interrupts on it. Use the reply's `__interrupt__` or
+  `state.tasks[…].interrupts`.
+- `interrupt()` requires a checkpointer; there is nowhere to suspend to
+  without one.
+
+## Live 7.2 demo (Sonnet actor + critic, `out/7.2/`)
+
+Same file (`AlertsPage.ts`), two answers, one question each, both arms
+**4/4 gates + critic pass, no TODOs, 30 lines different**. `handler-first`:
+`page.once("dialog", …)` before the click, 2 attempts — attempt 1 failed the
+lint gate (`no-floating-promises`: a synchronous handler cannot await),
+attempt 2 added `void` plus a `lastDialogMessage` field the critic asked for;
+11,523 actor tokens. `expect-event`:
+`Promise.all([waitForEvent("dialog"), click()])`, 1 attempt, 4,702 tokens. The
+model's own notes cite "Human decision 1". Four traces (two per arm — a resumed
+run is a second trace) in `out/7.2/demo-receipt.json`.
 
 ## What 7.1 built
 
@@ -46,7 +94,7 @@ TODOs). `getByTestId` applied to username/password/flash; the submit button had
 no id, so the agent kept `locator("button[type='submit']")` with a
 `TODO(review)` instead of inventing a test id.
 
-## Earlier state (6.4), kept for reference
+## Earlier state (6.4 and 6.5), kept for reference
 
 ## What the Haiku step built (commit `1c8edad`)
 
@@ -112,8 +160,9 @@ a live experiment is running.**
 
 ## Working agreement and environment
 
-Teach theory before code in plain English; code in explained patches under
-150 lines, one file at a time, unless the user asks for a step "in one go".
+Teach theory before code in plain English. The 150-line / one-file-at-a-time
+rule was removed on 2026-09-06: complete the whole step when asked, then give
+one walkthrough, and let Varun review before the next step.
 No agents unless asked. Frequent progress updates. Existing commit/push
 authorization persists; check `gh auth status` is on `varunbhatt2193` before
 pushing. Repo `/Users/varunbhatt/Downloads/Selenium2Playwright`, main, remote

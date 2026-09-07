@@ -22,6 +22,7 @@ from selenium2playwright import graph, memory
 from selenium2playwright.classify import Classification
 from selenium2playwright.prompts import build_critic_prompt, build_prompt, format_conventions
 from selenium2playwright.reflection import refinement_feedback
+from selenium2playwright.risk import Risk
 from selenium2playwright.schemas import (ConversionReport, ConversionResult, Critique, Finding,
                                          ValidationReport)
 
@@ -91,7 +92,9 @@ class CheckpointRoundTripTests(ScriptedModel):
             validation=[ValidationReport(gate="compile", passed=False, findings=[finding], tool_output="raw")],
             critique=REVISE, errors=["boom"])
         stored = {"classification": Classification("selenium", "mocha", "typescript", True, "ok"),
-                  "report": report, "baseline": report.result, "conventions": [DATA_TESTID]}
+                  "report": report, "baseline": report.result, "conventions": [DATA_TESTID],
+                  "risks": [Risk("dialogs", 21, "await dialog.accept();", 2)],
+                  "decisions": {"dialogs": "auto-dismiss"}}
 
         with patch.dict(os.environ, {"LANGGRAPH_STRICT_MSGPACK": "true"}):
             with memory.open_checkpointer(self.db) as checkpointer:
@@ -106,6 +109,8 @@ class CheckpointRoundTripTests(ScriptedModel):
         self.assertEqual(restored["report"].critique, REVISE)
         self.assertEqual(restored["baseline"].code, GOLDEN)
         self.assertEqual(restored["conventions"], [DATA_TESTID])
+        self.assertEqual(restored["risks"], stored["risks"])  # step 7.2, and a dataclass like the first
+        self.assertEqual(restored["decisions"], {"dialogs": "auto-dismiss"})
 
     def test_a_type_outside_the_allowlist_comes_back_as_plain_data(self):
         """The lockdown is real, not decorative: reading is data, not class loading.
