@@ -5,8 +5,11 @@
 **Phase 8 is complete. 8.1 moved the whole front end out of `graph.py` into a
 Typer app (`s2p convert` + `remember / memories / forget / threads`); 8.2 made
 the model, the critic model and the lap budget run-scoped, carried as the
-graph's context schema, and added `--json`. Next is Phase 9 (suite mode: Send
-API, reducers, subgraphs); it has not started.**
+graph's context schema, and added `--json`. A cross-provider pass after it
+verified the graph on OpenAI (alone, and as an OpenAI actor with an Anthropic
+critic), moved the last vendor-specific setting out of the critic node, and
+made every run check its model before starting. Next is Phase 9 (suite mode:
+Send API, reducers, subgraphs); it has not started.**
 Read [config.md](config.md) and [cli.md](cli.md) first, then
 [long-term-memory.md](long-term-memory.md),
 [human-in-the-loop.md](human-in-the-loop.md) and
