@@ -55,7 +55,7 @@ Docs to read: <https://docs.langchain.com/oss/python/langgraph/persistence>
 | `open_checkpointer(path)` | context manager: create the directory, open SQLite, yield a saver locked down as below |
 | `thread_config(thread_id, **extra)` | the one config key that turns a stateless invoke into a conversation turn |
 | `thread_state(graph, thread_id)` | the saved values, or `{}` for a thread that never ran |
-| `list_threads(path)` | distinct thread ids in the file, for `--list-threads` |
+| `list_threads(path)` | distinct thread ids in the file, for `s2p threads` |
 | `strict_serializer()` | see the sharp edge below |
 | `CHECKPOINT_TYPES` | every non-builtin class the state holds |
 
@@ -137,14 +137,14 @@ can't be followed honestly, apply what you can and leave a `TODO(review)`.
 
 ```bash
 # turn 1 — name the file once
-uv run python -m selenium2playwright.graph samples/selenium-suite/pages/LoginPage.ts \
+uv run s2p convert samples/selenium-suite/pages/LoginPage.ts \
     --thread login --out out/LoginPage.ts
 
 # turn 2 — name nothing
-uv run python -m selenium2playwright.graph --thread login \
+uv run s2p convert --thread login \
     --refine "use getByTestId for every form field"
 
-uv run python -m selenium2playwright.graph --list-threads
+uv run s2p threads
 ```
 
 `source` is now optional; omit it and `--thread` supplies it. The thread also

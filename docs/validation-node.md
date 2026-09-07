@@ -45,10 +45,10 @@ the one-shot converter's existing formatter calls retain their behavior.
 With Python dependencies and the sandbox Node dependencies installed:
 
 ```sh
-uv run python -m selenium2playwright.graph samples/selenium-suite/pages/LoginPage.ts \
+uv run s2p convert samples/selenium-suite/pages/LoginPage.ts \
   --out out/4.5/pages/LoginPage.ts
 
-uv run python -m selenium2playwright.graph samples/selenium-suite/tests/login.spec.ts \
+uv run s2p convert samples/selenium-suite/tests/login.spec.ts \
   out/4.5/pages/LoginPage.ts --out out/4.5/tests/login.spec.ts
 ```
 

@@ -11,7 +11,7 @@ from langchain_core.messages import AIMessage
 from langchain_core.runnables import RunnableLambda
 from pydantic import ValidationError
 
-from selenium2playwright import graph, llm
+from selenium2playwright import cli, graph, llm
 from selenium2playwright.schemas import ConversionResult, Critique, Finding, ValidationReport
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -97,11 +97,11 @@ class CriticTests(unittest.TestCase):
                     patch.object(graph, "route_after_critic", return_value="assemble"), \
                     patch.object(graph, "convert", return_value={"status": "converted", "result": ConversionResult(code=code),
                                                                  "usage": None, "iteration": 1}) as convert:
-                result = graph.main([self.state["source_path"]])
+                result = cli.run(["convert", self.state["source_path"], "--no-diff"])
             self.assertEqual(result, 1)
             self.assertEqual(stdout.getvalue(), code)
-            self.assertIn("PASS compile", stderr.getvalue())
-            self.assertIn("Critic: REVISE" if review else "Critic: UNAVAILABLE", stderr.getvalue())
+            self.assertRegex(stderr.getvalue(), r"compile[^\n]*PASS")
+            self.assertRegex(stderr.getvalue(), r"critic[^\n]*REVISE" if review else r"critic[^\n]*UNAVAILABLE")
             convert.assert_called_once()
             self.assertEqual(len(self.prompts), 1)
 

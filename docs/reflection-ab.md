@@ -105,7 +105,7 @@ comparison from saved reports without calling any model.
 .venv/bin/python scripts/run_reflection_ab.py --compare-only out/6.3/ab-<stamp>/attempts-1 out/6.3/ab-<stamp>/attempts-3
 
 # try the cap on the CLI for one file
-uv run python -m selenium2playwright.graph samples/selenium-suite/pages/LoginPage.ts --max-attempts 1
+uv run s2p convert samples/selenium-suite/pages/LoginPage.ts --max-attempts 1
 ```
 
 Commit first. The plan records whether the worktree was dirty, and a clean

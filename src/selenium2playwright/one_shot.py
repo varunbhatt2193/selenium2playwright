@@ -50,10 +50,8 @@ def convert(source: Path, context: list[Path], model_name: str | None = None) ->
     return response["parsed"]
 
 
-def report_usage(usage: dict | None) -> None:
+def format_usage(usage: dict) -> str:
     """Tokens in/out plus the cache split — the proof the playbook prefix is cached."""
-    if not usage:
-        return
     details = usage.get("input_token_details", {})
     # usage_metadata is LangChain's provider-neutral shape; "cache_read"/
     # "cache_creation" are its standard keys. langchain-anthropic 1.7 files a
@@ -63,12 +61,15 @@ def report_usage(usage: dict | None) -> None:
         details.get(k, 0)
         for k in ("cache_creation", "ephemeral_5m_input_tokens", "ephemeral_1h_input_tokens")
     )
-    print(
-        f"[{usage['input_tokens']} in / {usage['output_tokens']} out"
-        f" · cache write {written}"
-        f" · cache read {details.get('cache_read', 0)}]",
-        file=sys.stderr,
-    )
+    return (f"[{usage['input_tokens']} in / {usage['output_tokens']} out"
+            f" · cache write {written}"
+            f" · cache read {details.get('cache_read', 0)}]")
+
+
+def report_usage(usage: dict | None) -> None:
+    """The same line on stderr, for the plain-text one-shot script."""
+    if usage:
+        print(format_usage(usage), file=sys.stderr)
 
 
 def report_ledger(result: ConversionResult) -> None:

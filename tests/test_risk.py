@@ -17,7 +17,7 @@ from langchain_core.messages import AIMessage
 from langchain_core.runnables import RunnableLambda
 from langgraph.types import Command
 
-from selenium2playwright import graph, memory, risk
+from selenium2playwright import cli, graph, memory, risk
 from selenium2playwright.prompts import build_prompt, format_decisions
 from selenium2playwright.schemas import ConversionResult, Critique
 
@@ -278,12 +278,12 @@ class CommandLineTests(ScriptedGraph):
         with patch("sys.stdin") as stdin, patch("builtins.input", lambda: next(typed)):
             stdin.isatty.return_value = tty
             with redirect_stdout(out), redirect_stderr(err):
-                code = graph.main([*argv, "--db", str(self.db)])
+                code = cli.run([*argv, "--db", str(self.db)])
         return code, out.getvalue(), err.getvalue()
 
     def test_the_terminal_asks_the_question_and_a_number_picks_an_option(self):
         with self.replies([ConversionResult(code=GOLDEN)], [PASS]):
-            code, _, err = self.run_cli(str(ALERTS), "--thread", "alerts",
+            code, _, err = self.run_cli("convert", str(ALERTS), "--thread", "alerts",
                                         "--out", str(Path(self.tmp.name) / "AlertsPage.ts"),
                                         answers=["3"])
         self.assertIn("Paused — browser dialog handling", err)
@@ -297,14 +297,14 @@ class CommandLineTests(ScriptedGraph):
 
     def test_without_a_terminal_the_default_is_used_and_said_out_loud(self):
         with self.replies([ConversionResult(code=GOLDEN)], [PASS]):
-            _, _, err = self.run_cli(str(ALERTS), "--thread", "alerts", tty=False)
+            _, _, err = self.run_cli("convert", str(ALERTS), "--thread", "alerts", tty=False)
         self.assertIn("no terminal to ask on; using the default (handler-first)", err)
         self.assertIn(DIALOGS.default.guidance, self.conversion_prompts[0])
 
     def test_answer_flag_converts_without_pausing_and_is_remembered(self):
         with self.replies([ConversionResult(code=GOLDEN)] * 2, [PASS] * 2):
-            first = self.run_cli(str(ALERTS), "--thread", "alerts", "--answer", "dialogs=auto-dismiss")
-            second = self.run_cli("--thread", "alerts", "--refine", "prefer getByRole")
+            first = self.run_cli("convert", str(ALERTS), "--thread", "alerts", "--answer", "dialogs=auto-dismiss")
+            second = self.run_cli("convert", "--thread", "alerts", "--refine", "prefer getByRole")
         self.assertNotIn("Paused", first[2])
         self.assertIn("→ auto-dismiss", first[2])
         self.assertNotIn("Paused", second[2])  # turn 2 does not re-ask
@@ -312,19 +312,21 @@ class CommandLineTests(ScriptedGraph):
 
     def test_no_ask_reports_the_risk_and_converts_with_the_playbook_default(self):
         with self.replies([ConversionResult(code=GOLDEN)], [PASS]):
-            _, _, err = self.run_cli(str(ALERTS), "--thread", "alerts", "--no-ask")
+            _, _, err = self.run_cli("convert", str(ALERTS), "--thread", "alerts", "--no-ask")
         self.assertIn("not asked; converted with the playbook default", err)
         self.assertNotIn("HUMAN DECISIONS", self.conversion_prompts[0])
 
     def test_a_threadless_run_says_how_to_be_asked(self):
         with self.replies([ConversionResult(code=GOLDEN)], [PASS]):
-            _, _, err = self.run_cli(str(ALERTS))
+            _, _, err = self.run_cli("convert", str(ALERTS))
         self.assertIn("Rerun with --thread to be asked", err)
 
     def test_a_malformed_answer_is_rejected_before_any_work(self):
         for bad in ("dialogs", "not-a-risk=x"):
-            with self.assertRaises(SystemExit):
-                self.run_cli(str(ALERTS), "--thread", "alerts", "--answer", bad)
+            with self.subTest(answer=bad):
+                code, _, err = self.run_cli("convert", str(ALERTS), "--thread", "alerts", "--answer", bad)
+                self.assertEqual(code, 2)
+                self.assertIn("--answer must be KIND=ANSWER", err)
 
 
 if __name__ == "__main__":

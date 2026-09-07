@@ -13,7 +13,7 @@ from uuid import uuid4
 from langchain_core.messages import AIMessage
 from langchain_core.runnables import RunnableLambda
 
-from selenium2playwright import eval_experiment, eval_target, graph
+from selenium2playwright import cli, eval_experiment, eval_target, graph
 from selenium2playwright.eval_compare import compare_reports, render_comparison_markdown
 from selenium2playwright.eval_plan import build_plan, digest
 from selenium2playwright.eval_report import assemble_report
@@ -79,7 +79,7 @@ class AttemptCapGraphTests(unittest.TestCase):
     def test_cli_flag_reaches_the_graph(self):
         with self.replies([ConversionResult(code=BROKEN)], [REVISE]), redirect_stdout(io.StringIO()), \
                 patch("sys.stderr", new_callable=io.StringIO) as stderr:
-            code = graph.main([str(SOURCE), "--max-attempts", "1"])
+            code = cli.run(["convert", str(SOURCE), "--max-attempts", "1", "--no-diff"])
         self.assertEqual((code, self.calls), (1, ["ConversionResult", "Critique"]))
         self.assertIn("(1/1 attempts)", stderr.getvalue())
 

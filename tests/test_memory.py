@@ -18,7 +18,7 @@ from unittest.mock import Mock, patch
 from langchain_core.messages import AIMessage
 from langchain_core.runnables import RunnableLambda
 
-from selenium2playwright import graph, memory
+from selenium2playwright import cli, graph, memory
 from selenium2playwright.classify import Classification
 from selenium2playwright.prompts import build_critic_prompt, build_prompt, format_conventions
 from selenium2playwright.reflection import refinement_feedback
@@ -259,14 +259,14 @@ class CommandLineTests(ScriptedModel):
     def run_cli(self, *argv):
         out, err = io.StringIO(), io.StringIO()
         with redirect_stdout(out), redirect_stderr(err):
-            code = graph.main([*argv, "--db", str(self.db)])
+            code = cli.run([*argv, "--db", str(self.db)])
         return code, out.getvalue(), err.getvalue()
 
     def test_two_cli_turns_reuse_the_thread_and_its_output_path(self):
         destination = Path(self.tmp.name) / "out" / "LoginPage.ts"
         with self.replies([ConversionResult(code=GOLDEN), ConversionResult(code=TESTID)], [PASS, PASS]):
-            first = self.run_cli(str(SOURCE), "--thread", "login", "--out", str(destination))
-            second = self.run_cli("--thread", "login", "--refine", DATA_TESTID)
+            first = self.run_cli("convert", str(SOURCE), "--thread", "login", "--out", str(destination))
+            second = self.run_cli("convert", "--thread", "login", "--refine", DATA_TESTID)
         self.assertEqual((first[0], second[0]), (0, 0))
         self.assertIn("turn 1", first[2])
         self.assertIn("turn 2", second[2])
@@ -277,8 +277,8 @@ class CommandLineTests(ScriptedModel):
     def test_a_failed_refinement_turn_says_the_previous_one_still_stands(self):
         destination = Path(self.tmp.name) / "LoginPage.ts"
         with self.replies([ConversionResult(code=GOLDEN), RuntimeError("provider down")], [PASS]):
-            self.run_cli(str(SOURCE), "--thread", "login", "--out", str(destination))
-            code, _, err = self.run_cli("--thread", "login", "--refine", DATA_TESTID)
+            self.run_cli("convert", str(SOURCE), "--thread", "login", "--out", str(destination))
+            code, _, err = self.run_cli("convert", "--thread", "login", "--refine", DATA_TESTID)
         self.assertEqual(code, 1)
         self.assertIn("provider down", err)
         self.assertIn("No converted code was produced", err)
@@ -286,15 +286,14 @@ class CommandLineTests(ScriptedModel):
         self.assertEqual(destination.read_text(), GOLDEN)  # turn 1's file untouched
 
     def test_resuming_needs_a_thread_and_a_thread_needs_a_first_turn(self):
-        with self.assertRaises(SystemExit):
-            self.run_cli("--refine", DATA_TESTID)
-        with self.assertRaises(SystemExit):
-            self.run_cli("--thread", "never-run", "--refine", DATA_TESTID)
+        # 2 is the usage-error code click exits with; the message names the fix.
+        self.assertEqual(self.run_cli("convert", "--refine", DATA_TESTID)[0], 2)
+        self.assertEqual(self.run_cli("convert", "--thread", "never-run", "--refine", DATA_TESTID)[0], 2)
 
     def test_list_threads_prints_saved_ids(self):
         with self.replies([ConversionResult(code=GOLDEN)], [PASS]):
-            self.run_cli(str(SOURCE), "--thread", "login")
-        self.assertEqual(self.run_cli("--list-threads")[1].split(), ["login"])
+            self.run_cli("convert", str(SOURCE), "--thread", "login")
+        self.assertEqual(self.run_cli("threads")[1].split(), ["login"])
 
 
 if __name__ == "__main__":

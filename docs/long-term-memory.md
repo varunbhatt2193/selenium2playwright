@@ -129,21 +129,21 @@ a preference that does not apply here is **correctly ignored, not a defect**.
 **The CLI:**
 
 ```console
-$ ... --remember "In test specs, wrap each action in a named test.step() block"
+$ s2p remember "In test specs, wrap each action in a named test.step() block"
 remembered [ada40feb123c33a0] In test specs, wrap each action in a named test.step() block
 
-$ ... --memories
+$ s2p memories
 79a8696203943edb  Name page object classes <Feature>Page and give each one an open() method
 ada40feb123c33a0  In test specs, wrap each action in a named test.step() block
 
-$ ... samples/selenium-suite/tests/upload.spec.ts pages/UploadPage.ts --out ...
+$ s2p convert samples/selenium-suite/tests/upload.spec.ts pages/UploadPage.ts --out ...
 [selenium · mocha · typescript] selenium-webdriver mocha tests in TypeScript
 Long-term memory: applying 1 of 2 remembered preference(s)
   ada40feb123c33a0 (score 0.32) In test specs, wrap each action in a named test.step() block
 Conversion: passed (1/3 attempts) — All four gates and the critic passed; no open TODO(review) items.
 ```
 
-`--forget <key>` deletes one, `--user` picks whose memories, `--no-recall` turns
+`s2p forget <key>` deletes one, `--user` picks whose memories, `--no-recall` turns
 the whole thing off for a run. Nothing is remembered unless you say
 `--remember`: the agent never decides on its own that something was worth
 keeping. And when a preference exists but was *not* close enough, the run says

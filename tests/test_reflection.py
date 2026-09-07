@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 from langchain_core.messages import AIMessage
 from langchain_core.runnables import RunnableLambda
 
-from selenium2playwright import graph
+from selenium2playwright import cli, graph
 from selenium2playwright.reflection import MAX_ATTEMPTS
 from selenium2playwright.schemas import ConversionResult, Critique
 
@@ -123,7 +123,7 @@ class ReflectionTests(unittest.TestCase):
                 redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()) as stderr:
             output = Path(folder) / "existing.ts"
             output.write_text("existing output")
-            result = graph.main([str(SOURCE), "--out", str(output)])
+            result = cli.run(["convert", str(SOURCE), "--out", str(output)])
             self.assertEqual(result, 1)
             self.assertEqual(output.read_text(), "existing output")
         self.assertIn("no output file was written", stderr.getvalue())

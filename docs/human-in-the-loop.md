@@ -140,7 +140,7 @@ Three properties worth naming:
 
 ```bash
 # pauses and asks, because --thread gives it somewhere to pause
-uv run python -m selenium2playwright.graph --thread alerts samples/selenium-suite/pages/AlertsPage.ts
+uv run s2p convert --thread alerts samples/selenium-suite/pages/AlertsPage.ts
 
 Paused — browser dialog handling
   found: line 21: const dialog = await this.driver.wait(until.alertIsPresent(), 5000);  (+3 more)

@@ -26,7 +26,7 @@ from langchain_core.embeddings import Embeddings
 from langchain_core.messages import AIMessage
 from langchain_core.runnables import RunnableLambda
 
-from selenium2playwright import graph, memory, store
+from selenium2playwright import cli, graph, memory, store
 from selenium2playwright.classify import classify
 from selenium2playwright.prompts import build_prompt, format_remembered
 from selenium2playwright.schemas import ConversionResult, Critique
@@ -336,34 +336,34 @@ class CommandLineTests(StoreHarness):
     def cli(self, *argv):
         out, err = io.StringIO(), io.StringIO()
         with redirect_stdout(out), redirect_stderr(err):
-            code = graph.main([*argv, "--memory-db", str(self.db), "--db", str(self.threads)])
+            code = cli.run([*argv, "--memory-db", str(self.db)])
         return code, out.getvalue(), err.getvalue()
 
     def fake_embeddings(self):
-        return patch.multiple(graph, make_embeddings=Mock(return_value=self.embeddings),
+        return patch.multiple(cli, make_embeddings=Mock(return_value=self.embeddings),
                               embedding_dims=Mock(return_value=HashEmbeddings.dims))
 
     def test_teaching_listing_and_forgetting_need_no_file_to_convert(self):
         with self.fake_embeddings():
-            code, _, err = self.cli("--remember", TESTIDS, "--user", "varun")
+            code, _, err = self.cli("remember", TESTIDS, "--user", "varun")
             self.assertEqual(code, 0)
             self.assertIn("remembered", err)
-            _, out, _ = self.cli("--memories", "--user", "varun")
+            _, out, _ = self.cli("memories", "--user", "varun")
             self.assertIn(TESTIDS, out)
             key = out.split()[0]
-            _, _, err = self.cli("--forget", key, "--user", "varun")
+            _, _, err = self.cli("forget", key, "--user", "varun")
             self.assertIn(f"forgot [{key}]", err)
-            _, out, _ = self.cli("--memories", "--user", "varun")
+            _, out, _ = self.cli("memories", "--user", "varun")
             self.assertEqual(out, "")
 
     def test_forgetting_something_that_is_not_there_says_so(self):
-        _, _, err = self.cli("--forget", "0123456789abcdef")
+        _, _, err = self.cli("forget", "0123456789abcdef")
         self.assertIn("no memory", err)
 
     def test_a_run_reports_which_preferences_it_applied(self):
         with self.fake_embeddings(), self.replies([ConversionResult(code=GOLDEN)], [PASS]):
-            self.cli("--remember", TESTIDS, "--user", "varun")
-            code, _, err = self.cli(str(SOURCE), "--user", "varun", "--out",
+            self.cli("remember", TESTIDS, "--user", "varun")
+            code, _, err = self.cli("convert", str(SOURCE), "--user", "varun", "--out",
                                     str(Path(self.tmp.name) / "LoginPage.ts"))
         self.assertEqual(code, 0)
         self.assertIn("applying 1 of 1 remembered preference(s)", err)
@@ -372,32 +372,35 @@ class CommandLineTests(StoreHarness):
     def test_a_preference_that_does_not_fit_is_reported_as_not_applied(self):
         """Never silent: "why didn't it use my rule?" is answered on screen."""
         with self.fake_embeddings(), self.replies([ConversionResult(code=GOLDEN)], [PASS]):
-            self.cli("--remember", OFFTOPIC, "--user", "varun")
-            _, _, err = self.cli(str(SOURCE), "--user", "varun", "--out",
+            self.cli("remember", OFFTOPIC, "--user", "varun")
+            _, _, err = self.cli("convert", str(SOURCE), "--user", "varun", "--out",
                                  str(Path(self.tmp.name) / "LoginPage.ts"))
         self.assertIn("none close enough to this file", err)
 
     def test_no_recall_turns_the_whole_thing_off(self):
         with self.fake_embeddings(), self.replies([ConversionResult(code=GOLDEN)], [PASS]):
-            self.cli("--remember", TESTIDS, "--user", "varun")
-            _, _, err = self.cli(str(SOURCE), "--user", "varun", "--no-recall", "--out",
+            self.cli("remember", TESTIDS, "--user", "varun")
+            _, _, err = self.cli("convert", str(SOURCE), "--user", "varun", "--no-recall", "--out",
                                  str(Path(self.tmp.name) / "LoginPage.ts"))
         self.assertNotIn("Long-term memory", err)
 
     def test_no_recall_and_remember_together_is_a_usage_error(self):
-        with self.assertRaises(SystemExit):
-            self.cli("--no-recall", "--remember", TESTIDS)
+        code, _, err = self.cli("convert", "--no-recall", "--remember", TESTIDS)
+        self.assertEqual(code, 2)
+        self.assertIn("cannot be combined", err)
 
     def test_writing_a_memory_with_broken_embeddings_is_refused_not_silent(self):
         """A memory stored without a vector could never be found again."""
-        with patch.object(graph, "make_embeddings", side_effect=RuntimeError("no OPENAI_API_KEY")):
-            with self.assertRaises(SystemExit):
-                self.cli("--remember", TESTIDS)
+        with patch.object(cli, "make_embeddings", side_effect=RuntimeError("no OPENAI_API_KEY")):
+            code, _, err = self.cli("remember", TESTIDS)
+        self.assertEqual(code, 2)
+        self.assertIn("could never be recalled", err)
 
     def test_reading_with_broken_embeddings_degrades_out_loud(self):
-        with patch.object(graph, "make_embeddings", side_effect=RuntimeError("no OPENAI_API_KEY")):
+        with patch.object(cli, "make_embeddings", side_effect=RuntimeError("no OPENAI_API_KEY")):
             with self.replies([ConversionResult(code=GOLDEN)], [PASS]):
-                _, _, err = self.cli(str(SOURCE), "--out", str(Path(self.tmp.name) / "LoginPage.ts"))
+                _, _, err = self.cli("convert", str(SOURCE), "--out",
+                                     str(Path(self.tmp.name) / "LoginPage.ts"))
         self.assertIn("recall falls back to the most recent memories", err)
 
 

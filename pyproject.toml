@@ -13,10 +13,12 @@ dependencies = [
     "langsmith>=0.12.1",
     "openevals>=0.2.0",
     "python-dotenv>=1.2.3",
+    "rich>=14",
+    "typer>=0.16",
 ]
 
 [project.scripts]
-selenium2playwright = "selenium2playwright:main"
+s2p = "selenium2playwright.cli:app"
 
 [build-system]
 requires = ["uv_build>=0.12.1,<0.13.0"]

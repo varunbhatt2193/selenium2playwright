@@ -12,7 +12,7 @@ from unittest.mock import Mock, patch
 from langchain_core.messages import AIMessage
 from langchain_core.runnables import RunnableLambda
 
-from selenium2playwright import graph
+from selenium2playwright import cli, graph
 from selenium2playwright.prompts import format_context
 from selenium2playwright.schemas import ConversionResult, Critique, Finding, ValidationReport
 
@@ -72,12 +72,12 @@ class GraphValidationTests(unittest.TestCase):
         stdout, stderr = io.StringIO(), io.StringIO()
         with TemporaryDirectory() as folder, self.model_reply(code), redirect_stdout(stdout), redirect_stderr(stderr):
             output = Path(folder) / "pages/LoginPage.ts"
-            result = graph.main([str(SOURCE / POM), "--out", str(output)])
+            result = cli.run(["convert", str(SOURCE / POM), "--out", str(output)])
             self.assertEqual(result, 1)
             self.assertEqual(output.read_text(), code)
         self.assertEqual(stdout.getvalue(), "")
-        for row in ("PASS compile", "PASS residue", "FAIL lint", "PASS parity"):
-            self.assertIn(row, stderr.getvalue())
+        for gate, verdict in (("compile", "PASS"), ("residue", "PASS"), ("lint", "FAIL"), ("parity", "PASS")):
+            self.assertRegex(stderr.getvalue(), rf"{gate}[^\n]*{verdict}")
         self.assertIn("no-floating-promises", stderr.getvalue())
 
     def test_cli_stdout_is_only_code_and_warnings_do_not_fail(self):
@@ -87,9 +87,9 @@ class GraphValidationTests(unittest.TestCase):
         stdout, stderr = io.StringIO(), io.StringIO()
         with self.model_reply(code), patch.object(graph, "lint_check", return_value=warning), \
                 redirect_stdout(stdout), redirect_stderr(stderr):
-            self.assertEqual(graph.main([str(SOURCE / POM)]), 0)
+            self.assertEqual(cli.run(["convert", str(SOURCE / POM), "--no-diff"]), 0)
         self.assertEqual(stdout.getvalue(), code)
-        self.assertIn("PASS lint: 1 finding(s)", stderr.getvalue())
+        self.assertRegex(stderr.getvalue(), r"lint[^\n]*PASS[^\n]*1 finding\(s\)")
         self.assertIn("Review locator choice", stderr.getvalue())
 
     def test_tool_failures_are_reports_and_remaining_gates_still_run(self):
@@ -129,7 +129,7 @@ class GraphValidationTests(unittest.TestCase):
                 patch.object(graph, "validate") as validate, redirect_stderr(io.StringIO()):
             source = Path(folder) / "wdio.ts"
             source.write_text('import { browser } from "webdriverio";')
-            self.assertEqual(graph.main([str(source)]), 2)
+            self.assertEqual(cli.run(["convert", str(source)]), 2)
             model.assert_not_called()
             validate.assert_not_called()
 

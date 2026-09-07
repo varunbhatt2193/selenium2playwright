@@ -72,14 +72,14 @@ both model calls.
 
 ## Display and verification
 
-`report_critique` prints PASS or REVISE and each fix to stderr, after the validation
-scorecard. Critic token usage is labeled separately. Generated TypeScript still
+The critic's verdict is a row in the scorecard table (step 8.1), PASS or REVISE, and
+each requested fix is printed under it on stderr. Critic token usage is labeled separately. Generated TypeScript still
 goes to stdout or `--out`. Since step 5.2, exit 0 also requires an empty TODO ledger;
 exit 1 includes unresolved findings, TODOs, or unavailable tools/models. Exit 2 continues
 to mean refusal or invalid CLI arguments.
 
 ```sh
-uv run python -m selenium2playwright.graph samples/selenium-suite/pages/LoginPage.ts
+uv run s2p convert samples/selenium-suite/pages/LoginPage.ts
 uv run python -m unittest discover -s tests -v
 ```
 

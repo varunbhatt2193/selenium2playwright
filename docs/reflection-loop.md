@@ -10,7 +10,8 @@ approved committing and pushing this step on 2026-09-05.
 
 | File | Responsibility |
 |---|---|
-| [graph.py](../src/selenium2playwright/graph.py) | Attempt counter, conditional routes, final assembly, CLI output |
+| [graph.py](../src/selenium2playwright/graph.py) | Attempt counter, conditional routes, final assembly |
+| [cli.py](../src/selenium2playwright/cli.py) | `s2p convert` — the scorecard, the diff, the exit code |
 | [reflection.py](../src/selenium2playwright/reflection.py) | Repair feedback, token totals, TODO collection, three-attempt constant |
 | [prompts.py](../src/selenium2playwright/prompts.py) | Append repair evidence as a literal message |
 | [schemas.py](../src/selenium2playwright/schemas.py) | Final `ConversionReport` contract |

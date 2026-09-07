@@ -1,19 +1,11 @@
-"""Step 5.2 — a bounded convert/validate/critic loop, followed by assembly.
+"""The graph itself: a bounded convert/validate/critic loop, then assembly.
 
-    uv run python -m selenium2playwright.graph samples/selenium-suite/pages/LoginPage.ts
-    uv run python -m selenium2playwright.graph some/webdriverio.e2e.ts   # -> clean refusal
+The command line that drives it lives in cli.py (step 8.1); this file is the
+agent, and it has no front end of its own:
 
-    # step 7.1 — two turns of one conversation, the file named only once
-    uv run python -m selenium2playwright.graph --thread login LoginPage.ts --out out/LoginPage.ts
-    uv run python -m selenium2playwright.graph --thread login --refine "use data-testid locators"
-
-    # step 7.2 — a risky pattern stops and asks; --answer answers without a prompt
-    uv run python -m selenium2playwright.graph --thread alerts AlertsPage.ts
-    uv run python -m selenium2playwright.graph --thread alerts AlertsPage.ts --answer dialogs=auto-dismiss
-
-    # step 7.3 — teach it once; every later conversation recalls it by itself
-    uv run python -m selenium2playwright.graph --remember "name page objects <Page>Page"
-    uv run python -m selenium2playwright.graph CheckoutPage.ts   # recalls it, no flag
+    uv run s2p convert samples/selenium-suite/pages/LoginPage.ts
+    uv run s2p convert some/webdriverio.e2e.ts          # -> a clean refusal
+    uv run s2p convert --thread login --refine "use data-testid locators"
 
 Same work as one_shot.py, restructured as a graph so that (a) every step is a
 named node in the LangSmith trace and (b) the next steps — classify/refuse,
@@ -45,26 +37,22 @@ Vocabulary used here, from the LangGraph docs:
 
 from __future__ import annotations
 
-import argparse
 import os
 import subprocess
-import sys
-from contextlib import ExitStack
 from pathlib import Path
 from typing import Literal, Optional, TypedDict
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.store.base import BaseStore
-from langgraph.types import Command, interrupt
+from langgraph.types import interrupt
 
 # Imported under another name: the node below must call its injected store
 # parameter `store`, because that is the name LangGraph fills in.
-from selenium2playwright import env, memory, risk
+from selenium2playwright import risk
 from selenium2playwright import store as memory_store
 from selenium2playwright.classify import Classification, classify
-from selenium2playwright.llm import embedding_dims, make_embeddings, make_model, prepare_messages
-from selenium2playwright.one_shot import report_ledger, report_usage
+from selenium2playwright.llm import make_model, prepare_messages
 from selenium2playwright.prompts import (build_critic_prompt, build_prompt, format_context,
                                          format_conventions, format_decisions, format_remembered)
 from selenium2playwright.reflection import (MAX_ATTEMPTS, collect_todos, refinement_feedback,
@@ -215,7 +203,7 @@ def risk_review(state: ConversionState) -> ConversionState:
     """Step 7.2 — stop and ask the human about anything with two right answers.
 
     One interrupt() per unanswered risk. Each one suspends the graph where it
-    stands; the front end (main() below, a web UI later) reads the question out
+    stands; the front end (cli.convert today, a web UI later) reads the question out
     of the reply, gets an answer, and resumes the same thread with
     Command(resume=answer).
 
@@ -327,22 +315,6 @@ def validate(state: ConversionState) -> ConversionState:
     return {"validation": reports}
 
 
-def report_validation(reports: list[ValidationReport]) -> bool:
-    """Scorecard and findings go to stderr, leaving stdout as usable TypeScript."""
-    print("Validation (report-only):", file=sys.stderr)
-    if not reports:
-        print("  NOT RUN — no converted file available", file=sys.stderr)
-        return False
-    for report in reports:
-        print(f"  {'PASS' if report.passed else 'FAIL'} {report.gate}: {len(report.findings)} finding(s)",
-              file=sys.stderr)
-        for finding in report.findings:
-            print(f"    {finding.render()}", file=sys.stderr)
-        if not report.passed and not report.findings and report.tool_output:
-            print(report.tool_output, file=sys.stderr)
-    return all(report.passed for report in reports)
-
-
 def critic(state: ConversionState) -> ConversionState:
     """Review this draft once; the conditional edge decides whether to repair it."""
     usage = None
@@ -382,17 +354,6 @@ def critic(state: ConversionState) -> ConversionState:
             + (f"\n{r.tool_output}" if not r.findings else "") for r in failed
         ])
     return {"critique": critique, "critic_usage": sum_usage(state.get("critic_usage"), usage), "critique_error": ""}
-
-
-def report_critique(critique: Critique | None, error: str) -> bool:
-    """Print the review without mixing it into the generated TypeScript."""
-    if critique is None:
-        print(f"Critic: UNAVAILABLE — {error}" if error else "Critic: NOT RUN", file=sys.stderr)
-        return False
-    print(f"Critic: {critique.verdict.upper()}", file=sys.stderr)
-    for fix in critique.fixes:
-        print(f"  - {fix}", file=sys.stderr)
-    return critique.verdict == "pass"
 
 
 def validator_unavailable(state: ConversionState) -> bool:
@@ -477,282 +438,3 @@ def build_graph(checkpointer: BaseCheckpointSaver | None = None, store: BaseStor
     builder.add_edge("assemble", END)
     builder.add_edge("refuse", END)
     return builder.compile(checkpointer=checkpointer, store=store)
-
-
-def report_thread(state: ConversionState, db: Path, thread_id: str) -> None:
-    """What this conversation remembers, so a resumed turn is never a black box."""
-    print(f"Thread {thread_id!r} · turn {state.get('turn', 1)} · {db}", file=sys.stderr)
-    if state.get("baseline") is not None:
-        print("  continuing from the previous turn's conversion", file=sys.stderr)
-    for number, convention in enumerate(state.get("conventions", []), 1):
-        print(f"  standing instruction {number}: {convention}", file=sys.stderr)
-
-
-def report_risks(state: ConversionState) -> None:
-    """What was flagged and what was decided — never a silent choice."""
-    flagged = state.get("risks", [])
-    if not flagged:
-        return
-    decisions = state.get("decisions", {})
-    print(f"Risk review: {len(flagged)} pattern(s) with more than one correct conversion",
-          file=sys.stderr)
-    for item in flagged:
-        kind = risk.RISKS[item.kind]
-        where = f"{kind.title} (line {item.line}"
-        where += f", {item.count} occurrences)" if item.count > 1 else ")"
-        if item.kind in decisions:
-            answer = decisions[item.kind] or kind.default.key
-            print(f"  {where} → {answer}", file=sys.stderr)
-        else:
-            print(f"  {where} — not asked; converted with the playbook default. "
-                  f"Rerun with --thread to be asked, or --answer {item.kind}=<key>.", file=sys.stderr)
-
-
-def report_recall(state: ConversionState) -> None:
-    """What long-term memory contributed — including when the answer is nothing.
-
-    A preference that exists but was not close enough to this file is the
-    interesting case: it silently did not apply, so it is said out loud, with
-    the number, so "why did it not use my rule?" has an answer on screen.
-    """
-    recalled = state.get("recalled", [])
-    total = state.get("memory_count", 0)
-    if not total and not recalled:
-        return
-    if not recalled:
-        print(f"Long-term memory: {total} remembered preference(s), none close enough to this "
-              f"file (minimum score {memory_store.MIN_SCORE}). See --memories.", file=sys.stderr)
-        return
-    print(f"Long-term memory: applying {len(recalled)} of {total} remembered preference(s)",
-          file=sys.stderr)
-    for item in recalled:
-        how = f"score {item.score:.2f}" if item.score is not None else "unranked — semantic recall off"
-        print(f"  {item.key} ({how}) {item.text}", file=sys.stderr)
-
-
-def embeddings_for(writing: bool, parser: argparse.ArgumentParser):
-    """The configured embeddings model and its width, or (None, None).
-
-    None is fine for reading — recall falls back to the most recent memories and
-    says so. It is not fine for writing: a memory stored without a vector can
-    never be found by a later semantic search, so that is a hard error with the
-    two ways out, rather than a memory that quietly never comes back.
-    """
-    name = env.embeddings_name()
-    if not name:
-        return None, None
-    try:
-        model = make_embeddings()
-        return model, embedding_dims(model)
-    except Exception as exc:  # missing key, missing package, provider down
-        if writing:
-            parser.error(f"S2P_EMBEDDINGS={name} could not be loaded ({exc}); a memory written now "
-                         "could never be recalled. Fix its key, or set S2P_EMBEDDINGS=off to keep "
-                         "memories without semantic search.")
-        print(f"Long-term memory: {name} unavailable ({exc}); recall falls back to the most "
-              "recent memories.", file=sys.stderr)
-        return None, None
-
-
-def manage_memories(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
-    """--memories / --forget / a bare --remember: the store, with no conversion.
-
-    Listing and deleting address a key exactly, so they need no embeddings at
-    all; writing does, which is why the model is only built when it is used.
-    """
-    writing = bool(args.remember)
-    with ExitStack() as stack:
-        embeddings, dims = embeddings_for(writing, parser) if writing else (None, None)
-        store = stack.enter_context(memory_store.open_store(args.memory_db, embeddings, dims))
-        if args.remember:
-            saved = memory_store.remember(store, args.remember, args.user, source="cli")
-            print(f"remembered [{saved.key}] {saved.text}", file=sys.stderr)
-        if args.forget:
-            gone = memory_store.forget(store, args.forget, args.user)
-            print(f"forgot [{args.forget}]" if gone else f"no memory [{args.forget}] to forget",
-                  file=sys.stderr)
-        if args.memories:
-            for item in memory_store.memories(store, args.user):
-                print(f"{item.key}  {item.text}")
-    return 0
-
-
-def ask_human(payload: dict, interactive: bool) -> str:
-    """Put one interrupt's question to the user; return their answer verbatim.
-
-    Everything goes to stderr, and so does the input prompt, because stdout is
-    reserved for the converted TypeScript. An empty answer means "the default",
-    which is also what a run with no terminal gets — stated out loud, never
-    silently.
-    """
-    print(f"\nPaused — {payload['title']}", file=sys.stderr)
-    print(f"  found: {payload['evidence']}", file=sys.stderr)
-    print(f"  why you: {payload['why']}", file=sys.stderr)
-    print(f"  {payload['question']}", file=sys.stderr)
-    for number, option in enumerate(payload["options"], 1):
-        default = " [default]" if option["key"] == payload["default"] else ""
-        print(f"    {number}) {option['key']} — {option['label']}{default}", file=sys.stderr)
-    if not interactive:
-        print(f"  no terminal to ask on; using the default ({payload['default']}). "
-              f"Choose with --answer {payload['kind']}=<key>.", file=sys.stderr)
-        return ""
-    print("  answer (number, key, your own words, or Enter for the default): ", end="", file=sys.stderr)
-    answer = input().strip()
-    if answer.isdigit() and 1 <= int(answer) <= len(payload["options"]):
-        return payload["options"][int(answer) - 1]["key"]
-    return answer
-
-
-def parse_answers(values: list[str], parser: argparse.ArgumentParser) -> dict[str, str]:
-    """--answer dialogs=auto-dismiss ... into {kind: answer}, for scripted runs."""
-    answers = {}
-    for value in values:
-        kind, separator, text = value.partition("=")
-        if not separator or kind not in risk.RISKS:
-            parser.error(f"--answer must be KIND=ANSWER, KIND one of: {', '.join(risk.RISKS)}")
-        answers[kind] = text.strip()
-    return answers
-
-
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="Convert, validate, and repair Selenium TypeScript in up to three attempts")
-    parser.add_argument("source", nargs="?", type=Path,
-                        help="the Selenium file; omit it to continue a saved --thread")
-    parser.add_argument("context", nargs="*", type=Path, help="already-converted companion files")
-    parser.add_argument("--out", type=Path, help="output file; also anchors relative imports to companions")
-    parser.add_argument("--max-attempts", type=int, default=MAX_ATTEMPTS, choices=range(1, MAX_ATTEMPTS + 1),
-                        help="total conversion attempts: 1 = no repairs; 3 = initial draft plus two repairs")
-    parser.add_argument("--thread", help="conversation id; saves this turn and resumes the last one (step 7.1)")
-    parser.add_argument("--refine", default="", metavar="INSTRUCTION",
-                        help='a standing instruction for this thread, e.g. "use data-testid locators"')
-    parser.add_argument("--answer", action="append", default=[], metavar="KIND=ANSWER",
-                        help="answer a risk question up front, e.g. --answer dialogs=auto-dismiss")
-    parser.add_argument("--no-ask", action="store_true",
-                        help="never pause on a flagged pattern; report it and use the playbook default")
-    parser.add_argument("--remember", default="", metavar="PREFERENCE",
-                        help="file a preference in long-term memory: it applies now and in every "
-                             'future conversation, e.g. --remember "name page objects <Page>Page"')
-    parser.add_argument("--user", default=memory_store.DEFAULT_USER,
-                        help="whose long-term memories to use (default: local)")
-    parser.add_argument("--memories", action="store_true", help="print remembered preferences and exit")
-    parser.add_argument("--forget", metavar="KEY", help="delete one remembered preference by key and exit")
-    parser.add_argument("--no-recall", action="store_true",
-                        help="ignore long-term memory for this run; nothing is read or written")
-    parser.add_argument("--db", type=Path, default=memory.DEFAULT_DB, help="thread database file")
-    parser.add_argument("--memory-db", type=Path, default=memory_store.DEFAULT_DB,
-                        help="long-term memory database file (separate from --db: it outlives threads)")
-    parser.add_argument("--list-threads", action="store_true", help="print saved thread ids in --db and exit")
-    args = parser.parse_args(argv)
-    if args.list_threads:
-        for thread_id in memory.list_threads(args.db):
-            print(thread_id)
-        return 0
-    if args.no_recall and (args.remember or args.memories or args.forget):
-        parser.error("--no-recall turns long-term memory off; it cannot be combined with "
-                     "--remember, --memories or --forget")
-    # Teaching, listing or forgetting on their own: no file to convert, no model call.
-    if args.memories or args.forget or (args.remember and args.source is None and not args.thread):
-        return manage_memories(args, parser)
-    if args.source is None and not args.thread:
-        parser.error("give a source file, or --thread <id> to continue a saved conversation")
-    if args.out and args.source is not None and args.out.resolve() in {p.resolve() for p in
-                                                                      [args.source, *args.context]}:
-        parser.error("--out must differ from the source and companion files")
-
-    # Only keys the caller actually supplied: anything omitted on a later turn
-    # keeps the value the checkpointer restored, which is the whole point.
-    inputs: ConversionState = {"max_attempts": args.max_attempts}
-    if args.source is not None:
-        inputs["source_path"] = str(args.source)
-        inputs["context_paths"] = [str(p) for p in args.context]
-    if args.out:
-        inputs["output_path"] = str(args.out)
-    if args.refine:
-        inputs["refinement"] = args.refine
-    answers = parse_answers(args.answer, parser)
-    # Pausing needs a checkpointer to pause into, so only a --thread run can ask.
-    inputs["ask_risks"] = bool(args.thread) and not args.no_ask
-    inputs["user_id"] = args.user
-    if args.remember:
-        inputs["remember"] = args.remember
-    config = {"run_name": "conversion-graph", "tags": ["step:7.3", "prompt:v1", "critic:v1"],
-              "recursion_limit": 3 * MAX_ATTEMPTS + 5}
-
-    with ExitStack() as stack:
-        checkpointer = stack.enter_context(memory.open_checkpointer(args.db)) if args.thread else None
-        store = None
-        if not args.no_recall:
-            embeddings, dims = embeddings_for(bool(args.remember), parser)
-            store = stack.enter_context(memory_store.open_store(args.memory_db, embeddings, dims))
-        graph = build_graph(checkpointer, store)
-        if args.thread:
-            config = memory.thread_config(args.thread, **config)
-            saved = memory.thread_state(graph, args.thread)
-            if args.source is None and not saved.get("source_path"):
-                parser.error(f"thread {args.thread!r} has no saved conversion yet; "
-                             "pass a source file to start it")
-            # Merge, do not replace: an answer given on turn 1 still stands.
-            if answers or saved.get("decisions"):
-                inputs["decisions"] = {**saved.get("decisions", {}), **answers}
-        elif answers:
-            inputs["decisions"] = answers
-        final = graph.invoke(inputs, config=config)
-        # A paused invoke returns whatever it managed to write plus the question,
-        # and no report: the run is suspended on the thread, not finished. Answer,
-        # resume the same thread, repeat — at most one pause per risk kind,
-        # because risk_review asks each question exactly once.
-        interactive = sys.stdin.isatty()
-        for _ in range(len(risk.RISKS)):
-            if "__interrupt__" not in final:
-                break
-            answer = ask_human(final["__interrupt__"][0].value, interactive)
-            final = graph.invoke(Command(resume=answer), config=config)
-        if "__interrupt__" in final:
-            print("Still waiting on an answer after every question; nothing was converted.",
-                  file=sys.stderr)
-            return 2
-
-    if args.thread:
-        report_thread(final, args.db, args.thread)
-    c = final["classification"]
-    print(f"[{c.automation} · {c.runner} · {c.language}] {c.reason}", file=sys.stderr)
-    report_recall(final)
-    report_risks(final)
-    if final["status"] == "refused":
-        print(f"✗ not converted: {final['refusal']}", file=sys.stderr)
-        return 2
-    report = final["report"]
-    print(f"Conversion: {report.status} ({report.attempts}/{final['max_attempts']} attempts) — {report.reason}",
-          file=sys.stderr)
-    for error in report.errors:
-        print(f"  error: {error}", file=sys.stderr)
-    if final["usage"]:
-        print("Conversion token usage (all attempts):", file=sys.stderr)
-        report_usage(final["usage"])
-    if report.result is not None:
-        report_ledger(report.result)
-    report_validation(report.validation)
-    report_critique(report.critique, final["critique_error"])
-    if final["critic_usage"]:
-        print("Critic token usage (all attempts):", file=sys.stderr)
-        report_usage(final["critic_usage"])
-    # A resumed turn that was not given --out still knows where the file goes.
-    destination = args.out or (Path(final["output_path"]) if final.get("output_path") else None)
-    if report.result is None:
-        print("No converted code was produced; no output file was written.", file=sys.stderr)
-        if final.get("baseline") is not None:
-            # A failed refinement turn is not a lost conversion: the turn it was
-            # refining is still in the thread and still on disk. Say so.
-            print("The previous turn's conversion on this thread is unchanged.", file=sys.stderr)
-    elif destination is not None:
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_text(report.result.code, encoding="utf-8")
-        print(f"[wrote {destination}]", file=sys.stderr)
-    else:
-        print(report.result.code, end="")
-    return 0 if report.status == "passed" else 1
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

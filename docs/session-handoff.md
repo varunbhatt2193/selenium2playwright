@@ -1,16 +1,50 @@
-# Restart here — 2026-09-07 (after 7.3, long-term memory)
+# Restart here — 2026-09-06 (after 8.1, the `s2p` CLI)
 
 ## Current position
 
-**Phase 7 is complete. 7.3 gave the agent a store of its own: a preference
-taught in one conversation is recalled by itself in a fresh one, ranked by
-embeddings against a profile of the file — proved live. Next is Phase 8.1
-(a Typer `s2p` CLI); it has not started.**
-Read [long-term-memory.md](long-term-memory.md) first, then
+**Phase 7 is complete and Phase 8 has started. 8.1 moved the whole front end
+out of `graph.py` into a Typer app: `s2p convert` with a rich scorecard and a
+before/after diff, plus `s2p remember / memories / forget / threads`. Next is
+Phase 8.2 (runtime `--model`, `--max-iterations`, `--json` through a config
+schema); it has not started.**
+Read [cli.md](cli.md) first, then [long-term-memory.md](long-term-memory.md),
 [human-in-the-loop.md](human-in-the-loop.md) and
 [short-term-memory.md](short-term-memory.md). Commit/push authorization
 persists. The 150-line / one-file-at-a-time rule was removed by Varun on
 2026-09-06: complete a step when asked, then one walkthrough.
+
+## What 8.1 built
+
+- `cli.py` (483 lines) — the only front end. Five commands: `convert`,
+  `remember`, `memories`, `forget`, `threads`. `[project.scripts]` now installs
+  `s2p`; `python -m selenium2playwright.graph` is gone.
+- `graph.py` 758 → 448 lines: no `main()`, no argparse, no `print()`. Its
+  reporting helpers moved to `cli.py` and became rich renderings.
+- Scorecard `Table` (compile/residue/lint/parity + critic + open-TODO count),
+  verdict and reason on a plain soft-wrapped line above it, findings and fixes
+  printed in full underneath, then a `Panel(Syntax(..., "diff"))` before/after —
+  baselined on the *previous turn* when there is one, else the source.
+- `one_shot.format_usage()` split out of `report_usage()` so both surfaces
+  share the token line.
+- `tests/test_cli.py` (12); 7 existing test files repointed from `graph.main`
+  to `cli.run`, and `graph.make_embeddings` patches became `cli.make_embeddings`.
+  **203 offline tests pass.**
+- Live check: `uv run s2p convert samples/selenium-suite/pages/LoginPage.ts
+  --out out/8.1/pages/LoginPage.ts` — Sonnet actor + critic, 2/3 attempts,
+  4/4 gates + critic PASS, exit 1 on three honest locator TODOs.
+
+## 8.1 sharp edges
+
+- **rich parses `[...]` as markup.** Anything dynamic goes through `say()`,
+  which builds a `rich.text.Text`; a test pins `[data-testid]` surviving.
+- **Click always exits by raising `SystemExit`, even on success.** `cli.run()`
+  catches it and returns the code — that is the seam every test uses, and it is
+  why usage-error tests assert `code == 2` instead of `assertRaises`.
+- **A passing gate can still carry findings** (lint warnings): the detail cell
+  says `1 finding(s)` next to PASS, never "clean".
+- **Table rows are not sentences.** Assertions match the row line
+  (`compile[^\n]*PASS`), and the row helper filters on the box character so the
+  prose verdict line mentioning "critic" is not mistaken for the critic row.
 
 ## What 7.3 built
 
@@ -33,6 +67,8 @@ persists. The 150-line / one-file-at-a-time rule was removed by Varun on
   now a direct dependency. `Memory` added to `memory.CHECKPOINT_TYPES`.
 - CLI: `--remember`, `--memories`, `--forget`, `--user`, `--no-recall`,
   `--memory-db` (separate file from `--db`; the store outlives threads).
+  *(8.1 turned the first three into `s2p remember` / `memories` / `forget`;
+  `--remember`, `--user`, `--no-recall` and `--memory-db` stayed on `convert`.)*
 - `scripts/calibrate_recall.py`, `scripts/demo_store.py`, artifacts in `out/7.3/`.
 - Tests: `tests/test_store.py` (30); 191 total.
 
@@ -133,8 +169,8 @@ run is a second trace) in `out/7.2/demo-receipt.json`.
 - `prompts.format_conventions` + `build_prompt(conventions=)` +
   `build_critic_prompt(conventions=)`; new critic rubric line about standing
   instructions. Prompts are byte-identical to Phase 6 when there are none.
-- CLI: optional `source`, `--thread`, `--refine`, `--db`, `--list-threads`,
-  remembered `--out`. `.s2p/` gitignored; dependency `langgraph-checkpoint-sqlite`.
+- CLI: optional `source`, `--thread`, `--refine`, `--db`, `--list-threads`
+  *(8.1: now `s2p threads`)*, remembered `--out`. `.s2p/` gitignored; dependency `langgraph-checkpoint-sqlite`.
 - `scripts/demo_memory.py` — real two-turn run, artifacts + receipt in `out/7.1/`.
 - Tests: `tests/test_memory.py` (16); 136 total.
 
