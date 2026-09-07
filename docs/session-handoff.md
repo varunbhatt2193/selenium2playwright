@@ -1,23 +1,45 @@
-# Restart here — 2026-09-07 (after 10.2, one account setting short)
+# Restart here — 2026-09-07 (after 10.2; the managed platform could not host it)
 
 ## Current position
 
-**Phases 0–9 complete, 10.1 done, 10.2 built and proven but NOT deployed. 🏁 M4
-shipped at 9.3. 10.1 put the graphs behind `langgraph dev`; 10.2 made them
-*deployable*: the file travels as text (`source_text`), and the image carries
-the pinned Node toolchain the four gates shell out to. Everything was verified
-against the REAL deployment image on the REAL stack (`langgraph build` +
-`langgraph up --image` + postgres + redis) — a file sent as text came back 4/4
-gates + critic pass with every gate running `tsc` inside the container.**
+**Phases 0–9 complete, 10.1 done, 10.2 built and proven — but the cloud URL is
+blocked by a LangSmith platform bug, not by us. 🏁 M4 shipped at 9.3.** 10.1 put
+the graphs behind `langgraph dev`; 10.2 made them *deployable*: the file travels
+as text (`source_text`), and the image carries the pinned Node toolchain the four
+gates shell out to. Verified against the REAL deployment image on the REAL stack
+(`langgraph build` + `langgraph up --image` + postgres + redis) — a file sent as
+text came back 4/4 gates + critic pass with every gate running `tsc` inside the
+container.
 
-**THE ONE BLOCKER, and it is not technical:** `langgraph deploy list` says
-*"LangSmith Deployment is not enabled for this organization"* — an account/billing
-setting Varun turns on at smith.langchain.com/host/deployments. After that,
-10.2 finishes in two commands (in [deploy.md](deploy.md) §7) and 10.3 (the
-Streamlit playground against a cloud backend) can start. **Ask him whether he has
-enabled it before assuming 10.2 is still blocked.** If he would rather not pay
-yet, 10.3 can be built against `langgraph up` locally — the URL is the only
-difference.
+### ⛔ DO NOT RETRY `langgraph deploy`. Read [deploy.md](deploy.md) §9 first.
+
+LangSmith Deployment **was** enabled, and we deployed for real on 2026-09-07.
+**Six revisions across two deployments, ~2h35m, zero URLs, zero errors from our
+code.** The serverless tier sets `CORE_API_GRPC_SIDECAR=1` and never starts the
+sidecar, so the server dies waiting on `127.0.0.1:50051`. We fixed that (a `RUN
+sed -i` unset in `dockerfile_lines`), hit a second wall (`CREATE EXTENSION
+vector` needs superuser, which their Postgres will not grant), dropped the
+`store` block, got the container **running healthily for 19 minutes** — and the
+control plane *still* refused to assign a hostname. Their readiness gate wants
+the same missing sidecar. Both deployments were deleted so nothing bills.
+
+§9 of deploy.md has the full anatomy, the local one-command reproduction, and a
+list of the things that *look* like fixes and are not (`api_version` pinning is
+ignored on the remote build path; retrying; the web UI; `--engine-runtime-mode`).
+**If a future session is tempted to "just try deploying again", that section is
+the answer.** Only revisit the managed platform if LangChain announces a fix.
+
+**The path forward is self-hosting, and it is strictly better here:** the bug
+does not exist off that platform (the entrypoint runs the Go core in-process
+whenever the variable is unset, which is everywhere else), and a self-hosted
+Postgres is ours, so `CREATE EXTENSION vector` succeeds and the `store.index`
+block comes back. Varun asked for Render vs Fly.io pricing — see
+[deploy.md](deploy.md) §9 for the stack shape (this image +
+`pgvector/pgvector:pg16` + `redis:6`, `linux/amd64`).
+
+10.3 (the Streamlit playground) does not need any of this settled — build it
+against `langgraph up` locally; the backend URL is a one-line env change
+(`LANGGRAPH_DEPLOYMENT_URL`).
 
 Read [deploy.md](deploy.md) and [local-platform.md](local-platform.md) first —
 that is all of Phase 10 so far — then [suite-report.md](suite-report.md),

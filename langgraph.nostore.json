@@ -27,9 +27,6 @@
     "# skip the bundled Go core-api-grpc, and the server then dies waiting for a gRPC",
     "# answer on 127.0.0.1:50051 that never comes. Unsetting it restores the in-process",
     "# topology `langgraph up` uses, where the Go core runs in this same container.",
-    "# DB_MIGRATION_BY_CORE_API is deliberately left alone: the managed Postgres does",
-    "# not grant us superuser, so Python cannot CREATE EXTENSION vector for the store",
-    "# index. The Go core still owns the schema, as the platform intends.",
     "# Remove once the platform actually schedules the sidecar (bug reported).",
     "RUN sed -i '1a unset CORE_API_GRPC_SIDECAR' /storage/entrypoint.sh /storage/queue_entrypoint.sh"
   ],
@@ -43,14 +40,5 @@
       "description": "A whole Selenium folder: scan it, convert every file in dependency waves (the convert graph as a subgraph, fanned out with Send), then compile the finished tree as one project and write the report. Inputs: root (required), out_root, only."
     }
   },
-  "env": ".env",
-  "store": {
-    "index": {
-      "embed": "./src/selenium2playwright/server.py:embed_memories",
-      "dims": 1536,
-      "fields": [
-        "text"
-      ]
-    }
-  }
+  "env": ".env"
 }
