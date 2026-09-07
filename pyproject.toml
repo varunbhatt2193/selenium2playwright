@@ -29,3 +29,9 @@ build-backend = "uv_build"
 dev = [
     "langgraph-cli[inmem]>=0.4.31",
 ]
+# Step 10.3. The playground is a front end for a deployment, not part of the
+# agent: `s2p convert` and the graph itself must never need Streamlit installed,
+# so it is a group you opt into with `uv run --group ui streamlit run ui/app.py`.
+ui = [
+    "streamlit>=1.49",
+]

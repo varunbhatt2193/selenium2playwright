@@ -30,6 +30,13 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
+# Imported for its side effect: `env` loads .env on import, and this module
+# reads LANGSMITH_API_KEY. Inside the deployment the variable is already in the
+# environment, which is why this was not missed — but `feedback.pending()`, the
+# triage call, is run from a shell, and there it silently returned an empty
+# queue because there was no key to build a client with.
+from selenium2playwright import env as _env  # noqa: F401
+
 QUEUE_DATASET = os.environ.get("S2P_FEEDBACK_DATASET") or "s2p-feedback-queue"
 FEEDBACK_KEY = "user_score"
 

@@ -1,4 +1,4 @@
-# Restart here — 2026-09-07 (10.2 + 10.4 done: live at https://s2p.fly.dev, and now guarded)
+# Restart here — 2026-09-07 (Phase 10 complete: live at https://s2p.fly.dev, guarded, with a playground in front of it)
 
 ## Current position
 
@@ -60,11 +60,28 @@ with the measured median from LangSmith so the dollar figure means what it says.
 `docs/github-security.md` are Varun's own, deliberately left out of the 10.2/10.4
 commits.
 
-**Next is 10.3, the Streamlit playground** — the last piece before the link can
-go out, because `s2p.fly.dev` is a JSON API and a hiring manager who opens it
-sees `{"detail":"Not Found"}`. It needs `S2P_DEMO_KEY` server-side, an
-`X-S2P-Visitor` header per session, `GET /limits` for the budget line, and
-`POST /feedback` for the 👍/👎 buttons.
+**10.3 is done: the playground exists.**
+
+```bash
+uv run --group ui streamlit run ui/app.py     # talks to s2p.fly.dev out of .env
+```
+
+`ui/app.py` is layout only; every decision is in `playground.py` with 57 tests,
+because Streamlit re-runs the whole script on each click and importing the app
+file *is* running it. It calls the deployment with `S2P_DEMO_KEY` (never the
+owner key — that bypasses the meter) and an `X-S2P-Visitor` header per browser
+session, reads `GET /limits` for the budget line and posts to `/feedback` for
+👍/👎. Read [playground.md](playground.md) before touching it; the three bugs
+only a live run could find are listed there, and the first one matters for any
+demo you give: **a spec pasted alone cannot compile**, because it imports a page
+object the server has never seen — send the already-converted companion in the
+companion box (the `login.spec.ts` sample button pre-fills it).
+
+**Phase 10 is complete. Next is Phase 11** — 11.1 hard-case sprint, 11.2
+execution evals in CI, 11.3 launch kit (drop the 🚧 banner, comparison table,
+cost numbers, demo video, LinkedIn assets). 11.3 is also where *hosting the
+playground itself* belongs: today the page runs on your laptop against the live
+backend, which is enough to demo and not enough to put in a CV link.
 
 The managed platform is the part that failed, and it is history now: 10.1 put
 the graphs behind `langgraph dev`; 10.2 made them *deployable*: the file travels
@@ -100,9 +117,9 @@ block comes back. Varun asked for Render vs Fly.io pricing — see
 [deploy.md](deploy.md) §9 for the stack shape (this image +
 `pgvector/pgvector:pg16` + `redis:6`, `linux/amd64`).
 
-10.3 (the Streamlit playground) does not need any of this settled — build it
-against `langgraph up` locally; the backend URL is a one-line env change
-(`LANGGRAPH_DEPLOYMENT_URL`).
+The playground never needed any of this settled: it points at whatever
+`LANGGRAPH_DEPLOYMENT_URL` says, a local `langgraph up` or the Fly deployment,
+and cannot tell the difference.
 
 Read [deploy.md](deploy.md) and [local-platform.md](local-platform.md) first —
 that is all of Phase 10 so far — then [suite-report.md](suite-report.md),
@@ -120,7 +137,7 @@ plain-English walkthrough with check-yourself questions, then wait for his
 review. **Always end a turn that hands control back with an explicit "waiting on
 you" line** (asked 2026-09-06 — a pause must never be implied).
 
-**331 offline tests pass** (`uv run python -m unittest discover -s tests`, ~160 s
+**415 offline tests pass** (`uv run python -m unittest discover -s tests`, ~171 s
 — not `-t .`, and pytest is not installed). The suite is terminal-width
 independent from 40 to 200 columns as of 9.3.
 
