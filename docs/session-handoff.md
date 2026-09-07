@@ -1,33 +1,52 @@
-# Restart here — 2026-09-07 (after 6.4, LLM-as-judge)
+# Restart here — 2026-09-06 (after 7.1, short-term memory)
 
 ## Current position
 
-**Phase 6 is complete (6.1–6.5). 6.4 shipped 2026-09-07: an `openevals` judge,
-calibrated against the goldens with two judge models, and a judge pass over the
-six saved reflection experiments. Next is Phase 7.1 (SqliteSaver checkpointer);
-it has not started.** Read [phase-6.4-report.md](phase-6.4-report.md) first,
-then [evaluation-judge.md](evaluation-judge.md) (theory + what changed).
-Commit/push authorization persists. The 150-line / one-file-at-a-time rule was
-removed by Varun on 2026-09-06: complete a step when asked, then one walkthrough.
+**Phase 7.1 is complete: `SqliteSaver` + `thread_id`, two-turn refinement
+working live. Next is 7.2 (HITL `interrupt()`); it has not started.**
+Read [short-term-memory.md](short-term-memory.md) first — theory, the sharp
+edge, and the live diff. Commit/push authorization persists. The 150-line /
+one-file-at-a-time rule was removed by Varun on 2026-09-06: complete a step
+when asked, then one walkthrough.
 
-## What 6.4 built
+## What 7.1 built
 
-- `env.judge_model_name()` (`S2P_JUDGE_MODEL` → critic → actor); `model_names()` has three roles.
-- `eval_judge.py`: `IdiomaticJudge` wraps `create_llm_as_judge(prompt=RUBRIC, output_schema=SCORE_SCHEMA)`;
-  feedback keys `idiomatic_playwright` (1–5 or None) + `_status` (`scored`, `scored_from_reasoning`,
-  `no_output`, `judge_error`); `RUBRIC_SHA256` and `attempts` in `evaluator_info`; up to 3 tries.
-- `eval_calibration.py`: four mutations, `build_variants`, `score_variants`, `summarize`, markdown.
-- `eval_judge_pass.py`: `judge_experiment` (evaluate over an existing experiment), `arm_summary`,
-  `disagreements` (judge vs static), `cross_judge` (two judges), tables.
-- Scripts: `calibrate_judge.py`, `judge_experiment.py --comparison …`, `compare_judges.py`.
-- Receipts: `docs/phase-6.4-calibration-{opus,gpt54}.json`, `phase-6.4-judge-pass-{opus,gpt54}.json`,
-  `phase-6.4-judge-table-{opus,gpt54}.md`, `phase-6.4-judge-agreement.{json,md}`; journals in `out/6.4/`.
-- Judge feedback lives on the six experiments in LangSmith; evaluator traces go to the `evaluators` project.
-- Gap T11 (Anthropic `refusal` cut-off on long tool-call replies). `.env` now has an OpenAI key
-  (never read it); `S2P_JUDGE_MODEL=openai:gpt-5.4` is the recommended judge.
-- Tests: `tests/test_eval_judge.py` (11); 120 total.
+- `memory.py`: `open_checkpointer` (context manager, makes the dir, strict serde
+  + `CHECKPOINT_TYPES` allowlist), `thread_config`, `thread_state`,
+  `list_threads`, `strict_serializer`.
+- `graph.build_graph(checkpointer=None)` — the default is the old stateless
+  graph, so evals and every earlier phase are untouched.
+- New `ConversionState` keys: `refinement` (input), `turn`, `conventions`,
+  `baseline`. `intake` is the turn boundary; `convert` gained a third entry
+  (`reflection.refinement_feedback`); `critic` sees the conventions too.
+- `prompts.format_conventions` + `build_prompt(conventions=)` +
+  `build_critic_prompt(conventions=)`; new critic rubric line about standing
+  instructions. Prompts are byte-identical to Phase 6 when there are none.
+- CLI: optional `source`, `--thread`, `--refine`, `--db`, `--list-threads`,
+  remembered `--out`. `.s2p/` gitignored; dependency `langgraph-checkpoint-sqlite`.
+- `scripts/demo_memory.py` — real two-turn run, artifacts + receipt in `out/7.1/`.
+- Tests: `tests/test_memory.py` (16); 136 total.
 
-## Earlier state (6.5), kept for reference
+## Gotcha worth remembering (not yet in gap-log)
+
+`BaseCheckpointSaver.with_allowlist()` does nothing on its own: the default
+serializer allows every type (with a deprecation warning), and an allowlist on
+top of "everything" is still everything. Strict mode is normally reached via
+`LANGGRAPH_STRICT_MSGPACK`, read **once at import**, so patching it in a test is
+too late. `memory.strict_serializer()` asks for strict directly. A type missing
+from `CHECKPOINT_TYPES` fails *quietly*: it comes back as a plain dict and the
+`AttributeError` surfaces much later.
+
+## Live 7.1 demo (thread `demo-login`, Sonnet actor + critic)
+
+Turn 1: source path only → 3 attempts, 4/4 gates, critic revise ×3,
+needs-review (attempt cap). Turn 2: `{"refinement": "Use getByTestId() …"}` and
+nothing else → 2 attempts, 4/4 gates, critic **pass**, needs-review (open
+TODOs). `getByTestId` applied to username/password/flash; the submit button had
+no id, so the agent kept `locator("button[type='submit']")` with a
+`TODO(review)` instead of inventing a test id.
+
+## Earlier state (6.4), kept for reference
 
 ## What the Haiku step built (commit `1c8edad`)
 

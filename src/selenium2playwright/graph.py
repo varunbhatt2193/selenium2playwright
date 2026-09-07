@@ -3,6 +3,10 @@
     uv run python -m selenium2playwright.graph samples/selenium-suite/pages/LoginPage.ts
     uv run python -m selenium2playwright.graph some/webdriverio.e2e.ts   # -> clean refusal
 
+    # step 7.1 — two turns of one conversation, the file named only once
+    uv run python -m selenium2playwright.graph --thread login LoginPage.ts --out out/LoginPage.ts
+    uv run python -m selenium2playwright.graph --thread login --refine "use data-testid locators"
+
 Same work as one_shot.py, restructured as a graph so that (a) every step is a
 named node in the LangSmith trace and (b) the next steps — classify/refuse,
 validate, critic loop — are new nodes and edges, not a rewrite.
@@ -15,6 +19,10 @@ Vocabulary used here, from the LangGraph docs:
   conditional edge — "after node A, call this function; it returns the NAME
            of the next node". The graph branches on data, not the model.
   compile() — turns the wiring into a Runnable (invoke/stream/batch like a chain).
+  checkpointer — an object compile() writes the state to after every super-step,
+           filed under config["configurable"]["thread_id"]. Invoking the same
+           thread again loads that state first, so the graph starts a turn
+           already knowing what the last turn produced (see memory.py).
 """
 
 from __future__ import annotations
@@ -23,17 +31,21 @@ import argparse
 import os
 import subprocess
 import sys
+from contextlib import ExitStack
 from pathlib import Path
 from typing import Literal, TypedDict
 
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 
+from selenium2playwright import memory
 from selenium2playwright.classify import Classification, classify
 from selenium2playwright.llm import make_model, prepare_messages
 from selenium2playwright.one_shot import report_ledger, report_usage
-from selenium2playwright.prompts import build_critic_prompt, build_prompt, format_context
-from selenium2playwright.reflection import (MAX_ATTEMPTS, collect_todos, resolve_attempt_cap,
-                                            revision_feedback, sum_usage)
+from selenium2playwright.prompts import (build_critic_prompt, build_prompt, format_context,
+                                         format_conventions)
+from selenium2playwright.reflection import (MAX_ATTEMPTS, collect_todos, refinement_feedback,
+                                            resolve_attempt_cap, revision_feedback, sum_usage)
 from selenium2playwright.schemas import ConversionReport, ConversionResult, Critique, Finding, ValidationReport
 from selenium2playwright.validators.compile import compile_check
 from selenium2playwright.validators.lint import lint_check
@@ -53,6 +65,11 @@ class ConversionState(TypedDict, total=False):
     context_paths: list[str]
     output_path: str  # optional intended output location; anchors companion imports
     max_attempts: int  # optional lap budget, 1..MAX_ATTEMPTS; intake fills in the default (step 6.3)
+    refinement: str  # this turn's new instruction from the user; "" on a first turn (step 7.1)
+    # short-term memory (step 7.1) — written by intake, restored by the checkpointer
+    turn: int  # how many times this thread has been invoked; 1 on a fresh thread
+    conventions: list[str]  # every instruction this thread has been given, oldest first
+    baseline: ConversionResult | None  # the previous turn's accepted output, this turn's start
     # filled by intake
     source: str  # the Selenium file contents
     context: str  # already-converted companions, formatted for the prompt ("" if none)
@@ -75,14 +92,30 @@ class ConversionState(TypedDict, total=False):
 
 
 def intake(state: ConversionState) -> ConversionState:
-    """Read the files off disk. No LLM. Returns only the keys it produced."""
+    """Read the files off disk, then open a turn. No LLM.
+
+    On a fresh thread every memory key starts empty. On a thread the
+    checkpointer has restored, `state` already holds the previous turn's report
+    and standing instructions, so this is where one turn hands over to the next:
+    the previous result becomes this turn's `baseline`, a new `refinement`
+    joins `conventions`, and everything belonging to the finished turn — draft,
+    validation, review, attempt counter — is cleared so the turn starts honest.
+    The source is re-read rather than restored: the file on disk is the truth.
+    """
     source = Path(state["source_path"]).read_text(encoding="utf-8")
     paths = [Path(p) for p in state.get("context_paths", [])]
     context_files = {str(p.resolve()): p.read_text(encoding="utf-8") for p in paths}
     context = format_context(paths, contents=context_files)
+    previous = state.get("report")
+    conventions = list(state.get("conventions", []))
+    refinement = (state.get("refinement") or "").strip()
+    if refinement and refinement not in conventions:
+        conventions.append(refinement)
     return {"source": source, "context": context, "context_files": context_files,
             "classification": classify(source, state["source_path"]),
             "max_attempts": resolve_attempt_cap(state.get("max_attempts")),
+            "turn": state.get("turn", 0) + 1, "conventions": conventions, "refinement": "",
+            "baseline": previous.result if previous is not None else None,
             "iteration": 0, "result": None, "validation": [], "critique": None,
             "conversion_error": "", "critique_error": "", "usage": None,
             "critic_usage": None, "report": None}
@@ -99,15 +132,25 @@ def refuse(state: ConversionState) -> ConversionState:
 
 
 def convert(state: ConversionState) -> ConversionState:
-    """Generate a draft or repair the previous one using its actual review evidence."""
+    """Draft, repair, or refine — the trailing message says which, the node is one.
+
+    Three ways in: a first draft (no feedback), a repair of this turn's draft
+    (revision_feedback: the draft plus its findings and critic fixes), or the
+    first attempt of a later turn on the same thread (refinement_feedback: the
+    previous turn's accepted file). Standing instructions ride along on every
+    one of them, so a repair lap can never quietly undo the user's convention.
+    """
     iteration = state.get("iteration", 0) + 1
     usage = None
     try:
         feedback = ""
         if state.get("result") is not None and state.get("critique") is not None:
             feedback = revision_feedback(state["result"], state["validation"], state["critique"])
+        elif state.get("baseline") is not None:
+            feedback = refinement_feedback(state["baseline"])
         structured_model = make_model().with_structured_output(ConversionResult, include_raw=True)
-        chain = build_prompt(revision=feedback) | prepare_messages() | structured_model
+        chain = (build_prompt(revision=feedback, conventions=format_conventions(state.get("conventions", [])))
+                 | prepare_messages() | structured_model)
         response = chain.invoke(
             {"file_path": state["source_path"], "source": state["source"], "context": state["context"]}
         )
@@ -185,7 +228,8 @@ def critic(state: ConversionState) -> ConversionState:
         structured_model = make_model(for_critic=True).with_structured_output(
             Critique, method="json_schema", include_raw=True,
         )
-        chain = build_critic_prompt() | prepare_messages(for_critic=True) | structured_model
+        chain = (build_critic_prompt(conventions=format_conventions(state.get("conventions", [])))
+                 | prepare_messages(for_critic=True) | structured_model)
         evidence = "\n\n".join(
             f"{'PASS' if r.passed else 'FAIL'} {r.render()}"
             + (f"\n{r.tool_output}" if not r.passed and not r.findings else "")
@@ -275,8 +319,13 @@ def assemble(state: ConversionState) -> ConversionState:
     return {"report": report}
 
 
-def build_graph():
-    """Up to max_attempts convert/validate/critic laps, then assemble. Refuse goes to END."""
+def build_graph(checkpointer: BaseCheckpointSaver | None = None):
+    """Up to max_attempts convert/validate/critic laps, then assemble. Refuse goes to END.
+
+    checkpointer=None (the default) is the stateless graph every earlier phase
+    and the eval runner use: nothing is written, nothing is restored. Pass one
+    and each invoke becomes a turn of the conversation named by thread_id.
+    """
     builder = StateGraph(ConversionState)
     builder.add_node("intake", intake)
     builder.add_node("convert", convert)
@@ -296,28 +345,68 @@ def build_graph():
                                   {"convert": "convert", "assemble": "assemble"})
     builder.add_edge("assemble", END)
     builder.add_edge("refuse", END)
-    return builder.compile()
+    return builder.compile(checkpointer=checkpointer)
+
+
+def report_thread(state: ConversionState, db: Path, thread_id: str) -> None:
+    """What this conversation remembers, so a resumed turn is never a black box."""
+    print(f"Thread {thread_id!r} · turn {state.get('turn', 1)} · {db}", file=sys.stderr)
+    if state.get("baseline") is not None:
+        print("  continuing from the previous turn's conversion", file=sys.stderr)
+    for number, convention in enumerate(state.get("conventions", []), 1):
+        print(f"  standing instruction {number}: {convention}", file=sys.stderr)
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Convert, validate, and repair Selenium TypeScript in up to three attempts")
-    parser.add_argument("source", type=Path)
+    parser = argparse.ArgumentParser(
+        description="Convert, validate, and repair Selenium TypeScript in up to three attempts")
+    parser.add_argument("source", nargs="?", type=Path,
+                        help="the Selenium file; omit it to continue a saved --thread")
     parser.add_argument("context", nargs="*", type=Path, help="already-converted companion files")
     parser.add_argument("--out", type=Path, help="output file; also anchors relative imports to companions")
     parser.add_argument("--max-attempts", type=int, default=MAX_ATTEMPTS, choices=range(1, MAX_ATTEMPTS + 1),
                         help="total conversion attempts: 1 = no repairs; 3 = initial draft plus two repairs")
+    parser.add_argument("--thread", help="conversation id; saves this turn and resumes the last one (step 7.1)")
+    parser.add_argument("--refine", default="", metavar="INSTRUCTION",
+                        help='a standing instruction for this thread, e.g. "use data-testid locators"')
+    parser.add_argument("--db", type=Path, default=memory.DEFAULT_DB, help="thread database file")
+    parser.add_argument("--list-threads", action="store_true", help="print saved thread ids in --db and exit")
     args = parser.parse_args(argv)
-    if args.out and args.out.resolve() in {p.resolve() for p in [args.source, *args.context]}:
+    if args.list_threads:
+        for thread_id in memory.list_threads(args.db):
+            print(thread_id)
+        return 0
+    if args.source is None and not args.thread:
+        parser.error("give a source file, or --thread <id> to continue a saved conversation")
+    if args.out and args.source is not None and args.out.resolve() in {p.resolve() for p in
+                                                                      [args.source, *args.context]}:
         parser.error("--out must differ from the source and companion files")
-    inputs: ConversionState = {"source_path": str(args.source), "context_paths": [str(p) for p in args.context],
-                               "max_attempts": args.max_attempts}
+
+    # Only keys the caller actually supplied: anything omitted on a later turn
+    # keeps the value the checkpointer restored, which is the whole point.
+    inputs: ConversionState = {"max_attempts": args.max_attempts}
+    if args.source is not None:
+        inputs["source_path"] = str(args.source)
+        inputs["context_paths"] = [str(p) for p in args.context]
     if args.out:
         inputs["output_path"] = str(args.out)
-    graph = build_graph()
-    final = graph.invoke(
-        inputs, config={"run_name": "conversion-graph", "tags": ["step:5.2", "prompt:v1", "critic:v1"],
-                        "recursion_limit": 3 * MAX_ATTEMPTS + 5},
-    )
+    if args.refine:
+        inputs["refinement"] = args.refine
+    config = {"run_name": "conversion-graph", "tags": ["step:7.1", "prompt:v1", "critic:v1"],
+              "recursion_limit": 3 * MAX_ATTEMPTS + 5}
+
+    with ExitStack() as stack:
+        checkpointer = stack.enter_context(memory.open_checkpointer(args.db)) if args.thread else None
+        graph = build_graph(checkpointer)
+        if args.thread:
+            config = memory.thread_config(args.thread, **config)
+            if args.source is None and not memory.thread_state(graph, args.thread).get("source_path"):
+                parser.error(f"thread {args.thread!r} has no saved conversion yet; "
+                             "pass a source file to start it")
+        final = graph.invoke(inputs, config=config)
+
+    if args.thread:
+        report_thread(final, args.db, args.thread)
     c = final["classification"]
     print(f"[{c.automation} · {c.runner} · {c.language}] {c.reason}", file=sys.stderr)
     if final["status"] == "refused":
@@ -338,12 +427,18 @@ def main(argv: list[str] | None = None) -> int:
     if final["critic_usage"]:
         print("Critic token usage (all attempts):", file=sys.stderr)
         report_usage(final["critic_usage"])
+    # A resumed turn that was not given --out still knows where the file goes.
+    destination = args.out or (Path(final["output_path"]) if final.get("output_path") else None)
     if report.result is None:
         print("No converted code was produced; no output file was written.", file=sys.stderr)
-    elif args.out:
-        args.out.parent.mkdir(parents=True, exist_ok=True)
-        args.out.write_text(report.result.code, encoding="utf-8")
-        print(f"[wrote {args.out}]", file=sys.stderr)
+        if final.get("baseline") is not None:
+            # A failed refinement turn is not a lost conversion: the turn it was
+            # refining is still in the thread and still on disk. Say so.
+            print("The previous turn's conversion on this thread is unchanged.", file=sys.stderr)
+    elif destination is not None:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(report.result.code, encoding="utf-8")
+        print(f"[wrote {destination}]", file=sys.stderr)
     else:
         print(report.result.code, end="")
     return 0 if report.status == "passed" else 1

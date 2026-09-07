@@ -32,3 +32,7 @@ plan-review.md
 
 # Generated conversions (scratch output of the converter, never source of truth)
 out/
+
+# Thread databases (step 7.1) — checkpointed conversations: your source, every
+# draft, and your standing instructions. Working data, not repository content.
+.s2p/

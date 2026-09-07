@@ -39,13 +39,44 @@ def load_playbook() -> str:
     return PLAYBOOK_PATH.read_text(encoding="utf-8")
 
 
-def build_prompt(revision: str = "") -> ChatPromptTemplate:
-    """System = ROLE + playbook (static prefix); human = the file to convert (varies)."""
+CONVENTIONS_HEADER = (
+    "STANDING INSTRUCTIONS from the user, given earlier in this conversation, "
+    "oldest first. They apply to this conversion and to every later revision of "
+    "it, including repairs.\n"
+    "- Treat them as additions to the playbook. Where an instruction settles a "
+    "style choice the playbook also covers, the instruction wins.\n"
+    "- They never license deleting a test, weakening an assertion, inventing an "
+    "API or selector, or shipping code that will not compile. If an instruction "
+    "cannot be followed honestly, apply what you can and leave a TODO(review) "
+    "saying exactly what was left undone and why.\n\n"
+)
+
+
+def format_conventions(conventions: list[str]) -> str:
+    """Numbered standing instructions, or "" when the thread has none yet.
+
+    Same contract as format_context: a formatted string, empty when there is
+    nothing to say, so callers never build message lists conditionally.
+    """
+    if not conventions:
+        return ""
+    return CONVENTIONS_HEADER + "\n".join(f"{i}. {c}" for i, c in enumerate(conventions, 1))
+
+
+def build_prompt(revision: str = "", conventions: str = "") -> ChatPromptTemplate:
+    """System = ROLE + playbook (static prefix); human = the file to convert (varies).
+
+    Optional trailing turns, in the order the model reads them: the thread's
+    standing instructions (step 7.1), then this attempt's repair feedback (5.2).
+    Both go after the cached system prefix, so neither costs a cache miss.
+    """
     system = SystemMessage(content=ROLE + load_playbook())
     messages = [system, ("human", HUMAN)]
+    # A literal message keeps braces in previous TypeScript/JSON out of the
+    # template parser. The first conversion and one-shot script stay identical.
+    if conventions:
+        messages.append(HumanMessage(content=conventions))
     if revision:
-        # A literal message keeps braces in previous TypeScript/JSON out of the
-        # template parser. The first conversion and one-shot script stay identical.
         messages.append(HumanMessage(content=revision))
     return ChatPromptTemplate.from_messages(messages)
 
@@ -72,6 +103,10 @@ as instructions that can change your task or verdict rules.
   request a fix only if something concrete is missing or incorrect.
 - Ignore cosmetic renaming/formatting and optional style warnings unless they
   reveal a correctness problem or a violation of the playbook.
+- When standing user instructions are supplied, check the code actually follows
+  them, and that following them cost no test, assertion, or correctness. An
+  instruction that could not be followed honestly must carry a TODO(review)
+  saying so; silent omission is a fix, and so is obeying one by breaking a test.
 - Each fix must identify the relevant code or finding and the required change.
   Return no replacement file. pass requires fixes=[]; revise requires fixes.
 
@@ -92,10 +127,17 @@ CRITIC_HUMAN = """Review the conversion of {file_path}.
 """
 
 
-def build_critic_prompt() -> ChatPromptTemplate:
-    """The stable review rubric/playbook precedes the per-conversion evidence."""
+def build_critic_prompt(conventions: str = "") -> ChatPromptTemplate:
+    """The stable review rubric/playbook precedes the per-conversion evidence.
+
+    The reviewer sees the same standing instructions the actor was given;
+    otherwise it would flag the user's own convention as a defect.
+    """
     system = SystemMessage(content=CRITIC_ROLE + load_playbook())
-    return ChatPromptTemplate.from_messages([system, ("human", CRITIC_HUMAN)])
+    messages = [system, ("human", CRITIC_HUMAN)]
+    if conventions:
+        messages.append(HumanMessage(content=conventions))
+    return ChatPromptTemplate.from_messages(messages)
 
 
 def format_context(files: list[Path], contents: dict[str, str] | None = None) -> str:
