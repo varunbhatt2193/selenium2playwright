@@ -47,10 +47,11 @@ that is what 9.1's topological sort bought — so the parallelism is safe, and
 wave N+1 cannot start until every file in wave N is written, which is what
 makes the converted page object available as context to the test that imports it.
 
-Not in this step (they are 9.3): compiling the finished tree as one project, the
-aggregate scorecard, the parity ledger, the consolidated TODO(review) ledger and
-the suite report markdown. This module produces the per-file outcomes those are
-built from.
+The per-file outcomes this module collects are the raw material for step 9.3:
+`finish` hands them to `assemble.py`, which compiles the finished tree as one
+project, adds the results up, works out what public API survived, and writes the
+report. That is the last node, and it is where a folder full of files becomes
+something you can hand to somebody.
 """
 
 from __future__ import annotations
@@ -58,7 +59,7 @@ from __future__ import annotations
 import operator
 import shutil
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from fnmatch import fnmatch
 from pathlib import Path
 from typing import Annotated, Optional, TypedDict
@@ -68,6 +69,7 @@ from langgraph.runtime import Runtime
 from langgraph.store.base import BaseStore
 from langgraph.types import Send
 
+from selenium2playwright import assemble
 from selenium2playwright import graph as single
 from selenium2playwright import suite
 from selenium2playwright.reflection import MAX_ATTEMPTS, sum_usage
@@ -120,6 +122,9 @@ class FileOutcome:
     gates: tuple[tuple[str, bool], ...] = ()  # (gate, passed), in GATES order
     critic: str = ""  # pass | revise | "" when the review was unavailable
     todos: tuple[str, ...] = ()
+    # What the model said it decided. Kept because 9.3's parity ledger looks
+    # here for the reason a public member disappeared, and quotes it verbatim.
+    notes: tuple[str, ...] = ()
     written: str = ""  # where the converted file went; "" when nothing was produced
     seconds: float = 0.0
     usage: dict | None = None
@@ -165,8 +170,11 @@ class SuiteState(TypedDict, total=False):
     # consequence — a reduced channel can only be appended to, never rewritten,
     # so the sort into a stable order happens where it is read (see `ordered`).
     outcomes: Annotated[list[FileOutcome], operator.add]
-    # filled by finish
+    # where the markdown report goes; empty means out_root/conversion-report.md
+    report_path: str
+    # filled by finish (step 9.3)
     elapsed: float
+    assembly: assemble.Assembly
 
 
 def plan(state: SuiteState) -> SuiteState:
@@ -296,14 +304,34 @@ def record(job: FileJob, final: dict, seconds: float) -> FileOutcome:
         path=job["path"], wave=job["wave"], status=report.status, attempts=report.attempts,
         reason=report.reason, gates=tuple((g, passed[g]) for g in GATES if g in passed),
         critic=report.critique.verdict if report.critique is not None else "",
-        todos=tuple(report.result.todos), written=str(target), seconds=seconds,
+        todos=tuple(report.result.todos), notes=tuple(report.result.notes),
+        written=str(target), seconds=seconds,
         usage=final.get("usage"), critic_usage=final.get("critic_usage"),
         errors=tuple(report.errors))
 
 
-def finish(state: SuiteState) -> SuiteState:
-    """Nothing left to dispatch. Stop the clock; 9.3 will do the assembling here."""
-    return {"elapsed": time.time() - state.get("started", time.time())}
+def finish(state: SuiteState, runtime: Runtime[SuiteSettings] | None = None) -> SuiteState:
+    """Nothing left to dispatch — so ask what the whole tree adds up to (step 9.3).
+
+    The four assembled facts live here, inside the graph, rather than in the CLI
+    afterwards: the graph produced the tree, so the graph is what says whether
+    the tree holds together, and the whole-tree compile shows up in the trace
+    beside the conversions that made it necessary.
+    """
+    outcomes = ordered(state)
+    elapsed = time.time() - state.get("started", time.time())
+    root, out_root = Path(state["root"]), Path(state["out_root"])
+    manifest = state.get("manifest")
+    run = settings(runtime)
+    built = assemble.assemble(root, out_root, manifest, outcomes)
+    markdown = assemble.render(root, out_root, manifest, outcomes, built, elapsed=elapsed,
+                               models={"actor": run.model, "critic": run.critic_model},
+                               usage=suite_usage(outcomes))
+    report = Path(state.get("report_path") or out_root / assemble.REPORT_NAME)
+    report.parent.mkdir(parents=True, exist_ok=True)
+    report.write_text(markdown, encoding="utf-8")
+    return {"elapsed": elapsed,
+            "assembly": replace(built, markdown=markdown, report_path=str(report))}
 
 
 def build_suite_graph(store: BaseStore | None = None):
@@ -374,7 +402,8 @@ def run_json(state: dict, exit_code: int) -> dict:
         "files": [{
             "path": o.path, "wave": o.wave, "status": o.status, "attempts": o.attempts,
             "reason": o.reason, "gates": {gate: ok for gate, ok in o.gates},
-            "critic": o.critic, "todos": list(o.todos), "written": o.written,
+            "critic": o.critic, "todos": list(o.todos), "notes": list(o.notes),
+            "written": o.written,
             "seconds": round(o.seconds, 2), "errors": list(o.errors),
         } for o in outcomes],
     }

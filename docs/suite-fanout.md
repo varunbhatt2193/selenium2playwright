@@ -208,10 +208,8 @@ limit: **a wave is only as fast as its slowest file.**
 The output tree is written and each file is validated **on its own**. Not here:
 compiling the finished tree as one project, the aggregate scorecard, the
 per-file parity ledger, the consolidated TODO(review) ledger, and the suite
-report markdown. Those are 9.3, and they are built on the per-file outcomes
-this step produces. (For the record: the twelve converted sample files *do*
-compile as one project today — 9.3's job is to make that a checked, reported
-fact rather than something I ran by hand.)
+report markdown. Those are [9.3](suite-report.md) — the `finish` node — and
+they are built on the per-file outcomes this step produces.
 
 ## 9. Review checklist
 

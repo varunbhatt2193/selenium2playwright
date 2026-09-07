@@ -57,7 +57,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 
-from selenium2playwright import env, graph, memory, risk, suite, suite_graph
+from selenium2playwright import assemble, env, graph, memory, risk, suite, suite_graph
 from selenium2playwright import store as memory_store
 from selenium2playwright.llm import check_model, embedding_dims, make_embeddings
 from selenium2playwright.one_shot import format_usage
@@ -648,6 +648,9 @@ def convert_suite(
     user: UserOption = memory_store.DEFAULT_USER,
     recall: Annotated[bool, typer.Option(
         "--recall/--no-recall", help="use long-term memory; --no-recall reads and writes nothing")] = True,
+    report: Annotated[Optional[Path], typer.Option(
+        "--report", metavar="FILE",
+        help=f"where the markdown report goes; default <out>/{assemble.REPORT_NAME}")] = None,
     as_json: Annotated[bool, typer.Option(
         "--json", help="put the whole run on stdout as one JSON document")] = False,
     memory_db: MemoryDbOption = memory_store.DEFAULT_DB,
@@ -658,6 +661,10 @@ def convert_suite(
     dispatched in parallel and every file goes through the same graph `s2p
     convert` uses, so the per-file result is the same result — there is just one
     trace holding all of them (step 9.2).
+
+    When every wave is done the tree is assembled (step 9.3): compiled as one
+    project, added up into a scorecard, diffed against the source for public API
+    that went missing, and written out as a markdown report next to the code.
     """
     if out.resolve() == root.resolve():
         raise typer.BadParameter("--out must be a different folder from the suite being converted")
@@ -678,7 +685,8 @@ def convert_suite(
         raise typer.BadParameter(
             f"--only matched none of the {len(planned.convertible)} convertible file(s); "
             f"run `s2p scan {root}` to see them")
-    inputs = {"root": str(root), "out_root": str(out), "only": patterns, "manifest": planned}
+    inputs = {"root": str(root), "out_root": str(out), "only": patterns, "manifest": planned,
+              "report_path": str(report) if report else ""}
     run = suite_graph.SuiteSettings(model=models["actor"], critic_model=models["critic"],
                                     max_attempts=max_attempts, user_id=user if recall else "")
 
@@ -709,7 +717,7 @@ def suite_run_config(models: dict[str, str], max_attempts: int, waves: int, para
     suite rather than being a number that works until it does not.
     """
     return {"run_name": "suite-graph",
-            "tags": ["step:9.2", f"model:{models['actor'].split(':')[-1]}", f"waves:{waves}"],
+            "tags": ["step:9.3", f"model:{models['actor'].split(':')[-1]}", f"waves:{waves}"],
             "metadata": {"actor_model": models["actor"], "critic_model": models["critic"],
                          "max_attempts": max_attempts, "waves": waves, "parallel": parallel},
             "max_concurrency": parallel,
@@ -717,25 +725,26 @@ def suite_run_config(models: dict[str, str], max_attempts: int, waves: int, para
 
 
 def present_suite(final: dict, out: Path, as_json: bool) -> int:
-    """The run as a table, then the exit code it earned.
+    """The run as a table, then what the whole tree adds up to, then the exit code.
 
     One row per file in plan order — which is not the order they finished in,
     because they ran at the same time (suite_graph.ordered re-sorts them).
-    Exit 0 only when every file passed outright; a single needs-review is a 1,
-    for the same reason it is in `s2p convert`.
+    Exit 0 needs two things now: every file passed outright **and** the finished
+    tree compiles as one project. A per-file pass is a claim about one file; the
+    tree compile is the claim about the thing being handed over, and a folder
+    that does not build is not a delivery whatever its rows say.
     """
     outcomes = suite_graph.ordered(final)
     counts = suite_graph.totals(outcomes)
+    built = final.get("assembly") or assemble.Assembly()
     failed = len(outcomes) - counts["passed"]
-    exit_code = 0 if not failed else 1
+    exit_code = 0 if not failed and built.compiles else 1
 
     # The table is printed either way, for the same reason `s2p convert` prints
     # its scorecard under --json: stderr is for the person watching, stdout is
     # the document, and the two never compete for the same stream.
     console.print(suite_table(outcomes))
     for outcome in outcomes:
-        for todo in outcome.todos:
-            say(f"  {outcome.path}: {todo}")
         for error in outcome.errors:
             say(f"  {outcome.path}: error: {error}", style=FAIL_STYLE)
         if outcome.status in ("refused", "failed"):
@@ -748,14 +757,62 @@ def present_suite(final: dict, out: Path, as_json: bool) -> int:
     say(f"{len(outcomes)} file(s): " + " · ".join(f"{n} {name}" for name, n in counts.items() if n)
         + f" in {final.get('elapsed', 0.0):.1f}s",
         style=PASS_STYLE if not failed else "bold yellow")
+    show_assembly(built)
     for label, role in (("Conversion", "usage"), ("Critic", "critic_usage")):
         usage = suite_graph.suite_usage(outcomes, role)
         if usage:
             say(f"{label} tokens (whole suite): {format_usage(usage)}", style=MUTED)
     say(f"[wrote {out}]")
+    if built.report_path:
+        say(f"[wrote {built.report_path}]")
     if as_json:
-        print(json.dumps(suite_graph.run_json(final, exit_code), indent=2))
+        print(json.dumps(assemble.report_json(suite_graph.run_json(final, exit_code), built), indent=2))
     return exit_code
+
+
+def show_assembly(built: assemble.Assembly) -> None:
+    """The three suite-wide answers, in the order they change a decision.
+
+    The whole-tree compile first, because it is the one that can turn twelve
+    green rows into an unusable folder. Then what the conversion did to the
+    public surface, then the one list of everything still open.
+    """
+    if built.tree is None:
+        say(f"Whole tree: not compiled — {built.tree_error}", style=FAIL_STYLE)
+    elif built.tree.passed:
+        say(f"Whole tree: {built.files} file(s) compile together, no errors", style=PASS_STYLE)
+    else:
+        findings = built.tree.findings
+        say(f"Whole tree: {len(findings)} error(s) compiling {built.files} file(s) together",
+            style=FAIL_STYLE)
+        for finding in findings[:5]:
+            say(f"  {finding.render()}", style=FAIL_STYLE)
+        if len(findings) > 5:
+            say(f"  …and {len(findings) - 5} more; the report has all of them", style=FAIL_STYLE)
+
+    api = built.scorecard.get("api", {})
+    if any(api.values()):
+        unexplained = built.scorecard.get("unexplained_removals", 0)
+        removed = api.get("removed", 0)
+        say(f"Public API: {api.get('kept', 0)} kept · {api.get('renamed', 0)} renamed · "
+            f"{removed} removed" + (f" ({unexplained} with no reason given)" if unexplained else ""),
+            style=FAIL_STYLE if unexplained else MUTED)
+        for ledger in built.ledgers:
+            for change in ledger.losses:
+                say(f"  {ledger.path}: {change.name} — "
+                    + (f"now {change.counterpart}" if change.verdict == "renamed"
+                       else f"removed, {change.reason or 'no reason given'}"),
+                    style=MUTED if change.verdict == "renamed" or change.reason else FAIL_STYLE)
+
+    if built.todos:
+        say(f"TODO(review): {len(built.todos)} task(s) still open")
+        for number, todo in enumerate(built.todos, 1):
+            # A task can run to a paragraph; the terminal gets the first line of
+            # it and the report next to the code gets all of it.
+            text = todo.text if len(todo.text) <= 110 else todo.text[:109] + "…"
+            say(f"  {number}. {text} · " + ", ".join(todo.places), style=MUTED)
+    for note in built.notes:
+        say(f"  note: {note}", style=MUTED)
 
 
 def suite_table(outcomes: list[suite_graph.FileOutcome]) -> Table:

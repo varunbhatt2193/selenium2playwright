@@ -39,6 +39,12 @@ class CliHarness(unittest.TestCase):
                                           "ANTHROPIC_API_KEY": "sk-ant-offline-test"})
         tracing.start()
         self.addCleanup(tracing.stop)
+        # rich sizes tables and panels to the terminal, so the same cell folds
+        # at 40 columns and does not at 100 and an assertion on its text passes
+        # or fails depending on who is running the tests (see 9.1). Pin it.
+        width = cli.console._width
+        cli.console.width = 100
+        self.addCleanup(setattr, cli.console, "_width", width)
         self.tmp = TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
 
@@ -167,7 +173,20 @@ class StreamAndExitCodeTests(CliHarness):
             with self.subTest(argv=argv):
                 code, out, err = self.run_cli(*argv)
                 self.assertEqual((code, out), (2, ""))
-                self.assertIn(expected, err)
+                # Typer sizes its error panel to the terminal, so the same
+                # sentence wraps differently at 60 columns than at 140 — assert
+                # on the message, not on the window it was printed in (see 9.1).
+                self.assertIn(expected, unwrapped(err))
+
+
+def unwrapped(text: str) -> str:
+    """stderr with rich's box drawing and line wrapping taken back out.
+
+    The same helper `tests/test_store.py` needed, for the same reason: a phrase
+    asserted with `assertIn` passes at one terminal width and fails at another.
+    """
+    return " ".join(text.replace("\u2502", " ").replace("\u256d", " ").replace("\u256e", " ")
+                    .replace("\u2570", " ").replace("\u256f", " ").replace("\u2500", " ").split())
 
 
 class SurfaceTests(unittest.TestCase):

@@ -184,8 +184,10 @@ first time you can see all of it without scrolling.
   more subcommands: `s2p scan <folder>` reads a suite and prints the conversion
   plan without calling a model ([suite-scan.md](suite-scan.md), step 9.1), and
   `s2p suite <folder> --out <dir>` runs that plan, converting each wave of
-  independent files in parallel ([suite-fanout.md](suite-fanout.md), step 9.2).
-  The whole-tree compile and the suite report are 9.3.
+  independent files in parallel ([suite-fanout.md](suite-fanout.md), step 9.2)
+  and then compiling the finished tree as one project and writing a
+  `conversion-report.md` beside it ([suite-report.md](suite-report.md), step
+  9.3).
 - **Not a new agent.** Same graph, same prompts, same four gates, same critic.
   Every eval and every earlier phase's numbers still stand, because nothing
   below `cli.py` changed.

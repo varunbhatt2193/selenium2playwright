@@ -28,7 +28,7 @@ from langchain_core.runnables import RunnableLambda
 from langgraph.errors import InvalidUpdateError
 from langgraph.graph import END, START, StateGraph
 
-from selenium2playwright import cli, graph, suite, suite_graph
+from selenium2playwright import assemble, cli, graph, suite, suite_graph
 from selenium2playwright.schemas import ConversionReport, ConversionResult, Critique, ValidationReport
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -366,13 +366,15 @@ class CommandTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("2 passed", err)
         self.assertIn("1 needs-review", err)
-        self.assertIn("pages/LoginPage.ts: TODO(review): confirm the URL", err)
+        # The per-file TODO line is gone; it is in 9.3's consolidated ledger now.
+        self.assertIn("1. confirm the URL · pages/LoginPage.ts", err)
 
     def test_json_puts_the_whole_run_on_stdout_and_nothing_else(self):
         code, out, err = self.run_cli(str(self.root), "--out", str(self.out), "--json")
         self.assertEqual(code, 0)
         document = json.loads(out)
-        self.assertEqual(document["schema"], suite_graph.RUN_SCHEMA)
+        # Still every key of s2p.suite-run/v1, under the assembled document's name.
+        self.assertEqual(document["schema"], assemble.REPORT_SCHEMA)
         self.assertEqual(document["counts"]["passed"], 3)
         self.assertEqual([f["path"] for f in document["files"]],
                          ["pages/BasePage.ts", "pages/LoginPage.ts", "tests/login.spec.ts"])
