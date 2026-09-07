@@ -34,11 +34,14 @@ primary_region = "iad"
   size = "shared-cpu-1x"
   memory = "1gb"
 
-# One machine, always on. A database that scales to zero loses the connection
-# pool mid-conversion, and the run it was serving with it.
-[[services]]
-  internal_port = 5432
-  protocol = "tcp"
-  auto_stop_machines = false
-  auto_start_machines = false
-  min_machines_running = 1
+# Deliberately no [[services]] block. A services section is how a machine asks
+# Fly for public ingress, and Fly answers by allocating public v4 and v6
+# addresses — which it did, the first time this file had one. Private
+# networking needs none of that: any port a machine listens on is reachable at
+# <app>.internal over 6PN, services or not. So the database has no public
+# address at all, which is the only version of "not on the internet" worth
+# claiming.
+#
+# Autostop is a property of services too, so removing the block also removes the
+# thing that could stop this machine. It stays up, which is what a database
+# holding a connection pool mid-conversion needs to do.

@@ -28,9 +28,7 @@ primary_region = "iad"
   size = "shared-cpu-1x"
   memory = "256mb"
 
-[[services]]
-  internal_port = 6379
-  protocol = "tcp"
-  auto_stop_machines = false
-  auto_start_machines = false
-  min_machines_running = 1
+# No [[services]] block, for the same reason as postgres.toml: it would ask Fly
+# for public ingress and get public IPs. s2p-redis.internal:6379 works over the
+# private network without one, and without one there is no public address to
+# leave lying around.

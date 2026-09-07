@@ -37,7 +37,7 @@ Then:
 
 ```bash
 curl https://s2p.fly.dev/ok
-uv run python scripts/call_deployment.py samples/selenium/LoginPage.ts --url https://s2p.fly.dev
+uv run python scripts/call_deployment.py samples/selenium-suite/pages/LoginPage.ts --url https://s2p.fly.dev
 ```
 
 Put `LANGGRAPH_DEPLOYMENT_URL=https://s2p.fly.dev` in `.env` to make that the
@@ -86,6 +86,36 @@ Re-creating takes one command and a few minutes of build.
 The Postgres volume is 3 GB, not 10. Volumes can be extended later and never
 shrunk, so the small end is the reversible one — `fly volumes extend` when
 threads and memories actually need the room.
+
+## What it took to get right, first time through
+
+Recorded because none of it is guessable and all of it cost a round trip.
+
+**Secrets are forwarded from `.env` wholesale, not from a list.** The first
+version named the keys it expected. It missed `ANTHROPIC_WORKSPACE_ID`, so the
+container started clean, authenticated fine, and then took `400 Bad Request`
+from Anthropic on every model call — an identity-linked key must name the
+workspace it acts in, and `llm.py` sends it as the `anthropic-workspace-id`
+header. A hand-maintained list fails silently and late, which is the worst way
+for a deployment to fail. It now forwards every key in `.env` and skips only
+the handful the deployment defines for itself.
+
+**`set -o pipefail` makes ordinary shell idioms fatal.** `tr </dev/urandom |
+head -c 32` returns 141: `head` closes the pipe, `tr` dies of SIGPIPE. The
+password generator killed the script before step 2. Every early-closing
+pipeline here is now a captured variable, and the password comes from `openssl`.
+
+**`fly apps list` prints a box-drawn table that indents names by one space,**
+so `^name`-anchored matching never fires and "does this app exist?" answers no
+forever. The checks read `--json`.
+
+**A `[[services]]` block is a request for public ingress.** Postgres and Redis
+had one, purely to hold `auto_stop_machines = false`, and Fly duly allocated
+public v4 and v6 addresses for a database. Private networking needs no services
+block at all — any listening port answers at `<app>.internal` over 6PN — and
+without one there is no public address to leave lying around. Autostop is a
+property of services too, so removing the block removes the only thing that
+could have stopped those machines.
 
 ## Why a self-run Postgres instead of Fly's managed one
 

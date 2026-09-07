@@ -87,10 +87,19 @@ declare -a SECRETS=(
   "DATABASE_URI=$POSTGRES_URI"
   "REDIS_URI=redis://${REDIS_APP}.internal:6379"
 )
-for KEY in LANGSMITH_API_KEY ANTHROPIC_API_KEY OPENAI_API_KEY S2P_MODEL S2P_CRITIC_MODEL S2P_EMBEDDINGS; do
-  VALUE="$(sed -n "s/^${KEY}=//p" .env 2>/dev/null | tail -1 | tr -d '"'"'"'' || true)"
+# Forward every key in .env rather than a hand-maintained list. A list is
+# exactly the wrong shape here: it fails silently and late. ANTHROPIC_WORKSPACE_ID
+# was missing from one, so the container authenticated fine and then took a 400
+# from Anthropic on every call, because an identity-linked key must name the
+# workspace it acts in (llm.py sends it as the anthropic-workspace-id header).
+# The skip list below is short and is about things the deployment defines for
+# itself, not about which providers we happen to use.
+SKIP="POSTGRES_URI DATABASE_URI REDIS_URI PORT S2P_SANDBOX LANGGRAPH_DEPLOYMENT_URL"
+while IFS= read -r KEY; do
+  case " $SKIP " in *" $KEY "*) continue ;; esac
+  VALUE="$(sed -n "s/^${KEY}=//p" .env | tail -1 | tr -d '"'"'"'' || true)"
   [ -n "${VALUE:-}" ] && SECRETS+=("$KEY=$VALUE")
-done
+done < <(sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' .env | sort -u)
 fly secrets set -a "$APP" "${SECRETS[@]}" --stage
 echo "   set: ${#SECRETS[@]} secrets (values not shown)"
 

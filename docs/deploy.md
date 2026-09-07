@@ -345,3 +345,38 @@ be `linux/amd64` for most hosts.
 `langgraph.nostore.json` is kept as the config that actually started in the
 cloud — the sidecar patch with no `store` block. It is the fallback if a host
 ever hands us a Postgres we cannot create extensions on.
+
+## 10. It is live on Fly (2026-09-07, same day)
+
+<https://s2p.fly.dev> — three machines in `iad`: this image at 2 GB, a
+`pgvector/pgvector:pg16` we are superuser on, and `redis:6`. Set up by
+[`deploy/fly/deploy.sh`](../deploy/fly/deploy.sh), which is also the redeploy
+command. About $19.50/month, and the same file that took six failed revisions
+on the managed platform converts through it:
+
+```
+gates    : compile=PASS  residue=PASS  lint=PASS  parity=PASS
+critic   : pass
+```
+
+The reflection loop runs there too — a second call took two full
+convert/validate/critic laps before assembling. `/info` reports
+`"kind":"self-hosted"`, running `langgraph-api` 0.13.4 in lite mode against the
+LangSmith API key, with both graphs and the embeddings function registered.
+
+`store.index` is back in `langgraph.json`, because on our own database
+`CREATE EXTENSION vector` — and `ltree`, and `btree_gin` — simply succeed.
+That is the whole difference between §9 and this section.
+
+Everything learned in the process is in
+[deploy/fly/README.md](../deploy/fly/README.md): why secrets are forwarded from
+`.env` wholesale rather than from a list (a missing `ANTHROPIC_WORKSPACE_ID`
+produced a clean startup and then `400 Bad Request` on every model call), why a
+`[[services]]` block is a request for public ingress that a database should not
+make, and why `set -o pipefail` turns `tr </dev/urandom | head -c 32` into a
+fatal error.
+
+Cost is bounded by shape, not by a cap — Fly has neither spending limits nor
+billing alerts, and support has confirmed prepaid credit is not a substitute.
+`deploy/fly/cost.sh` shows what is running against what should be;
+`deploy/fly/teardown.sh` is the off switch.

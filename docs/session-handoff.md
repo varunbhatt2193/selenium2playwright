@@ -1,9 +1,19 @@
-# Restart here — 2026-09-07 (after 10.2; the managed platform could not host it)
+# Restart here — 2026-09-07 (10.2 done: it is live at https://s2p.fly.dev)
 
 ## Current position
 
-**Phases 0–9 complete, 10.1 done, 10.2 built and proven — but the cloud URL is
-blocked by a LangSmith platform bug, not by us. 🏁 M4 shipped at 9.3.** 10.1 put
+**Phases 0–9 complete, 10.1 done, 10.2 DONE — the converter is live at
+<https://s2p.fly.dev>, self-hosted on Fly. 🏁 M4 shipped at 9.3.**
+
+A file sent as text comes back `compile=PASS residue=PASS lint=PASS
+parity=PASS`, critic pass, with the reflection loop taking real laps. Three
+machines in `iad` (this image, `pgvector/pgvector:pg16`, `redis:6`), about
+$19.50/month. `./deploy/fly/deploy.sh` deploys and redeploys;
+`./deploy/fly/cost.sh` shows what is running; `./deploy/fly/teardown.sh --yes`
+is the off switch — Fly has no spending cap, so that script *is* the cap. Read
+[deploy/fly/README.md](../deploy/fly/README.md) before touching any of it.
+
+The managed platform is the part that failed, and it is history now: 10.1 put
 the graphs behind `langgraph dev`; 10.2 made them *deployable*: the file travels
 as text (`source_text`), and the image carries the pinned Node toolchain the four
 gates shell out to. Verified against the REAL deployment image on the REAL stack
