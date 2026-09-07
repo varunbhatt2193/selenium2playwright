@@ -12,6 +12,8 @@ from __future__ import annotations
 import os
 
 from langchain.chat_models import init_chat_model
+from langchain.embeddings import init_embeddings
+from langchain_core.embeddings import Embeddings
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import BaseMessage, SystemMessage
 from langchain_core.prompt_values import PromptValue
@@ -22,6 +24,17 @@ from selenium2playwright import env
 # A converted test file is ~500-2,000 tokens; most providers default max_tokens
 # to ~1k, which would silently truncate it mid-file. 8k is safe headroom.
 MAX_OUTPUT_TOKENS = 8_192
+
+# Vector width per embeddings model. The store bakes this into its SQLite index
+# at creation, so it must be right before the first write, not discovered after.
+# An unlisted model is probed once (one tiny embed call) rather than guessed.
+EMBEDDING_DIMS = {
+    "openai:text-embedding-3-small": 1536,
+    "openai:text-embedding-3-large": 3072,
+    "voyage:voyage-3.5-lite": 1024,
+    "voyage:voyage-3.5": 1024,
+    "google_genai:gemini-embedding-001": 3072,
+}
 
 
 def make_model(model_name: str | None = None, *, for_critic: bool = False) -> BaseChatModel:
@@ -80,3 +93,24 @@ def _mark_system_cacheable(prompt: PromptValue) -> list[BaseMessage]:
             m = SystemMessage(content=[block])
         out.append(m)
     return out
+
+
+def make_embeddings(name: str | None = None) -> Embeddings | None:
+    """Return a ready embeddings model, or None when recall is switched off.
+
+    Same shape as make_model: LangChain's init_embeddings takes the identical
+    "provider:model" string, so choosing Voyage over OpenAI is an .env edit plus
+    `uv add langchain-voyageai`. None is a real answer, not a failure — the
+    store then lists recent memories instead of ranking them (see store.py).
+    """
+    resolved = name if name is not None else env.embeddings_name()
+    if not resolved:
+        return None
+    return init_embeddings(resolved)
+
+
+def embedding_dims(embeddings: Embeddings, name: str | None = None) -> int:
+    """How wide this model's vectors are: the table, else ask the model once."""
+    resolved = name if name is not None else env.embeddings_name()
+    known = EMBEDDING_DIMS.get(resolved)
+    return known if known else len(embeddings.embed_query("dimension probe"))

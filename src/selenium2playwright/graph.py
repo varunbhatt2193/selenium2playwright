@@ -11,6 +11,10 @@
     uv run python -m selenium2playwright.graph --thread alerts AlertsPage.ts
     uv run python -m selenium2playwright.graph --thread alerts AlertsPage.ts --answer dialogs=auto-dismiss
 
+    # step 7.3 — teach it once; every later conversation recalls it by itself
+    uv run python -m selenium2playwright.graph --remember "name page objects <Page>Page"
+    uv run python -m selenium2playwright.graph CheckoutPage.ts   # recalls it, no flag
+
 Same work as one_shot.py, restructured as a graph so that (a) every step is a
 named node in the LangSmith trace and (b) the next steps — classify/refuse,
 validate, critic loop — are new nodes and edges, not a rewrite.
@@ -32,6 +36,11 @@ Vocabulary used here, from the LangGraph docs:
            The run continues only when someone invokes the same thread with
            Command(resume=answer). The node is then re-run from its first line
            and that interrupt() call returns the answer (see risk_review).
+  store  — the other database compile() can take: not one conversation but
+           everything the user has ever asked to be remembered, filed under a
+           namespace instead of a thread_id. Nodes that declare a `store`
+           parameter are handed it. Long-term to the checkpointer's short-term
+           (see store.py).
 """
 
 from __future__ import annotations
@@ -42,18 +51,22 @@ import subprocess
 import sys
 from contextlib import ExitStack
 from pathlib import Path
-from typing import Literal, TypedDict
+from typing import Literal, Optional, TypedDict
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
+from langgraph.store.base import BaseStore
 from langgraph.types import Command, interrupt
 
-from selenium2playwright import memory, risk
+# Imported under another name: the node below must call its injected store
+# parameter `store`, because that is the name LangGraph fills in.
+from selenium2playwright import env, memory, risk
+from selenium2playwright import store as memory_store
 from selenium2playwright.classify import Classification, classify
-from selenium2playwright.llm import make_model, prepare_messages
+from selenium2playwright.llm import embedding_dims, make_embeddings, make_model, prepare_messages
 from selenium2playwright.one_shot import report_ledger, report_usage
 from selenium2playwright.prompts import (build_critic_prompt, build_prompt, format_context,
-                                         format_conventions, format_decisions)
+                                         format_conventions, format_decisions, format_remembered)
 from selenium2playwright.reflection import (MAX_ATTEMPTS, collect_todos, refinement_feedback,
                                             resolve_attempt_cap, revision_feedback, sum_usage)
 from selenium2playwright.schemas import ConversionReport, ConversionResult, Critique, Finding, ValidationReport
@@ -77,6 +90,8 @@ class ConversionState(TypedDict, total=False):
     max_attempts: int  # optional lap budget, 1..MAX_ATTEMPTS; intake fills in the default (step 6.3)
     refinement: str  # this turn's new instruction from the user; "" on a first turn (step 7.1)
     ask_risks: bool  # pause for the human on a flagged pattern (step 7.2); needs a checkpointer
+    user_id: str  # whose long-term memories to use (step 7.3); "local" unless --user says otherwise
+    remember: str  # a preference to file in long-term memory this run; "" the rest of the time
     # short-term memory (step 7.1) — written by intake, restored by the checkpointer
     turn: int  # how many times this thread has been invoked; 1 on a fresh thread
     conventions: list[str]  # every instruction this thread has been given, oldest first
@@ -87,6 +102,9 @@ class ConversionState(TypedDict, total=False):
     context_files: dict[str, str]  # absolute companion path -> contents captured at intake
     classification: Classification  # what the file is, and whether we can convert it
     risks: list[risk.Risk]  # patterns with more than one correct conversion (step 7.2)
+    # filled by recall — long-term memory, which belongs to the user, not the thread
+    recalled: list[memory_store.Memory]  # preferences close enough to this file to send
+    memory_count: int  # how many the user has in total, so "none matched" can be said out loud
     # filled by risk_review — the human's answers, kept for every later turn
     decisions: dict[str, str]  # risk kind -> the answer, an option key or the user's own words
     # filled by convert OR refuse — exactly one of them runs
@@ -135,14 +153,62 @@ def intake(state: ConversionState) -> ConversionState:
             "max_attempts": resolve_attempt_cap(state.get("max_attempts")),
             "turn": state.get("turn", 0) + 1, "conventions": conventions, "refinement": "",
             "baseline": previous.result if previous is not None else None,
+            "recalled": [], "memory_count": 0,
             "iteration": 0, "result": None, "validation": [], "critique": None,
             "conversion_error": "", "critique_error": "", "usage": None,
             "critic_usage": None, "report": None}
 
 
-def route_after_intake(state: ConversionState) -> Literal["risk_review", "refuse"]:
+def route_after_intake(state: ConversionState) -> Literal["recall", "refuse"]:
     """The branching decision. Reads state, returns the next node's name."""
-    return "risk_review" if state["classification"].supported else "refuse"
+    return "recall" if state["classification"].supported else "refuse"
+
+
+# Optional[BaseStore], not the modern BaseStore | None, and that is not a style
+# slip. LangGraph decides whether to inject the store by matching this parameter
+# by name AND by the literal text of its annotation, against a fixed list that
+# holds "BaseStore" and "Optional[BaseStore]" and nothing else. `from __future__
+# import annotations` at the top of this file turns every annotation into a
+# string, so "BaseStore | None" matches none of them — and the failure is
+# silent: the node still runs, store is just always None, and long-term memory
+# quietly does nothing. tests/test_store.py pins the spelling.
+def recall(state: ConversionState, *, store: Optional[BaseStore] = None) -> ConversionState:  # noqa: UP045
+    """Step 7.3 — file this run's new preference, then fetch the ones that fit.
+
+    LangGraph hands a node the store by parameter name, so this signature is the
+    whole wiring. store=None is the default everywhere else — the stateless
+    graph, the eval runner, every earlier phase — and then this node returns
+    nothing and the prompt is byte-identical to Phase 6.
+
+    Two things happen here, in this order for a reason. A preference given now
+    (--remember) is written first and always sent, because the user just said it;
+    it never has to survive a similarity threshold to be obeyed this run. Then
+    the store is asked which *older* preferences are close enough to this file to
+    be worth the tokens — the answer is usually a subset, sometimes none, and
+    both are reported rather than assumed.
+
+    Anything already standing on this thread is excluded: a rule the user
+    repeated locally should reach the model once, not twice.
+    """
+    if store is None:
+        return {}
+    user = state.get("user_id") or memory_store.DEFAULT_USER
+    fresh: list[memory_store.Memory] = []
+    new = (state.get("remember") or "").strip()
+    if new:
+        fresh.append(memory_store.remember(store, new, user, source=state["source_path"]))
+    query = memory_store.recall_query(state["source_path"], state["classification"], state["source"])
+    found = memory_store.recall(store, query, user,
+                                exclude=[*state.get("conventions", []), *(m.text for m in fresh)])
+    # "": consumed, like refinement in intake. A later turn on this thread must
+    # not silently re-file a preference the user typed once.
+    return {"recalled": [*fresh, *found], "remember": "",
+            "memory_count": len(memory_store.memories(store, user))}
+
+
+def remembered(state: ConversionState) -> str:
+    """The recalled preferences as prompt text; "" when there is no store."""
+    return format_remembered([m.text for m in state.get("recalled", [])])
 
 
 def risk_review(state: ConversionState) -> ConversionState:
@@ -204,7 +270,8 @@ def convert(state: ConversionState) -> ConversionState:
             feedback = refinement_feedback(state["baseline"])
         structured_model = make_model().with_structured_output(ConversionResult, include_raw=True)
         chain = (build_prompt(revision=feedback, decisions=guidance(state),
-                              conventions=format_conventions(state.get("conventions", [])))
+                              conventions=format_conventions(state.get("conventions", [])),
+                              remembered=remembered(state))
                  | prepare_messages() | structured_model)
         response = chain.invoke(
             {"file_path": state["source_path"], "source": state["source"], "context": state["context"]}
@@ -284,7 +351,7 @@ def critic(state: ConversionState) -> ConversionState:
             Critique, method="json_schema", include_raw=True,
         )
         chain = (build_critic_prompt(conventions=format_conventions(state.get("conventions", [])),
-                                     decisions=guidance(state))
+                                     decisions=guidance(state), remembered=remembered(state))
                  | prepare_messages(for_critic=True) | structured_model)
         evidence = "\n\n".join(
             f"{'PASS' if r.passed else 'FAIL'} {r.render()}"
@@ -375,15 +442,20 @@ def assemble(state: ConversionState) -> ConversionState:
     return {"report": report}
 
 
-def build_graph(checkpointer: BaseCheckpointSaver | None = None):
+def build_graph(checkpointer: BaseCheckpointSaver | None = None, store: BaseStore | None = None):
     """Up to max_attempts convert/validate/critic laps, then assemble. Refuse goes to END.
 
     checkpointer=None (the default) is the stateless graph every earlier phase
     and the eval runner use: nothing is written, nothing is restored. Pass one
     and each invoke becomes a turn of the conversation named by thread_id.
+
+    store=None likewise: no long-term memory, so nothing is recalled and nothing
+    is written. The two are independent — a one-off run with no thread can still
+    recall what you taught it last week.
     """
     builder = StateGraph(ConversionState)
     builder.add_node("intake", intake)
+    builder.add_node("recall", recall)
     builder.add_node("risk_review", risk_review)
     builder.add_node("convert", convert)
     builder.add_node("refuse", refuse)
@@ -394,7 +466,8 @@ def build_graph(checkpointer: BaseCheckpointSaver | None = None):
     # After intake, ask route_after_intake which node comes next. The mapping
     # {returned name: node name} is what lets LangGraph draw the branch.
     builder.add_conditional_edges("intake", route_after_intake,
-                                  {"risk_review": "risk_review", "refuse": "refuse"})
+                                  {"recall": "recall", "refuse": "refuse"})
+    builder.add_edge("recall", "risk_review")
     builder.add_edge("risk_review", "convert")
     builder.add_conditional_edges("convert", route_after_convert,
                                   {"validate": "validate", "assemble": "assemble"})
@@ -403,7 +476,7 @@ def build_graph(checkpointer: BaseCheckpointSaver | None = None):
                                   {"convert": "convert", "assemble": "assemble"})
     builder.add_edge("assemble", END)
     builder.add_edge("refuse", END)
-    return builder.compile(checkpointer=checkpointer)
+    return builder.compile(checkpointer=checkpointer, store=store)
 
 
 def report_thread(state: ConversionState, db: Path, thread_id: str) -> None:
@@ -433,6 +506,75 @@ def report_risks(state: ConversionState) -> None:
         else:
             print(f"  {where} — not asked; converted with the playbook default. "
                   f"Rerun with --thread to be asked, or --answer {item.kind}=<key>.", file=sys.stderr)
+
+
+def report_recall(state: ConversionState) -> None:
+    """What long-term memory contributed — including when the answer is nothing.
+
+    A preference that exists but was not close enough to this file is the
+    interesting case: it silently did not apply, so it is said out loud, with
+    the number, so "why did it not use my rule?" has an answer on screen.
+    """
+    recalled = state.get("recalled", [])
+    total = state.get("memory_count", 0)
+    if not total and not recalled:
+        return
+    if not recalled:
+        print(f"Long-term memory: {total} remembered preference(s), none close enough to this "
+              f"file (minimum score {memory_store.MIN_SCORE}). See --memories.", file=sys.stderr)
+        return
+    print(f"Long-term memory: applying {len(recalled)} of {total} remembered preference(s)",
+          file=sys.stderr)
+    for item in recalled:
+        how = f"score {item.score:.2f}" if item.score is not None else "unranked — semantic recall off"
+        print(f"  {item.key} ({how}) {item.text}", file=sys.stderr)
+
+
+def embeddings_for(writing: bool, parser: argparse.ArgumentParser):
+    """The configured embeddings model and its width, or (None, None).
+
+    None is fine for reading — recall falls back to the most recent memories and
+    says so. It is not fine for writing: a memory stored without a vector can
+    never be found by a later semantic search, so that is a hard error with the
+    two ways out, rather than a memory that quietly never comes back.
+    """
+    name = env.embeddings_name()
+    if not name:
+        return None, None
+    try:
+        model = make_embeddings()
+        return model, embedding_dims(model)
+    except Exception as exc:  # missing key, missing package, provider down
+        if writing:
+            parser.error(f"S2P_EMBEDDINGS={name} could not be loaded ({exc}); a memory written now "
+                         "could never be recalled. Fix its key, or set S2P_EMBEDDINGS=off to keep "
+                         "memories without semantic search.")
+        print(f"Long-term memory: {name} unavailable ({exc}); recall falls back to the most "
+              "recent memories.", file=sys.stderr)
+        return None, None
+
+
+def manage_memories(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
+    """--memories / --forget / a bare --remember: the store, with no conversion.
+
+    Listing and deleting address a key exactly, so they need no embeddings at
+    all; writing does, which is why the model is only built when it is used.
+    """
+    writing = bool(args.remember)
+    with ExitStack() as stack:
+        embeddings, dims = embeddings_for(writing, parser) if writing else (None, None)
+        store = stack.enter_context(memory_store.open_store(args.memory_db, embeddings, dims))
+        if args.remember:
+            saved = memory_store.remember(store, args.remember, args.user, source="cli")
+            print(f"remembered [{saved.key}] {saved.text}", file=sys.stderr)
+        if args.forget:
+            gone = memory_store.forget(store, args.forget, args.user)
+            print(f"forgot [{args.forget}]" if gone else f"no memory [{args.forget}] to forget",
+                  file=sys.stderr)
+        if args.memories:
+            for item in memory_store.memories(store, args.user):
+                print(f"{item.key}  {item.text}")
+    return 0
 
 
 def ask_human(payload: dict, interactive: bool) -> str:
@@ -488,13 +630,30 @@ def main(argv: list[str] | None = None) -> int:
                         help="answer a risk question up front, e.g. --answer dialogs=auto-dismiss")
     parser.add_argument("--no-ask", action="store_true",
                         help="never pause on a flagged pattern; report it and use the playbook default")
+    parser.add_argument("--remember", default="", metavar="PREFERENCE",
+                        help="file a preference in long-term memory: it applies now and in every "
+                             'future conversation, e.g. --remember "name page objects <Page>Page"')
+    parser.add_argument("--user", default=memory_store.DEFAULT_USER,
+                        help="whose long-term memories to use (default: local)")
+    parser.add_argument("--memories", action="store_true", help="print remembered preferences and exit")
+    parser.add_argument("--forget", metavar="KEY", help="delete one remembered preference by key and exit")
+    parser.add_argument("--no-recall", action="store_true",
+                        help="ignore long-term memory for this run; nothing is read or written")
     parser.add_argument("--db", type=Path, default=memory.DEFAULT_DB, help="thread database file")
+    parser.add_argument("--memory-db", type=Path, default=memory_store.DEFAULT_DB,
+                        help="long-term memory database file (separate from --db: it outlives threads)")
     parser.add_argument("--list-threads", action="store_true", help="print saved thread ids in --db and exit")
     args = parser.parse_args(argv)
     if args.list_threads:
         for thread_id in memory.list_threads(args.db):
             print(thread_id)
         return 0
+    if args.no_recall and (args.remember or args.memories or args.forget):
+        parser.error("--no-recall turns long-term memory off; it cannot be combined with "
+                     "--remember, --memories or --forget")
+    # Teaching, listing or forgetting on their own: no file to convert, no model call.
+    if args.memories or args.forget or (args.remember and args.source is None and not args.thread):
+        return manage_memories(args, parser)
     if args.source is None and not args.thread:
         parser.error("give a source file, or --thread <id> to continue a saved conversation")
     if args.out and args.source is not None and args.out.resolve() in {p.resolve() for p in
@@ -514,12 +673,19 @@ def main(argv: list[str] | None = None) -> int:
     answers = parse_answers(args.answer, parser)
     # Pausing needs a checkpointer to pause into, so only a --thread run can ask.
     inputs["ask_risks"] = bool(args.thread) and not args.no_ask
-    config = {"run_name": "conversion-graph", "tags": ["step:7.2", "prompt:v1", "critic:v1"],
+    inputs["user_id"] = args.user
+    if args.remember:
+        inputs["remember"] = args.remember
+    config = {"run_name": "conversion-graph", "tags": ["step:7.3", "prompt:v1", "critic:v1"],
               "recursion_limit": 3 * MAX_ATTEMPTS + 5}
 
     with ExitStack() as stack:
         checkpointer = stack.enter_context(memory.open_checkpointer(args.db)) if args.thread else None
-        graph = build_graph(checkpointer)
+        store = None
+        if not args.no_recall:
+            embeddings, dims = embeddings_for(bool(args.remember), parser)
+            store = stack.enter_context(memory_store.open_store(args.memory_db, embeddings, dims))
+        graph = build_graph(checkpointer, store)
         if args.thread:
             config = memory.thread_config(args.thread, **config)
             saved = memory.thread_state(graph, args.thread)
@@ -551,6 +717,7 @@ def main(argv: list[str] | None = None) -> int:
         report_thread(final, args.db, args.thread)
     c = final["classification"]
     print(f"[{c.automation} · {c.runner} · {c.language}] {c.reason}", file=sys.stderr)
+    report_recall(final)
     report_risks(final)
     if final["status"] == "refused":
         print(f"✗ not converted: {final['refusal']}", file=sys.stderr)

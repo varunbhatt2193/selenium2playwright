@@ -56,12 +56,13 @@ class ReflectionTests(unittest.TestCase):
                                  todos=["TODO(review): Await the fill operation."])
         with self.replies([draft, ConversionResult(code=GOLDEN)], [REVISE, PASS]):
             updates = list(graph.build_graph().stream({"source_path": str(SOURCE)}, stream_mode="updates"))
-        # risk_review (step 7.2) runs on every supported file; with nothing to ask
-        # about, and nothing asking, it is a no-op pass-through on the way to convert.
+        # recall (7.3) and risk_review (7.2) run on every supported file. With no
+        # store attached and nothing to ask about, both are no-op pass-throughs on
+        # the way to convert, and the prompts stay byte-identical to Phase 6.
         self.assertEqual([next(iter(u)) for u in updates],
-                         ["intake", "risk_review", "convert", "validate", "critic",
+                         ["intake", "recall", "risk_review", "convert", "validate", "critic",
                           "convert", "validate", "critic", "assemble"])
-        self.assertFalse(updates[3]["validate"]["validation"][2].passed)
+        self.assertFalse(updates[4]["validate"]["validation"][2].passed)
         report = updates[-1]["assemble"]["report"]
         self.assertEqual((report.status, report.attempts), ("passed", 2))
         self.assertEqual(report.result.code, GOLDEN)
@@ -72,8 +73,8 @@ class ReflectionTests(unittest.TestCase):
         feedback = self.conversion_prompts[1][-1].content
         for evidence in ("previous_conversion", "usernameInput.fill", "no-floating-promises", REVISE.fixes[0]):
             self.assertIn(evidence, feedback)
-        self.assertEqual(updates[5]["convert"]["usage"]["total_tokens"], 30)
-        self.assertEqual(updates[7]["critic"]["critic_usage"]["input_token_details"]["cache_read"], 6)
+        self.assertEqual(updates[6]["convert"]["usage"]["total_tokens"], 30)
+        self.assertEqual(updates[8]["critic"]["critic_usage"]["input_token_details"]["cache_read"], 6)
 
     def test_persistent_failure_stops_at_three_attempts(self):
         with self.replies([ConversionResult(code=BROKEN)] * MAX_ATTEMPTS, [PASS] * MAX_ATTEMPTS):

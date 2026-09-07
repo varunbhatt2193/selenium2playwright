@@ -53,6 +53,7 @@ IN_MEMORY = ":memory:"
 CHECKPOINT_TYPES: tuple[tuple[str, str], ...] = (
     ("selenium2playwright.classify", "Classification"),
     ("selenium2playwright.risk", "Risk"),
+    ("selenium2playwright.store", "Memory"),
     ("selenium2playwright.schemas", "ConversionResult"),
     ("selenium2playwright.schemas", "Critique"),
     ("selenium2playwright.schemas", "Finding"),

@@ -1,15 +1,78 @@
-# Restart here — 2026-09-06 (after 7.2, human-in-the-loop)
+# Restart here — 2026-09-07 (after 7.3, long-term memory)
 
 ## Current position
 
-**Phase 7.2 is complete: a risky pattern suspends the run with `interrupt()`,
-your answer resumes it, and the answer changes the output — proved live. Next is
-7.3 (long-term memory, the Store); it has not started.**
-Read [human-in-the-loop.md](human-in-the-loop.md) first, then
-[short-term-memory.md](short-term-memory.md) (7.2 is built on 7.1's
-checkpointer). Commit/push authorization persists. The 150-line /
-one-file-at-a-time rule was removed by Varun on 2026-09-06: complete a step
-when asked, then one walkthrough.
+**Phase 7 is complete. 7.3 gave the agent a store of its own: a preference
+taught in one conversation is recalled by itself in a fresh one, ranked by
+embeddings against a profile of the file — proved live. Next is Phase 8.1
+(a Typer `s2p` CLI); it has not started.**
+Read [long-term-memory.md](long-term-memory.md) first, then
+[human-in-the-loop.md](human-in-the-loop.md) and
+[short-term-memory.md](short-term-memory.md). Commit/push authorization
+persists. The 150-line / one-file-at-a-time rule was removed by Varun on
+2026-09-06: complete a step when asked, then one walkthrough.
+
+## What 7.3 built
+
+- `store.py`: `Memory(key, text, score, created)`, `open_store` (SqliteStore +
+  vector index; records which embeddings model built the file and refuses to
+  open it with another), `remember`/`forget`/`memories`/`recall`, and
+  `recall_query` — a distilled **profile** of the file (kind, name, class, test
+  titles, methods, locator strategies, element ids, camelCase split into words),
+  not the file itself.
+- `graph.recall` between `intake` and `risk_review`, given the store by
+  `compile(store=…)`. New state: `user_id`, `remember`, `recalled`,
+  `memory_count`. A preference given this run is always sent; older ones must
+  clear `MIN_SCORE`; anything already standing on the thread is excluded.
+- `prompts.format_remembered` + a REMEMBERED PREFERENCES block ahead of
+  conventions and decisions, to actor *and* critic, plus a rubric line saying an
+  ignored preference is not a defect.
+- Embeddings: `env.embeddings_name()` / `llm.make_embeddings()` /
+  `llm.embedding_dims()`, default **`openai:text-embedding-3-small`**,
+  `S2P_EMBEDDINGS=off` supported, Voyage a one-line swap. `langchain-openai` is
+  now a direct dependency. `Memory` added to `memory.CHECKPOINT_TYPES`.
+- CLI: `--remember`, `--memories`, `--forget`, `--user`, `--no-recall`,
+  `--memory-db` (separate file from `--db`; the store outlives threads).
+- `scripts/calibrate_recall.py`, `scripts/demo_store.py`, artifacts in `out/7.3/`.
+- Tests: `tests/test_store.py` (30); 191 total.
+
+## 7.3 sharp edges (LangGraph/library behaviour, not our bugs)
+
+- **`SqliteStore` reads `text_fields`, not the documented `fields`.** Give it
+  only `fields` and it silently embeds `"$"` — the whole JSON document — so each
+  memory's `source` path lands in its own vector and the same sentence scores
+  differently depending on where it was written (0.3238 vs 0.3954, observed).
+  `open_store` passes both keys.
+- **`store: BaseStore | None` silently disables injection.** LangGraph matches
+  the parameter by name *and by the literal text of the annotation*, against a
+  list holding `"BaseStore"` / `"Optional[BaseStore]"` only. With
+  `from __future__ import annotations` the modern union spelling matches nothing:
+  the node runs, `store` is always None, nothing is ever recalled, no error.
+- **A memory written to an unindexed store can never be found again** (vectors
+  are computed on write). `--remember` therefore hard-fails when embeddings
+  cannot be loaded; reading degrades to recency and says so.
+- **`SqliteStore.setup()` needs `isolation_level=None`** or its migrations raise
+  "cannot start a transaction within a transaction".
+
+## Recall calibration (measured, `out/7.3/recall-calibration.json`)
+
+The naive "paste the head of the file" query separates nothing: lowest genuinely
+applicable 0.2962 sits *below* the loudest unrelated 0.3044. The profile query
+fixes the ranking (naming wins on page objects, fixtures on specs, noise at the
+bottom). The bands still overlap, so the verdict is a **shortlist** check, not a
+threshold hunt: at `MIN_SCORE = 0.29`, cap 3, the six sample files recall
+**11 of 15 applicable and 0 of 18 unrelated**. Every miss is one vaguely worded
+memory: prefixing the same rule with "In test specs," moved it 0.281 → 0.320.
+Re-run the script after changing the embeddings model or the query.
+
+## Live 7.3 demo (Sonnet actor + critic, `out/7.3/`)
+
+Taught while converting `pages/LoginPage.ts` on thread `monday`, applied by
+itself on `tests/upload.spec.ts` in fresh thread `wednesday` with nothing typed:
+`test.step` blocks, **25 lines** different from the storeless control, all three
+arms **4/4 gates + critic pass in 1 attempt**, +394 actor tokens for the recall.
+Three of four memories correctly stayed behind (the vague twin, a page object
+rule, and the CI/S3 noise). Receipt `out/7.3/demo-receipt.json`.
 
 ## What 7.2 built
 
@@ -168,7 +231,8 @@ authorization persists; check `gh auth status` is on `varunbhatt2193` before
 pushing. Repo `/Users/varunbhatt/Downloads/Selenium2Playwright`, main, remote
 `https://github.com/varunbhatt2193/selenium2playwright.git`. `.env`, `out/`,
 `roadmap.md`, `plan-review.md` stay ignored; never expose credentials.
-`S2P_MODEL` = actor, `S2P_CRITIC_MODEL` = critic (optional); eval CLIs
-default to Opus. Use the existing `.venv` and Node toolchains. Chrome
+`S2P_MODEL` = actor, `S2P_CRITIC_MODEL` = critic (optional),
+`S2P_EMBEDDINGS` = recall (default `openai:text-embedding-3-small`, `off`
+supported); eval CLIs default to Opus. Use the existing `.venv` and Node toolchains. Chrome
 computer-use works for LangSmith screenshots (crop the sidebar with `sips`,
 offset 208 px); close tabs when done.

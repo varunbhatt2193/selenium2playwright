@@ -22,11 +22,21 @@ load_dotenv(override=False)
 # API key must exist; the model half is passed through untouched.
 DEFAULT_MODEL = "anthropic:claude-sonnet-5"
 
+# Embeddings turn a memory into a list of numbers so the store can rank by
+# meaning (step 7.3). Anthropic ships none, so the default is OpenAI's small
+# model: 1536 dimensions, cheapest of the good ones, and a memory set is tiny
+# (a few dozen sentences re-embedded once each). Swap providers with
+# S2P_EMBEDDINGS="voyage:voyage-3.5-lite" and its package; S2P_EMBEDDINGS=off
+# turns semantic recall off entirely and needs no key.
+DEFAULT_EMBEDDINGS = "openai:text-embedding-3-small"
+EMBEDDINGS_OFF = "off"
+
 # provider -> (env var, expected prefix). Prefix catches "right var, wrong paste".
 PROVIDER_KEYS = {
     "anthropic": ("ANTHROPIC_API_KEY", "sk-ant-"),  # console.anthropic.com -> API Keys
     "openai": ("OPENAI_API_KEY", "sk-"),  # platform.openai.com -> API keys
     "google_genai": ("GOOGLE_API_KEY", "AIza"),  # aistudio.google.com -> Get API key
+    "voyage": ("VOYAGE_API_KEY", "pa-"),  # dash.voyageai.com -> API Keys (embeddings only)
 }
 
 ALWAYS_REQUIRED = {
@@ -59,7 +69,20 @@ def judge_model_name() -> str:
     return os.environ.get("S2P_JUDGE_MODEL") or critic_model_name()
 
 
-ROLE_VARIABLES = {"actor": "S2P_MODEL", "critic": "S2P_CRITIC_MODEL", "judge": "S2P_JUDGE_MODEL"}
+def embeddings_name() -> str:
+    """The embeddings 'provider:model' string, or "" when recall is switched off.
+
+    Empty means "use the default", exactly like S2P_MODEL — a blank line in
+    .env is not a decision. The literal value "off" is the decision: no
+    embeddings model, no key required, and the store falls back to listing the
+    most recent memories instead of ranking them by meaning.
+    """
+    name = os.environ.get("S2P_EMBEDDINGS") or DEFAULT_EMBEDDINGS
+    return "" if name.strip().lower() == EMBEDDINGS_OFF else name
+
+
+ROLE_VARIABLES = {"actor": "S2P_MODEL", "critic": "S2P_CRITIC_MODEL", "judge": "S2P_JUDGE_MODEL",
+                  "embeddings": "S2P_EMBEDDINGS"}
 
 
 def model_names() -> dict[str, str]:
@@ -74,7 +97,10 @@ def provider(name: str | None = None) -> str:
 def required() -> dict[str, str]:
     """Vars this configuration needs: LangSmith + a key for every provider in use."""
     needed = dict(ALWAYS_REQUIRED)
-    for role, name in model_names().items():
+    roles = model_names()
+    if embeddings_name():
+        roles["embeddings"] = embeddings_name()
+    for role, name in roles.items():
         if provider(name) not in PROVIDER_KEYS:
             variable = ROLE_VARIABLES[role]
             raise ValueError(
@@ -93,6 +119,7 @@ def masked(value: str) -> str:
 
 def check() -> bool:
     """Print one line per required var; return True only if all are usable."""
+    print(f"embeddings: {embeddings_name() or 'off (recall lists the most recent memories)'}")
     print(f"model: {model_name()}" + (f"  (critic: {critic_model_name()})" if critic_model_name() != model_name() else ""))
     ok = True
     for name, prefix in required().items():

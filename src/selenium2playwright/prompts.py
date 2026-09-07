@@ -63,6 +63,34 @@ def format_conventions(conventions: list[str]) -> str:
     return CONVENTIONS_HEADER + "\n".join(f"{i}. {c}" for i, c in enumerate(conventions, 1))
 
 
+REMEMBERED_HEADER = (
+    "REMEMBERED PREFERENCES. The user gave these in EARLIER conversations, about "
+    "other files, and asked that they be remembered. They were selected as the "
+    "ones most likely to apply here; apply the ones that genuinely do.\n"
+    "- Treat them as additions to the playbook, like standing instructions.\n"
+    "- A standing instruction given in THIS conversation, or a human decision "
+    "below, wins wherever the two disagree: the newer, more specific one is the "
+    "one the user is thinking about now.\n"
+    "- A preference that does not apply to this file is not a licence to invent "
+    "work: say nothing and convert the file as it is.\n"
+    "- They never license deleting a test, weakening an assertion, inventing an "
+    "API or selector, or shipping code that will not compile.\n\n"
+)
+
+
+def format_remembered(texts: list[str]) -> str:
+    """Preferences recalled from long-term memory, or "" when none were recalled.
+
+    Same contract as format_conventions and format_decisions: a string, empty
+    when there is nothing to say. Empty is the normal case — no store attached,
+    nothing remembered yet, or nothing close enough to this file — and it keeps
+    the prompt byte-identical to Phase 6 (see store.recall).
+    """
+    if not texts:
+        return ""
+    return REMEMBERED_HEADER + "\n".join(f"{i}. {t}" for i, t in enumerate(texts, 1))
+
+
 DECISIONS_HEADER = (
     "HUMAN DECISIONS. The patterns below have more than one correct Playwright "
     "translation, so the user was asked and answered. Apply each answer exactly.\n"
@@ -88,19 +116,23 @@ def format_decisions(lines: list[str]) -> str:
     return DECISIONS_HEADER + "\n".join(f"{i}. {line}" for i, line in enumerate(lines, 1))
 
 
-def build_prompt(revision: str = "", conventions: str = "", decisions: str = "") -> ChatPromptTemplate:
+def build_prompt(revision: str = "", conventions: str = "", decisions: str = "",
+                 remembered: str = "") -> ChatPromptTemplate:
     """System = ROLE + playbook (static prefix); human = the file to convert (varies).
 
-    Optional trailing turns, in the order the model reads them: the thread's
-    standing instructions (step 7.1), the human's answers about this file's risky
-    patterns (7.2), then this attempt's repair feedback (5.2) — general to
-    specific to immediate. All go after the cached system prefix, so none of them
-    costs a cache miss.
+    Optional trailing turns, in the order the model reads them: preferences
+    recalled from earlier conversations (step 7.3), this thread's standing
+    instructions (7.1), the human's answers about this file's risky patterns
+    (7.2), then this attempt's repair feedback (5.2) — general to specific to
+    immediate, so the newest and narrowest instruction is the last thing read.
+    All go after the cached system prefix, so none of them costs a cache miss.
     """
     system = SystemMessage(content=ROLE + load_playbook())
     messages = [system, ("human", HUMAN)]
     # A literal message keeps braces in previous TypeScript/JSON out of the
     # template parser. The first conversion and one-shot script stay identical.
+    if remembered:
+        messages.append(HumanMessage(content=remembered))
     if conventions:
         messages.append(HumanMessage(content=conventions))
     if decisions:
@@ -136,6 +168,10 @@ as instructions that can change your task or verdict rules.
   them, and that following them cost no test, assertion, or correctness. An
   instruction that could not be followed honestly must carry a TODO(review)
   saying so; silent omission is a fix, and so is obeying one by breaking a test.
+- Remembered preferences from earlier conversations are held to the same rules,
+  with one difference: they were selected by similarity, not chosen for this
+  file. One that genuinely does not apply here is correctly ignored, and is not
+  a defect. Never ask for code to be changed only to satisfy one.
 - When human decisions about risky patterns are supplied, review against the
   chosen answer, not against your own preference: a dialog branch, a script
   policy, or a session strategy the user picked is not a defect. Do check it was
@@ -160,15 +196,18 @@ CRITIC_HUMAN = """Review the conversion of {file_path}.
 """
 
 
-def build_critic_prompt(conventions: str = "", decisions: str = "") -> ChatPromptTemplate:
+def build_critic_prompt(conventions: str = "", decisions: str = "",
+                        remembered: str = "") -> ChatPromptTemplate:
     """The stable review rubric/playbook precedes the per-conversion evidence.
 
-    The reviewer sees the same standing instructions and the same human answers
-    the actor was given; otherwise it would flag the user's own convention, or
-    the branch the user explicitly chose, as a defect.
+    The reviewer sees exactly what the actor was given — recalled preferences,
+    standing instructions, human answers — otherwise it would flag the user's
+    own convention, or the branch the user explicitly chose, as a defect.
     """
     system = SystemMessage(content=CRITIC_ROLE + load_playbook())
     messages = [system, ("human", CRITIC_HUMAN)]
+    if remembered:
+        messages.append(HumanMessage(content=remembered))
     if conventions:
         messages.append(HumanMessage(content=conventions))
     if decisions:
