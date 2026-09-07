@@ -46,7 +46,8 @@ class CriticTests(unittest.TestCase):
         review = Critique(verdict="revise", fixes=["LoginPage.ts:23: await the fill() call."])
         with self.reply(review) as make_model:
             update = graph.critic(self.state)
-        make_model.assert_called_once_with(for_critic=True)
+            # The resolved critic name, or None when no state recorded one (8.2).
+            make_model.assert_called_once_with(None, for_critic=True)
         self.model.with_structured_output.assert_called_once_with(Critique, method="json_schema", include_raw=True)
         human = self.prompts[0][-1].content
         for evidence in ("source evidence", "converted evidence", "companion evidence", "decision evidence",

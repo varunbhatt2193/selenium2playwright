@@ -3,8 +3,9 @@
 Everything else speaks LangChain: BaseChatModel, messages, Runnables. Swapping
 Anthropic for OpenAI/Gemini/Bedrock is `uv add langchain-<provider>` plus
 S2P_MODEL="provider:model" in .env; no other file changes. Roadmap rule 5:
-develop on claude-sonnet-5 (cheap), opus for evals/demos. Phase 8 turns this
-into a CLI flag via a configurable field on the same init_chat_model call.
+develop on claude-sonnet-5 (cheap), opus for evals/demos. Step 8.2 added the
+runtime path: `s2p convert --model opus` reaches make_model as an argument,
+through the graph's context schema, and beats the environment for that run.
 """
 
 from __future__ import annotations
@@ -37,6 +38,15 @@ EMBEDDING_DIMS = {
 }
 
 
+def resolve_name(model_name: str | None = None, *, for_critic: bool = False) -> str:
+    """The model string this call will actually use: argument > env > default.
+
+    One place decides, so the name that reaches the provider, the name in the
+    trace and the name printed on the scorecard can never drift apart.
+    """
+    return model_name or (env.critic_model_name() if for_critic else env.model_name())
+
+
 def make_model(model_name: str | None = None, *, for_critic: bool = False) -> BaseChatModel:
     """Return a ready chat model.
 
@@ -44,7 +54,7 @@ def make_model(model_name: str | None = None, *, for_critic: bool = False) -> Ba
     env fallback is S2P_CRITIC_MODEL, which itself falls back to S2P_MODEL, so
     the critic can be a different (stronger) model than the actor.
     """
-    name = model_name or (env.critic_model_name() if for_critic else env.model_name())
+    name = resolve_name(model_name, for_critic=for_critic)
     provider = name.split(":", 1)[0]
     kwargs = _client_kwargs(provider)
     if for_critic and provider == "anthropic":
@@ -72,7 +82,7 @@ def prepare_messages(model_name: str | None = None, *, for_critic: bool = False)
     for_critic resolves the same env fallback as make_model, so the marker
     always matches the model that will actually receive the messages.
     """
-    name = model_name or (env.critic_model_name() if for_critic else env.model_name())
+    name = resolve_name(model_name, for_critic=for_critic)
     provider = name.split(":", 1)[0]
     if provider == "anthropic":
         return RunnableLambda(_mark_system_cacheable)

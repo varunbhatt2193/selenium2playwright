@@ -1,7 +1,8 @@
-"""Step 8.1 — `s2p`: the command line, in Typer, with a rich scorecard and diff.
+"""Steps 8.1-8.2 — `s2p`: the command line, in Typer, with a rich scorecard and diff.
 
     uv run s2p convert samples/selenium-suite/pages/LoginPage.ts --out out/LoginPage.ts
     uv run s2p convert --thread login --refine "use data-testid locators"
+    uv run s2p convert page.ts --model opus --json        # step 8.2: pick a model, get JSON
     uv run s2p remember "name page objects <Feature>Page"
     uv run s2p memories        # what it has been taught
     uv run s2p forget <key>    # drop one
@@ -28,6 +29,12 @@ a preference that was not close enough to apply, a risk nobody was asked about,
 an unavailable critic — each one is said out loud, because the alternative is a
 user wondering why their rule did nothing.
 
+Step 8.2 adds the run-scoped settings — `--model`, `--critic-model`,
+`--max-attempts` — and hands them to the graph as its *context*, not as state:
+they describe how this one invocation runs, so they are typed fresh each time
+and never restored from a thread. `--json` puts the whole outcome on stdout as
+one document, for CI and for the callers Phase 9 and 10 will add.
+
 Exit codes (unchanged): 0 = every gate and the critic passed with no open
 TODO(review), 1 = needs-review, 2 = unsupported input or a usage error.
 """
@@ -35,8 +42,10 @@ TODO(review), 1 = needs-review, 2 = unsupported input or a usage error.
 from __future__ import annotations
 
 import difflib
+import json
 import sys
 from contextlib import ExitStack
+from dataclasses import asdict
 from pathlib import Path
 from typing import Annotated, Optional
 
@@ -72,8 +81,15 @@ MemoryDbOption = Annotated[Path, typer.Option(
     "--memory-db", help="long-term memory database (outlives threads, unlike --db)")]
 ThreadDbOption = Annotated[Path, typer.Option("--db", help="thread (conversation) database")]
 
+ModelOption = Annotated[str, typer.Option(
+    "--model", metavar="NAME",
+    help=f"actor model for this run: {' | '.join(env.MODEL_ALIASES)}, or a full provider:model")]
+
 PASS_STYLE, FAIL_STYLE, MUTED = "bold green", "bold red", "dim"
 DIFF_LIMIT = 240  # a whole-file rewrite is long; past this, read the file itself
+# Named and versioned so a consumer can check the shape it is reading rather
+# than guessing from the keys; a breaking change gets /v2, never a silent edit.
+REPORT_SCHEMA = "s2p.conversion-report/v1"
 
 
 def say(*parts: object, style: str = "") -> None:
@@ -97,6 +113,19 @@ def show_thread(state: dict, db: Path, thread_id: str) -> None:
         say("  continuing from the previous turn's conversion", style=MUTED)
     for number, convention in enumerate(state.get("conventions", []), 1):
         say(f"  standing instruction {number}: {convention}", style=MUTED)
+
+
+def show_models(state: dict) -> None:
+    """Which models actually ran. Always printed, because it is always a choice.
+
+    The names come from the state, where intake recorded what it resolved, so
+    this line cannot disagree with the model that was called (graph.model_for).
+    """
+    models = state.get("models", {})
+    if not models:
+        return
+    actor, critic = models.get("actor", "?"), models.get("critic", "?")
+    say(f"Models: actor {actor}" + ("" if critic == actor else f" · critic {critic}"), style=MUTED)
 
 
 def show_recall(state: dict) -> None:
@@ -215,16 +244,69 @@ def show_diff(before: str, after: str, before_label: str, after_label: str) -> N
                         title=f"{before_label} → {after_label}", title_align="left"))
 
 
-def present(state: dict, out: Path | None, show_diff_panel: bool) -> int:
+def json_report(state: dict, destination: Path | None, exit_code: int) -> str:
+    """The whole outcome as one JSON document — the machine-readable surface.
+
+    Everything the scorecard shows is here as data, plus what a caller cannot
+    see from the terminal: which models ran, which turn this was, what was
+    recalled and decided. The converted file is inside it, at
+    report.result.code, so `--json` alone is a complete answer and nothing has
+    to be scraped off stderr.
+
+    ConversionReport is a pydantic model, so its half serialises itself;
+    Classification is a dataclass, hence asdict. A refused run is a real
+    outcome, not an error: it produces the same document with report = null.
+    """
+    report = state.get("report")
+    document = {
+        "schema": REPORT_SCHEMA,
+        "source": state.get("source_path", ""),
+        "output": str(destination) if destination is not None else None,
+        "status": "refused" if state["status"] == "refused" else report.status if report else "failed",
+        "exit_code": exit_code,
+        "refusal": state.get("refusal", ""),
+        "classification": asdict(state["classification"]),
+        "models": state.get("models", {}),
+        "max_attempts": state.get("max_attempts", MAX_ATTEMPTS),
+        "turn": state.get("turn", 1),
+        "conventions": state.get("conventions", []),
+        "recalled": [item.text for item in state.get("recalled", [])],
+        "decisions": state.get("decisions", {}),
+        "usage": {"conversion": state.get("usage"), "critic": state.get("critic_usage")},
+        "report": report.model_dump(mode="json") if report is not None else None,
+    }
+    return json.dumps(document, indent=2)
+
+
+def emit(state: dict, destination: Path | None, exit_code: int, as_json: bool,
+         code: str | None) -> int:
+    """stdout, exactly once: the JSON document, or the converted file, or nothing.
+
+    Every return path in present() comes through here, which is what keeps the
+    promise that stdout is machine-readable and complete — a refusal in --json
+    mode is still a document, and --json never prints the raw code as well,
+    because that would leave stdout holding two things at once.
+    """
+    if as_json:
+        print(json_report(state, destination, exit_code))
+    elif code is not None:
+        print(code, end="")  # stdout: the file, and nothing else
+    return exit_code
+
+
+def present(state: dict, out: Path | None, show_diff_panel: bool, as_json: bool = False) -> int:
     """Everything the run produced, then the exit code it earned."""
     classification = state["classification"]
     say(f"[{classification.automation} · {classification.runner} · {classification.language}] "
         f"{classification.reason}", style=MUTED)
+    show_models(state)
     show_recall(state)
     show_risks(state)
+    # A resumed turn that was not given --out still knows where the file goes.
+    destination = out or (Path(state["output_path"]) if state.get("output_path") else None)
     if state["status"] == "refused":
         say(f"✗ not converted: {state['refusal']}", style=FAIL_STYLE)
-        return 2
+        return emit(state, None, 2, as_json, None)
     report = state["report"]
     say(f"Conversion: {report.status} ({report.attempts}/"
         f"{state.get('max_attempts', MAX_ATTEMPTS)} attempts) — {report.reason}",
@@ -236,15 +318,13 @@ def present(state: dict, out: Path | None, show_diff_panel: bool) -> int:
     for label, usage in (("Conversion", state.get("usage")), ("Critic", state.get("critic_usage"))):
         if usage:
             say(f"{label} tokens (all attempts): {format_usage(usage)}", style=MUTED)
-    # A resumed turn that was not given --out still knows where the file goes.
-    destination = out or (Path(state["output_path"]) if state.get("output_path") else None)
     if report.result is None:
         say("No converted code was produced; no output file was written.", style=FAIL_STYLE)
         if state.get("baseline") is not None:
             # A failed refinement turn is not a lost conversion: the turn it was
             # refining is still in the thread and still on disk. Say so.
             say("The previous turn's conversion on this thread is unchanged.")
-        return 1
+        return emit(state, None, 1, as_json, None)
     if show_diff_panel:
         baseline = state.get("baseline")
         before = baseline.code if baseline is not None else state["source"]
@@ -254,9 +334,8 @@ def present(state: dict, out: Path | None, show_diff_panel: bool) -> int:
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(report.result.code, encoding="utf-8")
         say(f"[wrote {destination}]")
-    else:
-        print(report.result.code, end="")  # stdout: the file, and nothing else
-    return 0 if report.status == "passed" else 1
+    return emit(state, destination, 0 if report.status == "passed" else 1, as_json,
+                None if destination is not None else report.result.code)
 
 
 def ask_human(payload: dict, interactive: bool) -> str:
@@ -322,6 +401,41 @@ def embeddings_for(writing: bool):
         return None, None
 
 
+def run_config(models: dict[str, str], max_attempts: int) -> dict:
+    """The LangSmith half of the same choices: tags and metadata for the trace.
+
+    Context tells the graph what to do; this tells the trace what was done, in
+    the two forms LangSmith can search on — tags for filtering a list of runs,
+    metadata for reading one. Without it, `--model opus` would be visible only
+    by opening an individual LLM span and squinting at it.
+    """
+    return {"run_name": "conversion-graph",
+            "tags": ["step:8.2", "prompt:v1", "critic:v1",
+                     f"model:{models['actor'].split(':')[-1]}", f"attempts:{max_attempts}"],
+            "metadata": {"actor_model": models["actor"], "critic_model": models["critic"],
+                         "max_attempts": max_attempts},
+            "recursion_limit": 3 * MAX_ATTEMPTS + 5}
+
+
+def resolve_models(model: str, critic_model: str) -> dict[str, str]:
+    """Turn the model flags into full names, and refuse an unusable choice now.
+
+    The key check runs only for a model named on the command line. A default
+    run is left alone on purpose: it is env.check()'s job to report a
+    misconfigured .env, and making every conversion depend on a key probe would
+    break every offline test and every scripted run that never calls a provider.
+    """
+    try:
+        names = env.resolve_roles(model, critic_model)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    for role, flag in (("actor", model), ("critic", critic_model)):
+        problem = env.key_missing(names[role]) if flag else ""
+        if problem:
+            raise typer.BadParameter(problem)
+    return names
+
+
 @app.command()
 def convert(
     source: Annotated[Optional[Path], typer.Argument(
@@ -351,6 +465,12 @@ def convert(
     max_attempts: Annotated[int, typer.Option(
         "--max-attempts", min=1, max=MAX_ATTEMPTS,
         help="total conversion attempts: 1 = no repairs; 3 = draft plus two repairs")] = MAX_ATTEMPTS,
+    model: ModelOption = "",
+    critic_model: Annotated[str, typer.Option(
+        "--critic-model", metavar="NAME",
+        help="reviewer model; defaults to the actor unless S2P_CRITIC_MODEL says otherwise")] = "",
+    as_json: Annotated[bool, typer.Option(
+        "--json", help="put the whole outcome on stdout as one JSON document, code included")] = False,
     diff: Annotated[bool, typer.Option("--diff/--no-diff", help="show the before/after diff")] = True,
     db: ThreadDbOption = memory.DEFAULT_DB,
     memory_db: MemoryDbOption = memory_store.DEFAULT_DB,
@@ -364,10 +484,11 @@ def convert(
     companions = list(context or [])
     if out and source is not None and out.resolve() in {p.resolve() for p in [source, *companions]}:
         raise typer.BadParameter("--out must differ from the source and companion files")
+    models = resolve_models(model, critic_model)
 
     # Only keys the caller actually supplied: anything omitted on a later turn
     # keeps the value the checkpointer restored, which is the whole point.
-    inputs: dict = {"max_attempts": max_attempts, "user_id": user}
+    inputs: dict = {"user_id": user}
     if source is not None:
         inputs["source_path"] = str(source)
         inputs["context_paths"] = [str(p) for p in companions]
@@ -380,8 +501,12 @@ def convert(
     answers = parse_answers(answer or [])
     # Pausing needs a checkpointer to pause into, so only a --thread run can ask.
     inputs["ask_risks"] = bool(thread) and ask
-    config = {"run_name": "conversion-graph", "tags": ["step:8.1", "prompt:v1", "critic:v1"],
-              "recursion_limit": 3 * MAX_ATTEMPTS + 5}
+    # The run-scoped half of this call: how it runs, not what it is about. It is
+    # handed to invoke() as context, so nothing here is written to the thread
+    # and every turn is free to choose again (graph.RunSettings).
+    run = graph.RunSettings(model=models["actor"], critic_model=models["critic"],
+                            max_attempts=max_attempts)
+    config = run_config(models, max_attempts)
 
     with ExitStack() as stack:
         checkpointer = stack.enter_context(memory.open_checkpointer(db)) if thread else None
@@ -401,7 +526,7 @@ def convert(
                 inputs["decisions"] = {**saved.get("decisions", {}), **answers}
         elif answers:
             inputs["decisions"] = answers
-        final = compiled.invoke(inputs, config=config)
+        final = compiled.invoke(inputs, config=config, context=run)
         # A paused invoke returns whatever it managed to write plus the question,
         # and no report: the run is suspended on the thread, not finished. Answer,
         # resume the same thread, repeat — at most one pause per risk kind,
@@ -411,7 +536,7 @@ def convert(
             if "__interrupt__" not in final:
                 break
             final = compiled.invoke(Command(resume=ask_human(final["__interrupt__"][0].value, interactive)),
-                                    config=config)
+                                    config=config, context=run)
         if "__interrupt__" in final:
             say("Still waiting on an answer after every question; nothing was converted.",
                 style=FAIL_STYLE)
@@ -419,7 +544,7 @@ def convert(
 
     if thread:
         show_thread(final, db, thread)
-    raise typer.Exit(present(final, out, diff))
+    raise typer.Exit(present(final, out, diff, as_json))
 
 
 @app.command()

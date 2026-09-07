@@ -81,6 +81,71 @@ def embeddings_name() -> str:
     return "" if name.strip().lower() == EMBEDDINGS_OFF else name
 
 
+# Short names for the models this project is developed against, so a flag can
+# read `--model opus` instead of the full string. This is a convenience table,
+# not a lock-in: any "provider:model" string is accepted untouched, and adding
+# another provider's model here is one line (model-agnostic rule).
+MODEL_ALIASES = {
+    "sonnet": "anthropic:claude-sonnet-5",
+    "opus": "anthropic:claude-opus-5",
+    "fable": "anthropic:claude-fable-5-1",
+    "haiku": "anthropic:claude-haiku-4-5-20251001",
+}
+
+
+def resolve_model(name: str) -> str:
+    """An alias or a full 'provider:model' string in; a full string out.
+
+    A bare word that is not an alias is an error rather than a guess: without a
+    provider half, init_chat_model would have to infer one, and inferring the
+    wrong provider fails much later with an unrelated authentication message.
+    """
+    text = (name or "").strip()
+    if ":" in text:
+        return text
+    if text in MODEL_ALIASES:
+        return MODEL_ALIASES[text]
+    raise ValueError(f"unknown model {name!r}; use provider:model, or one of: "
+                     f"{', '.join(MODEL_ALIASES)}")
+
+
+def resolve_roles(model: str = "", critic_model: str = "") -> dict[str, str]:
+    """Which actor and critic a run will use: flags first, then .env, then the default.
+
+    Step 8.2: a flag beats the environment, because the flag was typed just now.
+    --model alone moves the critic too, since one model for both is the default
+    arrangement (see critic_model_name) — unless the critic was chosen
+    deliberately, by --critic-model or by S2P_CRITIC_MODEL in .env, in which
+    case that split survives a change of actor.
+    """
+    actor = resolve_model(model) if model else model_name()
+    if critic_model:
+        critic = resolve_model(critic_model)
+    else:
+        critic = os.environ.get("S2P_CRITIC_MODEL") or actor
+    return {"actor": actor, "critic": critic}
+
+
+def key_missing(name: str) -> str:
+    """"" when this model's provider key is present and plausible, else why not.
+
+    Checked before a run that names a model on the command line, so a typo or an
+    unconfigured provider costs nothing instead of surfacing as an
+    authentication error a minute in. Never prints a key: the reason names the
+    variable, and any value it shows is masked.
+    """
+    who = provider(name)
+    if who not in PROVIDER_KEYS:
+        return f"unknown provider {who!r} in {name!r}; known: {', '.join(PROVIDER_KEYS)}"
+    var, prefix = PROVIDER_KEYS[who]
+    value = os.environ.get(var, "")
+    if not value:
+        return f"{name} needs {var}, which is not set (see .env.example)"
+    if not value.startswith(prefix):
+        return f"{var} is set, but does not look like a {prefix}… key: {masked(value)}"
+    return ""
+
+
 ROLE_VARIABLES = {"actor": "S2P_MODEL", "critic": "S2P_CRITIC_MODEL", "judge": "S2P_JUDGE_MODEL",
                   "embeddings": "S2P_EMBEDDINGS"}
 

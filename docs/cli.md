@@ -176,8 +176,9 @@ first time you can see all of it without scrolling.
 
 ## 8. What this is not
 
-- **Not configurable yet.** `--model`, `--json` and a config schema are step
-  8.2; today the model still comes from `S2P_MODEL` in `.env`.
+- **Not configurable, in 8.1.** `--model`, `--critic-model` and `--json` arrived
+  in step 8.2, through the graph's context schema — see [config.md](config.md).
+  In 8.1 the model still came from `S2P_MODEL` in `.env`.
 - **Not a suite runner.** One file (plus already-converted companions) per
   invocation. Walking a directory in waves is Phase 9.
 - **Not a new agent.** Same graph, same prompts, same four gates, same critic.
@@ -190,4 +191,4 @@ first time you can see all of it without scrolling.
 2. Why does the reason for a verdict sit outside the table instead of in it?
 3. What breaks if `say()` is replaced with `console.print()`?
 4. On turn 2 of a thread, what is the diff comparing — and why not the source?
-5. What still has to happen before `s2p convert --model opus` can work?
+5. What has to exist below `cli.py` before `s2p convert --model opus` can work? ([answer](config.md))

@@ -28,6 +28,13 @@ Vocabulary used here, from the LangGraph docs:
            The run continues only when someone invokes the same thread with
            Command(resume=answer). The node is then re-run from its first line
            and that interrupt() call returns the answer (see risk_review).
+  context — the run-scoped settings of a single invoke: not what the run is
+           about (that is state) but *how* it runs — which model, how many
+           attempts. Declared as a schema on StateGraph(context_schema=...),
+           passed per call as invoke(..., context=RunSettings(...)), and handed
+           to any node that declares a `runtime` parameter. Nothing about it is
+           saved: a checkpointed thread restores its state, never its context,
+           so a flag typed on turn 2 is obeyed on turn 2 (see RunSettings).
   store  — the other database compile() can take: not one conversation but
            everything the user has ever asked to be remembered, filed under a
            namespace instead of a thread_id. Nodes that declare a `store`
@@ -39,17 +46,19 @@ from __future__ import annotations
 
 import os
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Optional, TypedDict
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
+from langgraph.runtime import Runtime
 from langgraph.store.base import BaseStore
 from langgraph.types import interrupt
 
 # Imported under another name: the node below must call its injected store
 # parameter `store`, because that is the name LangGraph fills in.
-from selenium2playwright import risk
+from selenium2playwright import env, risk
 from selenium2playwright import store as memory_store
 from selenium2playwright.classify import Classification, classify
 from selenium2playwright.llm import make_model, prepare_messages
@@ -62,6 +71,42 @@ from selenium2playwright.validators.compile import compile_check
 from selenium2playwright.validators.lint import lint_check
 from selenium2playwright.validators.parity import parity_check
 from selenium2playwright.validators.residue import residue_check
+
+
+@dataclass(frozen=True)
+class RunSettings:
+    """Step 8.2 — the knobs one run may turn, and the graph's context schema.
+
+    These are choices about *how* this invocation runs, which is why they are
+    context and not state: state is the conversation (its source file, its
+    standing instructions, its last conversion) and it is checkpointed, while
+    context is passed fresh on every invoke and never saved. That distinction
+    is the whole reason `s2p convert --thread login --model opus` does what it
+    says on turn 2 instead of being overruled by what turn 1 recorded.
+
+    Empty and None mean "not chosen here", so the environment (S2P_MODEL,
+    S2P_CRITIC_MODEL) and then the defaults still decide — the same precedence
+    llm.resolve_name has always used, now with the command line on top.
+    """
+
+    model: str = ""  # the actor, "provider:model"; "" = whatever .env says
+    critic_model: str = ""  # the reviewer; "" = follow the actor (see env.resolve_roles)
+    max_attempts: int | None = None  # lap budget; None = the state input, else MAX_ATTEMPTS
+
+
+def settings(runtime: Runtime[RunSettings] | None) -> RunSettings:
+    """This run's context, or the defaults when it was invoked without one.
+
+    LangGraph does *not* fill in a context schema's defaults: invoke without
+    `context=` and every node sees runtime.context = None, so reading a field
+    off it raises AttributeError. Every node goes through here instead, which
+    is also what keeps a plain build_graph().invoke({...}) — the eval runner,
+    every earlier phase, most tests — working exactly as it did.
+    """
+    context = getattr(runtime, "context", None)
+    if isinstance(context, dict):  # a caller may pass the schema's fields as a dict
+        return RunSettings(**context)
+    return context if isinstance(context, RunSettings) else RunSettings()
 
 
 class ConversionState(TypedDict, total=False):
@@ -89,6 +134,7 @@ class ConversionState(TypedDict, total=False):
     context: str  # already-converted companions, formatted for the prompt ("" if none)
     context_files: dict[str, str]  # absolute companion path -> contents captured at intake
     classification: Classification  # what the file is, and whether we can convert it
+    models: dict[str, str]  # the actor and critic this turn resolved to (step 8.2)
     risks: list[risk.Risk]  # patterns with more than one correct conversion (step 7.2)
     # filled by recall — long-term memory, which belongs to the user, not the thread
     recalled: list[memory_store.Memory]  # preferences close enough to this file to send
@@ -111,7 +157,7 @@ class ConversionState(TypedDict, total=False):
     report: ConversionReport | None
 
 
-def intake(state: ConversionState) -> ConversionState:
+def intake(state: ConversionState, runtime: Runtime[RunSettings] | None = None) -> ConversionState:
     """Read the files off disk, then open a turn. No LLM.
 
     On a fresh thread every memory key starts empty. On a thread the
@@ -122,10 +168,22 @@ def intake(state: ConversionState) -> ConversionState:
     validation, review, attempt counter — is cleared so the turn starts honest.
     The source is re-read rather than restored: the file on disk is the truth.
 
+    It is also where this run's context becomes part of the record. The models
+    and the lap budget are resolved once, here, and written into the state, so
+    the nodes that call a model, the scorecard, the JSON report and the
+    checkpoint all name the same thing. A cap given in the context wins over
+    one restored from the thread, for the reason in RunSettings: the flag was
+    typed now, the state is a memory of last time.
+
     Risks are re-detected from that same source for the same reason. Answers
     (`decisions`) are not touched: like conventions they belong to the
     conversation, so a question answered on turn 1 is not asked again on turn 2.
     """
+    # runtime defaults to None so the node stays what the vocabulary above says a
+    # node is — a plain function of state, callable directly in a test. LangGraph
+    # injects it by parameter name either way.
+    run = settings(runtime)
+    cap = run.max_attempts if run.max_attempts is not None else state.get("max_attempts")
     source = Path(state["source_path"]).read_text(encoding="utf-8")
     paths = [Path(p) for p in state.get("context_paths", [])]
     context_files = {str(p.resolve()): p.read_text(encoding="utf-8") for p in paths}
@@ -138,7 +196,8 @@ def intake(state: ConversionState) -> ConversionState:
     return {"source": source, "context": context, "context_files": context_files,
             "classification": classify(source, state["source_path"]),
             "risks": risk.detect_risks(source),
-            "max_attempts": resolve_attempt_cap(state.get("max_attempts")),
+            "max_attempts": resolve_attempt_cap(cap),
+            "models": env.resolve_roles(run.model, run.critic_model),
             "turn": state.get("turn", 0) + 1, "conventions": conventions, "refinement": "",
             "baseline": previous.result if previous is not None else None,
             "recalled": [], "memory_count": 0,
@@ -199,6 +258,15 @@ def remembered(state: ConversionState) -> str:
     return format_remembered([m.text for m in state.get("recalled", [])])
 
 
+def model_for(state: ConversionState, role: str) -> str | None:
+    """The actor or critic intake resolved; None lets llm.py fall back to .env.
+
+    The nodes that spend money read the record rather than the context, so the
+    model named on the scorecard is provably the model that was called.
+    """
+    return state.get("models", {}).get(role) or None
+
+
 def risk_review(state: ConversionState) -> ConversionState:
     """Step 7.2 — stop and ask the human about anything with two right answers.
 
@@ -256,11 +324,12 @@ def convert(state: ConversionState) -> ConversionState:
             feedback = revision_feedback(state["result"], state["validation"], state["critique"])
         elif state.get("baseline") is not None:
             feedback = refinement_feedback(state["baseline"])
-        structured_model = make_model().with_structured_output(ConversionResult, include_raw=True)
+        actor = model_for(state, "actor")
+        structured_model = make_model(actor).with_structured_output(ConversionResult, include_raw=True)
         chain = (build_prompt(revision=feedback, decisions=guidance(state),
                               conventions=format_conventions(state.get("conventions", [])),
                               remembered=remembered(state))
-                 | prepare_messages() | structured_model)
+                 | prepare_messages(actor) | structured_model)
         response = chain.invoke(
             {"file_path": state["source_path"], "source": state["source"], "context": state["context"]}
         )
@@ -319,12 +388,13 @@ def critic(state: ConversionState) -> ConversionState:
     """Review this draft once; the conditional edge decides whether to repair it."""
     usage = None
     try:
-        structured_model = make_model(for_critic=True).with_structured_output(
+        reviewer = model_for(state, "critic")
+        structured_model = make_model(reviewer, for_critic=True).with_structured_output(
             Critique, method="json_schema", include_raw=True,
         )
         chain = (build_critic_prompt(conventions=format_conventions(state.get("conventions", [])),
                                      decisions=guidance(state), remembered=remembered(state))
-                 | prepare_messages(for_critic=True) | structured_model)
+                 | prepare_messages(reviewer, for_critic=True) | structured_model)
         evidence = "\n\n".join(
             f"{'PASS' if r.passed else 'FAIL'} {r.render()}"
             + (f"\n{r.tool_output}" if not r.passed and not r.findings else "")
@@ -413,8 +483,12 @@ def build_graph(checkpointer: BaseCheckpointSaver | None = None, store: BaseStor
     store=None likewise: no long-term memory, so nothing is recalled and nothing
     is written. The two are independent — a one-off run with no thread can still
     recall what you taught it last week.
+
+    context_schema is the third of these: it takes no argument here because it
+    is not a resource to open but a shape to accept, one RunSettings per
+    invoke. Passing none is still valid and still means "use .env".
     """
-    builder = StateGraph(ConversionState)
+    builder = StateGraph(ConversionState, context_schema=RunSettings)
     builder.add_node("intake", intake)
     builder.add_node("recall", recall)
     builder.add_node("risk_review", risk_review)

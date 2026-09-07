@@ -1,17 +1,56 @@
-# Restart here — 2026-09-06 (after 8.1, the `s2p` CLI)
+# Restart here — 2026-09-07 (after 8.2, run-scoped configuration)
 
 ## Current position
 
-**Phase 7 is complete and Phase 8 has started. 8.1 moved the whole front end
-out of `graph.py` into a Typer app: `s2p convert` with a rich scorecard and a
-before/after diff, plus `s2p remember / memories / forget / threads`. Next is
-Phase 8.2 (runtime `--model`, `--max-iterations`, `--json` through a config
-schema); it has not started.**
-Read [cli.md](cli.md) first, then [long-term-memory.md](long-term-memory.md),
+**Phase 8 is complete. 8.1 moved the whole front end out of `graph.py` into a
+Typer app (`s2p convert` + `remember / memories / forget / threads`); 8.2 made
+the model, the critic model and the lap budget run-scoped, carried as the
+graph's context schema, and added `--json`. Next is Phase 9 (suite mode: Send
+API, reducers, subgraphs); it has not started.**
+Read [config.md](config.md) and [cli.md](cli.md) first, then
+[long-term-memory.md](long-term-memory.md),
 [human-in-the-loop.md](human-in-the-loop.md) and
 [short-term-memory.md](short-term-memory.md). Commit/push authorization
 persists. The 150-line / one-file-at-a-time rule was removed by Varun on
 2026-09-06: complete a step when asked, then one walkthrough.
+
+## What 8.2 built
+
+- `graph.RunSettings` (frozen dataclass: `model`, `critic_model`,
+  `max_attempts`) declared as `StateGraph(..., context_schema=RunSettings)`,
+  passed per call as `compiled.invoke(inputs, config=…, context=run)`.
+- `graph.settings(runtime)` — the required guard: LangGraph does **not** apply
+  a context schema's defaults, so `runtime.context` is `None` on any invoke
+  without `context=` (every earlier phase, the eval runner, most tests).
+- `intake` is the only node that reads the context. It resolves both models and
+  the cap once and records them in the state (`state["models"]`); `convert` and
+  `critic` read that record via `graph.model_for`, so the label can never
+  disagree with the call. A context cap beats one restored from a thread.
+- `env.MODEL_ALIASES` (sonnet/opus/fable/haiku) + `env.resolve_model`,
+  `env.resolve_roles` (flag > `.env` > default; `--model` moves the critic too
+  unless a split was chosen deliberately) and `env.key_missing` (fail fast,
+  masked, never prints a value).
+- `llm.resolve_name` extracted so `make_model` and `prepare_messages` cannot
+  disagree about which model a call is for.
+- `cli.py`: `--model`, `--critic-model`, `--json`; `run_config()` puts the same
+  choices on the trace as tags + metadata; `json_report()` + `emit()` (one
+  stdout writer for every exit path, refusals included).
+- `tests/test_config.py` (14). **217 offline tests pass.**
+- Live check: `--model haiku --critic-model opus` on `LoginPage.ts` — 2/3
+  attempts, 4/4 gates + critic PASS, exit 1 on two `baseURL` TODOs; LangSmith
+  showed two Haiku actor spans and two Opus critic spans with `.env` untouched.
+
+## 8.2 sharp edges
+
+- **A context schema's defaults are not applied.** `runtime.context is None`
+  without `context=`; always go through `graph.settings()`.
+- **`runtime` has a `= None` default** so nodes remain directly callable in
+  tests; LangGraph still injects by parameter name.
+- **The lap budget has two channels**: context (CLI) and the `max_attempts`
+  state input (eval harness, since 6.3). Context wins when set.
+- **`--json` must own stdout alone** — never the document *and* the code.
+- **Provider keys are only checked when a model is named on the command line**;
+  probing on every run would break every offline test.
 
 ## What 8.1 built
 
