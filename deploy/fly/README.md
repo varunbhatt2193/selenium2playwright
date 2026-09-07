@@ -17,8 +17,8 @@ s2p            our image, 2 GB, public HTTPS   ← the only thing on the interne
   └── s2p-redis       redis:6
 ```
 
-Roughly **$20/month** with everything always-on: app $11.11, Postgres $5.92 plus
-$1.50 of volume, Redis ~$1.94.
+Roughly **$19.50/month** with everything always-on: app $11.11, Postgres $5.92
+plus $0.45 of volume, Redis ~$1.94.
 
 ## Run it
 
@@ -26,6 +26,9 @@ $1.50 of volume, Redis ~$1.94.
 fly auth login              # opens a browser
 ./deploy/fly/deploy.sh      # from the repository root
 ```
+
+Fly requires a card on the organization before it will create any app, even one
+that would fit inside a free allowance.
 
 Safe to re-run — it is also the redeploy command. Existing apps, volumes and
 the database password are reused rather than recreated.
@@ -39,6 +42,50 @@ uv run python scripts/call_deployment.py samples/selenium/LoginPage.ts --url htt
 
 Put `LANGGRAPH_DEPLOYMENT_URL=https://s2p.fly.dev` in `.env` to make that the
 default and drop the `--url`.
+
+## Cost control
+
+**Fly has no spending cap and no billing alerts.** Their own cost-management
+page says it: *"We don't support billing alerts (yet), so budget accordingly"*,
+and of the free allowance, *"there's no soft ceiling. If you go over, we'll
+bill you."* So there is no switch to flip.
+
+Prepaid credit looks like the workaround and is not one. Fly support:
+*"Credits are not a way to control spend... any remaining unpaid amount is
+charged to your payment method on file"* and *"We aren't able to cap spending
+limits at this time."* When the balance hits zero the account rolls onto the
+card rather than stopping. Nor can the card be removed — Fly requires one on
+file for "deploying multiple apps and deploying public images", which is this
+project exactly. A virtual card with a bank-side monthly limit is the only hard
+ceiling that actually exists; it lives at the bank, not at Fly, and a decline
+suspends the apps.
+
+What we do on our side is make the bill a constant. Nothing in this directory
+scales: one machine per app, fixed sizes, `--ha=false` on every deploy, no
+autoscaler, no per-request pricing. Traffic does not move the number. The only
+ways the bill can change are a deploy that creates a machine we did not intend,
+or a volume someone grows.
+
+Two commands hold that line:
+
+```bash
+./deploy/fly/cost.sh            # what is running vs. what should be
+./deploy/fly/teardown.sh --yes  # destroy all three apps, stop the meter
+```
+
+`cost.sh` prints every machine and volume the project owns next to the expected
+shape, so drift shows up in one glance. It deliberately does not guess at
+rates — the authoritative month-to-date figure is on the Fly dashboard, and the
+script's last line links there.
+
+`teardown.sh` is the actual limit. A stopped machine still bills its volume;
+only destroying the app stops the charge, so tearing down and re-running
+`deploy.sh` is a normal thing to do between demos rather than a last resort.
+Re-creating takes one command and a few minutes of build.
+
+The Postgres volume is 3 GB, not 10. Volumes can be extended later and never
+shrunk, so the small end is the reversible one — `fly volumes extend` when
+threads and memories actually need the room.
 
 ## Why a self-run Postgres instead of Fly's managed one
 

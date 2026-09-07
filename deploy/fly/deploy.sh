@@ -29,17 +29,27 @@ fly auth whoami >/dev/null 2>&1 || { echo "Not logged in. Run: fly auth login"; 
 # in this repository and never in a shell history. Re-running reuses it: if the
 # secret already exists we leave it alone, because rotating it here would
 # silently break the POSTGRES_URI the API app already holds.
+# Every existence check below captures the output and matches it in-process
+# rather than piping into `grep -q`. Under `set -o pipefail` a pipeline whose
+# reader exits early returns 141 (SIGPIPE), which `set -e` treats as failure —
+# so the "already exists, skip it" path would kill the script instead.
 ensure_app() {
-  fly apps list 2>/dev/null | grep -qE "^$1[[:space:]]" || fly apps create "$1" --org personal
+  local list
+  list="$(fly apps list --json 2>/dev/null || true)"
+  grep -qE "\"Name\": *\"$1\"" <<<"$list" || fly apps create "$1" --org personal
 }
 
 say "1/6  Postgres app ($PG_APP)"
 ensure_app "$PG_APP"
-fly volumes list -a "$PG_APP" 2>/dev/null | grep -q s2p_pgdata \
-  || fly volumes create s2p_pgdata -a "$PG_APP" -r "$REGION" -n 1 -s 10 --yes
+VOLUMES="$(fly volumes list -a "$PG_APP" --json 2>/dev/null || true)"
+grep -q '"name": *"s2p_pgdata"' <<<"$VOLUMES" \
+  || fly volumes create s2p_pgdata -a "$PG_APP" -r "$REGION" -n 1 -s 3 --yes
 
-if ! fly secrets list -a "$PG_APP" 2>/dev/null | grep -q POSTGRES_PASSWORD; then
-  PGPASS="$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32)"
+PG_SECRETS="$(fly secrets list -a "$PG_APP" --json 2>/dev/null || true)"
+if ! grep -q POSTGRES_PASSWORD <<<"$PG_SECRETS"; then
+  # openssl rather than `tr </dev/urandom | head -c 32`: that pipeline SIGPIPEs.
+  # Hex only, so the password can never need escaping inside POSTGRES_URI.
+  PGPASS="$(openssl rand -hex 24)"
   fly secrets set -a "$PG_APP" "POSTGRES_PASSWORD=$PGPASS" --stage
   echo "$PGPASS" > "$HERE/.pgpassword"      # gitignored; needed to build POSTGRES_URI
   chmod 600 "$HERE/.pgpassword"
@@ -78,7 +88,7 @@ declare -a SECRETS=(
   "REDIS_URI=redis://${REDIS_APP}.internal:6379"
 )
 for KEY in LANGSMITH_API_KEY ANTHROPIC_API_KEY OPENAI_API_KEY S2P_MODEL S2P_CRITIC_MODEL S2P_EMBEDDINGS; do
-  VALUE="$(grep -E "^${KEY}=" .env 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '"'"'"'' || true)"
+  VALUE="$(sed -n "s/^${KEY}=//p" .env 2>/dev/null | tail -1 | tr -d '"'"'"'' || true)"
   [ -n "${VALUE:-}" ] && SECRETS+=("$KEY=$VALUE")
 done
 fly secrets set -a "$APP" "${SECRETS[@]}" --stage
@@ -92,7 +102,7 @@ fly deploy -c "$HERE/app.toml" -a "$APP" \
   --remote-only --ha=false --yes
 
 say "Done"
-fly status -a "$APP" | head -20
+fly status -a "$APP" 2>/dev/null | sed -n "1,20p"
 URL="https://${APP}.fly.dev"
 echo
 echo "  URL:    $URL"
