@@ -56,9 +56,14 @@ decide against the same table as everything else.
 (measured: $0.024–$0.058/file). Once there is a week of real traffic, replace it
 with the measured median from LangSmith so the dollar figure means what it says.
 
-**Untracked and not mine:** `.github/` (dependabot + codeql) and
-`docs/github-security.md` are Varun's own, deliberately left out of the 10.2/10.4
-commits.
+**CodeQL and Dependabot are now published** (`.github/workflows/codeql.yml`,
+`.github/dependabot.yml`, `docs/github-security.md` — Varun's own files, held
+back from the 10.2/10.4 commits and committed on 2026-09-07). Publishing them is
+only step 1: the repository *settings* that switch on alerts, secret protection
+and push protection can be enabled by the owner alone, in
+Settings → Advanced Security. The checklist is
+[github-security.md](github-security.md); the first CodeQL run should appear
+under Actions on the next push.
 
 **10.3 is done: the playground exists.**
 
