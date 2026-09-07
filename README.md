@@ -76,7 +76,7 @@ For a one-off file, Claude in a repo is genuinely fine. An agent earns its exist
 - [x] **M0** — one-prompt conversion, traced end-to-end in LangSmith
 - [x] **M1** — LangGraph pipeline: classify → convert (with honest refusals)
 - [x] **M2** — deterministic validators + reflection loop
-- [ ] **Evals** — measured conversion quality on a public dataset *(the numbers will go here)*
+- [x] **Evals** — 12 pinned files, four exact gates + a calibrated LLM judge. Sonnet, one attempt: 12/12 static, 11/12 graph, judge 4.4/5 at $0.29; Haiku needs the repair loop (2→9/12); Opus first drafts judge 4.9/5. Details in [phase-6.4-report.md](docs/phase-6.4-report.md) and [reflection-shootout.md](docs/reflection-shootout.md)
 - [ ] **M3** — conversation memory + human-in-the-loop for risky patterns
 - [ ] **M4** — whole-suite conversion: page objects first, then tests, in parallel
 - [ ] **M5** — deployed playground you can try
