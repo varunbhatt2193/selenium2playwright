@@ -1,21 +1,160 @@
-# Restart here — 2026-09-07 (after 8.2, run-scoped configuration)
+# Restart here — 2026-09-07 (after 9.3, M4 shipped)
 
 ## Current position
 
-**Phase 8 is complete. 8.1 moved the whole front end out of `graph.py` into a
-Typer app (`s2p convert` + `remember / memories / forget / threads`); 8.2 made
-the model, the critic model and the lap budget run-scoped, carried as the
-graph's context schema, and added `--json`. A cross-provider pass after it
-verified the graph on OpenAI (alone, and as an OpenAI actor with an Anthropic
-critic), moved the last vendor-specific setting out of the critic node, and
-made every run check its model before starting. Next is Phase 9 (suite mode:
-Send API, reducers, subgraphs); it has not started.**
-Read [config.md](config.md) and [cli.md](cli.md) first, then
+**Phases 0–9 are complete. 🏁 M4 — the wow demo — shipped at 9.3: `s2p suite
+<folder> --out <dir>` scans a Selenium suite, converts every file through the
+same graph `s2p convert` uses (waves of independent files in parallel, one
+LangSmith trace), then compiles the finished tree as one project and writes a
+`conversion-report.md` next to the code. Next is Phase 10 — deploy, playground,
+monitor: 10.1 is `langgraph.json` + `langgraph dev` + poking the graph in
+Studio. It has not started.**
+
+Read [suite-report.md](suite-report.md), [suite-fanout.md](suite-fanout.md) and
+[suite-scan.md](suite-scan.md) first — that is all of Phase 9 — then
+[cli.md](cli.md) and [config.md](config.md), then
 [long-term-memory.md](long-term-memory.md),
 [human-in-the-loop.md](human-in-the-loop.md) and
-[short-term-memory.md](short-term-memory.md). Commit/push authorization
-persists. The 150-line / one-file-at-a-time rule was removed by Varun on
-2026-09-06: complete a step when asked, then one walkthrough.
+[short-term-memory.md](short-term-memory.md).
+[phase-9.3-report.md](phase-9.3-report.md) is the live artifact the whole
+milestone builds toward — read it to see what the tool actually hands a person.
+
+Commit/push authorization persists. The 150-line / one-file-at-a-time rule was
+removed by Varun on 2026-09-06: complete the whole step when asked, then one
+plain-English walkthrough with check-yourself questions, then wait for his
+review. **Always end a turn that hands control back with an explicit "waiting on
+you" line** (asked 2026-09-06 — a pause must never be implied).
+
+**301 offline tests pass** (`uv run python -m unittest discover -s tests`, ~151 s
+— not `-t .`, and pytest is not installed). The suite is terminal-width
+independent from 40 to 200 columns as of 9.3.
+
+## What 9.3 built (`assemble.py`, the last step of M4)
+
+- **The argument.** Every per-file gate verdict is a *local* claim: this file
+  compiled on its own, against the companions it happened to import. Two files
+  that each compile perfectly can refuse to compile together, and nothing in the
+  project could see it. So the suite graph's `finish` node now compiles the
+  **delivered tree as one project** (`compile_tree` → the pinned
+  `tsc --noEmit` over all of `out_root`), and **exit 0 requires both**:
+  `not failed and built.compiles`. A compile that could not run is
+  `compiles=False` — unknown is never green.
+- **Parity ledger.** `sandbox/members.cjs` is a second parse-only sandbox script
+  (never imports or runs submitted code, same rule as `parity.cjs`) reporting
+  each file's public surface: non-private class members, `public` constructor
+  parameter properties, top-level exported functions and constants. Source names
+  are matched to converted ones as kept / renamed / removed; a removal's reason
+  is **quoted verbatim** from the model's own `notes`/`todos` when one of them
+  names the member, else the report says **no reason given**. `FileOutcome`
+  gained `notes` for exactly this. Test identities come free from a second call
+  to the existing `parity.cjs`.
+- **Rename detection is the one guess, and it is deliberately timid.** `stem()`
+  strips accessor prefixes (get/set/is/waitFor/verify…) and type-ish suffixes
+  (Text/Value/Element/Locator); containment of one stem in the other scores 1.0,
+  otherwise `SequenceMatcher`, cutoff `RENAME_RATIO = 0.7`. So
+  `getFlashText → flashMessage` is a rename and `open → goto` is a removal plus
+  an addition. **A wrong rename hides a loss; a missed one is only noise.**
+  Members pair only *inside the same class* (class renames are matched first, so
+  `LoginPage → LoginPageObject` is not a bloodbath), and members and tests are
+  matched in **separate pools** — a lost test can never be explained away as a
+  renamed method.
+- **Consolidated TODO(review) ledger** (playbook rule 25): read from *both* the
+  comments in the written code (with line numbers, whole comment blocks) and the
+  `todos` each conversion reported, then merged by **containment**, not equality.
+- `s2p.suite-report/v1` is a strict **superset** of 9.2's `s2p.suite-run/v1` —
+  same keys, new schema name, plus `tree` / `scorecard` / `parity` / `todos`.
+  Markdown goes to `<out>/conversion-report.md`; `--report FILE` moves it.
+- `tests/test_assemble.py` (26). The one to read first builds two files that
+  each compile perfectly alone and cannot compile together; a CLI test proves
+  that turns two green rows into exit 1.
+- **Live 2026-09-07**, all 12 sample files, `--parallel 4`, Sonnet: 9 passed /
+  3 needs-review, exit 1, **83.1 s**, the tree compiles, **20 public names kept,
+  8 renamed, 0 removed** — all eight the same idiom shift
+  (`getResultText → resultMessage`). Two distinct TODOs, one of them reported by
+  *both* `tests/login.spec.ts` and `pages/LoginPage.ts` and collapsed to one
+  line. Trace `01a07aa0-d597-75e1-bdfb-886593881b7e`: one trace, 557 runs, 32
+  LLM spans; `--parallel 4` is visible in it (first four branches start within
+  17 ms, the fifth 16 ms after the first finishes), wave 2 starts 28 ms after
+  wave 1's slowest, and the whole `finish` assembly costs **0.63 s** of the 83.
+  Report committed verbatim as `docs/phase-9.3-report.md`.
+
+## 9.3 sharp edges
+
+- **`members.cjs` uses `parity.cjs`'s stdin protocol**: a *list* of `{path:
+  source}` maps in, the same list of inventories out, so one node process
+  inventories both sides. Passing a single map made `ts.createSourceFile`
+  receive an object and die inside the scanner.
+- **A wrapped `// TODO(review):` comment only had its first line captured**, so
+  it never matched the full sentence the model reported and one task showed up
+  as two. Fixed with `todo_blocks()` (consume continuation comment lines) plus
+  the containment merge. **No test caught this — only reading the live output
+  did.** Read the real artifact before believing the test suite.
+- **Three pre-existing width-dependent failures in `test_cli.py`** surfaced at
+  COLUMNS=40/60: fixed with `test_store`'s `unwrapped()` helper and by pinning
+  `cli.console.width = 100` in `CliHarness.setUp`.
+- **Assembly is a graph node, not CLI code.** The graph produced the tree, so
+  the graph says whether the tree holds together — and the whole-tree compile
+  lands in the trace beside the conversions that made it necessary.
+
+## What 9.2 built (`suite_graph.py` — Send, reducers, subgraphs)
+
+- Shape: `START → plan → next_wave --dispatch--> [convert_file × N] → next_wave
+  … → finish`. **`Send`**: a conditional edge may return a *list* of
+  `Send(node, payload)` instead of a node name, so the fan-out width is data
+  (the wave), not wiring; the payload **is** the branch's whole input state (it
+  is not merged into the parent), hence
+  `add_node("convert_file", convert_file, input_schema=FileJob)`. Sync mode runs
+  the branches on a real `ThreadPoolExecutor`.
+- **Reducer**: N branches writing one key is `InvalidUpdateError: Can receive
+  only one value per step`; `outcomes: Annotated[list[FileOutcome],
+  operator.add]` is the join. Two consequences: results arrive in **completion
+  order** (`ordered()` re-sorts by `(wave, path)` at read time), and a reduced
+  channel can only be appended to, never rewritten — so the sort can never live
+  in a node.
+- **Subgraph**: `convert_file` invokes `graph.build_graph()` with
+  `run_name=f"convert:{path}"`, so LangSmith nests suite → file → attempt → LLM.
+  `SuiteSettings` context (model / critic_model / max_attempts / user_id) is
+  copied into each child's `RunSettings`.
+- `plan` copies `copy`-action files into `out_root` **first** (they are context);
+  `dispatch` builds each job's `context_paths` from `out_root` **at dispatch
+  time**, which is how wave 2 sees the *converted* companion. A needs-review file
+  is still written (the next wave imports it); a branch that raises becomes a
+  `failed` row, never a dead suite; `ask_risks=False` always (twelve parallel
+  branches have nobody to interrupt).
+- `--only PATTERN` (fnmatch on the relative path or the bare name, repeatable),
+  `--parallel N` → `config["max_concurrency"]`, `recursion_limit = 2*waves + 6`.
+- **Gotcha:** `from __future__ import annotations` makes
+  `SuiteState.__annotations__["outcomes"]` a *string*, so pinning the reducer in
+  a test needs `get_type_hints(..., include_extras=True)`.
+
+## What 9.1 built (`suite.py` — the scan, no LLM)
+
+- `SuiteFile` / `Manifest`; `discover` (os.walk with `SKIP_DIRS` **pruned from
+  the walk**, not filtered after); `import_specifiers` (one regex covering
+  `from "x"`, `import "x"`, `export … from`, `require()`, dynamic `import()`);
+  `resolve_import` (TypeScript's own order `.ts .tsx .js .mjs .cjs /index.ts
+  /index.js`; a non-`.` specifier → `external_imports`; a relative path leaving
+  the folder → `None`, a real limitation the report names).
+- **The two readings of `classify()`**: a helper with no automation library gets
+  `supported=False` from the classifier (right answer to "convert this file")
+  but action **copy** from the scanner — "nothing to convert" in a folder is not
+  a refusal. Four kinds → three actions; copied and skipped files are in no wave.
+- **Waves are Kahn's algorithm layer by layer**, over convertible files only; an
+  import cycle gets one final wave plus a note rather than a hang or a silent
+  drop. `imports` does double duty: the wait-for edge *and* the file's
+  `context_paths`. `imported_by` is for blast-radius reporting.
+- `s2p scan <folder>`: table on stderr, `s2p.suite-manifest/v1` on stdout under
+  `--json`. The toy 6-file mixed suite is built in a `TemporaryDirectory` inside
+  `tests/test_suite.py`, deliberately **not** in `samples/` (whose
+  `tsconfig.json` includes `**/*.ts`, so a broken fixture there would fail
+  `tsc`). Note it is a **three-deep** chain (BasePage → LoginPage → spec) = 3
+  waves.
+- **Gotcha that cost two test failures: rich/Typer output is terminal-width
+  dependent.** In a `Table` the cells *interleave* when folded, so no string
+  trick can reassemble a path — pin the width instead
+  (`cli.console.width = 100` in `setUp`, restore `cli.console._width` in
+  cleanup; `patch.object(console, "width", …)` fails, the property has no
+  deleter).
 
 ## What 8.2 built
 
@@ -331,14 +470,29 @@ a live experiment is running.**
 
 ## Working agreement and environment
 
-Teach theory before code in plain English. The 150-line / one-file-at-a-time
-rule was removed on 2026-09-06: complete the whole step when asked, then give
-one walkthrough, and let Varun review before the next step.
-No agents unless asked. Frequent progress updates. Existing commit/push
-authorization persists; check `gh auth status` is on `varunbhatt2193` before
-pushing. Repo `/Users/varunbhatt/Downloads/Selenium2Playwright`, main, remote
-`https://github.com/varunbhatt2193/selenium2playwright.git`. `.env`, `out/`,
-`roadmap.md`, `plan-review.md` stay ignored; never expose credentials.
+Teach theory before code in **plain, simple English** — assume no LangChain
+knowledge and explain every construct as it appears. The 150-line /
+one-file-at-a-time rule was removed on 2026-09-06: complete the whole step when
+asked, then give one walkthrough with check-yourself questions, and let Varun
+review before the next step. Review questions target **agentic workflows /
+LangChain / LangGraph / LangSmith** — never SDET or TypeScript fundamentals,
+which are his home turf. **End every turn that hands control back with an
+explicit "waiting on you" line**; he has twice had to ask "stuck?" after a
+finished step. No agents unless asked. Frequent progress updates.
+
+Existing commit/push authorization persists; check `gh auth status` is on
+`varunbhatt2193` before pushing (the active account flips between his projects
+on this Mac). Repo `/Users/varunbhatt/Downloads/Selenium2Playwright`, main,
+remote `https://github.com/varunbhatt2193/selenium2playwright.git`. `.env`,
+`out/`, `roadmap.md`, `plan-review.md` stay ignored; never read `.env` or print
+a key value; never re-add `roadmap.md` / `plan-review.md` to the repo (Varun's
+call — not recruiter-friendly; the public face is README.md + plan.md).
+
+**`src/selenium2playwright/bbb.py` is Varun's Streamlit scratch file and is
+staged-but-uncommitted (`AM`) in the index. Leave it alone, and commit with the
+pathspec form `git commit -- <paths>`, NEVER `git add … && git commit`** — it is
+already in the index, so a bare commit sweeps it in whatever you added (that
+happened on 2026-09-07 and had to be undone with `git reset --soft HEAD~1`).
 `S2P_MODEL` = actor, `S2P_CRITIC_MODEL` = critic (optional),
 `S2P_EMBEDDINGS` = recall (default `openai:text-embedding-3-small`, `off`
 supported); eval CLIs default to Opus. Use the existing `.venv` and Node toolchains. Chrome
