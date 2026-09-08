@@ -31,7 +31,7 @@ concurrency:
 
 jobs:
   offline-checks:
-    name: Offline checks (485 tests)
+    name: Offline checks (590 tests)
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -55,14 +55,19 @@ jobs:
         with:
           enable-cache: true
 
+      # `--group ui` because `tests/test_web.py` imports FastAPI. The group
+      # exists so the agent never needs a web server installed to convert a
+      # file; the tests for that server still need one, and without it the
+      # module fails to import and takes 22 tests down with it — including the
+      # three that hold the page route shut.
       - name: Install Python dependencies
-        run: uv sync --frozen
+        run: uv sync --frozen --group ui
 
       # No credentials are set on purpose: every model reply in the suite is
       # scripted, and a test that needs a real key is a test that would charge
       # this repository to run.
       - name: Run the offline suite
-        run: uv run python -m unittest discover -s tests
+        run: uv run --frozen --group ui python -m unittest discover -s tests
 
   execution-gate:
     name: Execution gate (${{ matrix.suite }} fixtures in a browser)
