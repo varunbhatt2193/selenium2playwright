@@ -126,7 +126,7 @@ For a one-off file, Claude in a repo is genuinely fine. An agent earns its exist
 - [x] **M3** — conversation memory ([threads + checkpointer](docs/short-term-memory.md)) + [human-in-the-loop for risky patterns](docs/human-in-the-loop.md) + [long-term memory across conversations](docs/long-term-memory.md)
 - [x] **M3.5** — the `s2p` command line: [convert, scorecard, diff](docs/cli.md) + [runtime `--model` and `--json`](docs/config.md)
 - [x] **M4** — whole-suite conversion: [scan and order](docs/suite-scan.md) → [parallel fan-out](docs/suite-fanout.md) → [one report](docs/suite-report.md); 12 files in 83.1s, the tree compiles as one project
-- [x] **M5** — a playground anyone can try: the agent is [deployed](deploy/fly/README.md), [guarded](docs/guardrails.md), and the [page in front of it](docs/playground.md) is public at **[varun-s2p.fly.dev](https://varun-s2p.fly.dev)** — single files or a whole suite, uploaded as a zip and returned as one
+- [x] **M5** — a playground anyone can try: the agent is [deployed](deploy/fly/README.md), [guarded](docs/guardrails.md), and the [page in front of it](docs/playground.md) is public at **[varun-s2p.fly.dev](https://varun-s2p.fly.dev)** — single files or a whole suite, uploaded as a zip and returned as one · the page is React + Vite over a small FastAPI server that streams the agent's progress as server-sent events
 
 **Stack:** Python · LangGraph · LangSmith · any LangChain chat model — Claude by default, OpenAI verified end to end, swappable per run with `--model` or in `.env` via `S2P_MODEL` · TypeScript toolchain as the referee
 

@@ -141,11 +141,19 @@ Settings → Advanced Security. The checklist is
 [github-security.md](github-security.md); the first CodeQL run should appear
 under Actions on the next push.
 
-**10.3 is done: the playground exists.**
+**10.3 is done: the playground exists — and since 2026-09-08 it is a React page.**
 
 ```bash
-uv run --group ui streamlit run ui/app.py     # talks to s2p.fly.dev out of .env
+cd ui/web && npm ci && npm run build                 # the page
+uv run --group ui uvicorn ui.server:app --port 8501  # serves it + /api, talks to s2p.fly.dev out of .env
+uv run --group ui streamlit run ui/app.py            # the ORIGINAL page; still runs, local-only folder paths
 ```
+
+`ui/server.py` is seven FastAPI routes (`tests/test_web.py`, 19 tests) over the
+same `playground.py`; progress streams as server-sent events. One theme (teal),
+no switcher — decided by Varun. Redeploy with `./deploy/fly/deploy-ui.sh`, which
+now builds the page in a Node stage of `Dockerfile.ui`. The Streamlit notes
+below are still the right mental model for what the page may and may not send.
 
 `ui/app.py` is layout only; every decision is in `playground.py` with 57 tests,
 because Streamlit re-runs the whole script on each click and importing the app

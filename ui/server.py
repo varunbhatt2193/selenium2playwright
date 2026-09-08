@@ -1,0 +1,418 @@
+"""The web playground: a small HTTP server in front of `playground.py`.
+
+    uv run --group ui uvicorn ui.server:app --port 8501
+
+`ui/app.py` (Streamlit) was the first page in front of the agent. It works, and
+it looks like Streamlit — which is the one thing a page that is supposed to
+*sell* the agent cannot afford. This server is the other half of the
+replacement: `ui/web` is a React page built with Vite, and this file is the
+handful of JSON routes it talks to.
+
+It holds no logic of its own. Every decision — what a request may contain, how
+a run is streamed, how a scorecard is read out of the final state, what a 403
+means in a sentence — is still `selenium2playwright/playground.py`, with its
+tests. The routes here translate between that module and HTTP:
+
+    GET  /api/session       who this browser is, the samples, today's budget
+    GET  /api/limits        today's budget, again (the page refreshes it)
+    POST /api/convert       one file  → a stream of progress, then the scorecard
+    POST /api/feedback      👍 / 👎 on a finished run
+    POST /api/suite/plan    uploaded files → the wave plan, before any spend
+    POST /api/suite/convert a tree → a stream of files landing, then the result
+    POST /api/suite/zip     the converted tree → a zip with the report inside
+
+Two things it deliberately does not do, and they are the same two the Streamlit
+page did not do:
+
+**It does not hand out a key.** `S2P_DEMO_KEY` is read on this machine and used
+on this machine. A visitor gets a URL, not a credential.
+
+**It does not ask the graph anything a stranger may not ask.** No server paths,
+no writes to shared memory. `guard.py` refuses all of that anyway; the page
+simply never offers it, and `playground.check_input` says so under the box
+before the request is sent.
+
+Progress travels as **server-sent events**: one `data: {json}` line per thing
+worth telling the person watching. A conversion is a minute of silence
+otherwise, and the reflection loop going round ("Converting to Playwright —
+attempt 2") is the most interesting thing on the page.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from collections.abc import Iterator
+from dataclasses import asdict
+from pathlib import Path
+from typing import Any
+
+from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
+
+from selenium2playwright import playground as pg
+from selenium2playwright.suite import SOURCE_SUFFIXES as SUFFIXES
+
+# The built page. Vite writes `index.html` plus hashed files under `assets/`;
+# the Dockerfile builds it in a Node stage and copies only this directory across.
+DIST = Path(__file__).resolve().parent / "web" / "dist"
+
+# What a visitor id this server minted looks like. Anything else in the header
+# is replaced, not trusted: the id ends up in a Redis key on the far side, and
+# `guard._VISITOR_OK` is the server's rule — this is the same rule, one hop
+# earlier, restricted to the shape `playground.new_visitor` produces.
+VISITOR = re.compile(r"^pg-[0-9a-f]{12}$")
+
+# A thread id is a path segment in the SDK's request to the deployment, so it
+# must be one before it is allowed to be one.
+THREAD = re.compile(r"^[0-9a-f-]{36}$")
+
+app = FastAPI(title="Selenium → Playwright playground", docs_url=None, redoc_url=None)
+
+
+# --- helpers ------------------------------------------------------------------
+
+
+def visitor_of(header: str | None) -> str:
+    """The visitor this request is from, minting one if the header is not ours."""
+    supplied = (header or "").strip()
+    return supplied if VISITOR.match(supplied) else pg.new_visitor()
+
+
+def limits_view(visitor: str) -> dict[str, Any]:
+    """`GET /limits` plus the two sentences the page prints about it."""
+    snapshot = pg.fetch_limits(visitor=visitor)
+    return {**snapshot, "line": pg.budget_line(snapshot), "visitor_line": pg.visitor_line(snapshot)}
+
+
+def sample_view(sample: pg.Sample) -> dict[str, Any]:
+    companion = sample.context()
+    return {
+        "name": sample.name,
+        "blurb": sample.blurb,
+        "source": sample.read(),
+        "companion_name": next(iter(companion), ""),
+        "companion_text": next(iter(companion.values()), ""),
+    }
+
+
+def card_view(card: pg.Scorecard) -> dict[str, Any]:
+    """A `Scorecard` as JSON, with the two properties the page also wants."""
+    return {**asdict(card), "passed": card.passed, "gates_line": card.gates_line}
+
+
+def plan_view(plan: pg.SuitePlan) -> dict[str, Any]:
+    return {**asdict(plan), "files": plan.files, "line": plan.line}
+
+
+def result_view(result: pg.SuiteResult) -> dict[str, Any]:
+    return {**asdict(result), "totals": result.totals, "passed": result.passed,
+            "headline": result.headline}
+
+
+def sse(events: Iterator[dict[str, Any]]) -> StreamingResponse:
+    """Server-sent events. One JSON object per line, flushed as it happens.
+
+    A sync generator on purpose: the SDK client is synchronous, and Starlette
+    runs a sync iterator in a worker thread, so a minute-long stream does not
+    block the event loop for every other visitor.
+    """
+    def body() -> Iterator[bytes]:
+        for event in events:
+            yield f"data: {json.dumps(event)}\n\n".encode()
+
+    return StreamingResponse(
+        body(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+def failure(exc: Exception) -> dict[str, Any]:
+    """Every failure here is somebody else's server, said in a sentence."""
+    wait = pg.retry_after(exc)
+    message = pg.explain(exc) + (f" You can try again in about {wait}s." if wait else "")
+    return {"kind": "error", "message": message}
+
+
+# --- session and budget -------------------------------------------------------
+
+
+@app.get("/ok")
+def ok() -> dict[str, bool]:
+    """Fly's health check. `/` would look healthy with the page missing."""
+    return {"ok": True}
+
+
+@app.get("/api/session")
+def session(x_s2p_visitor: str | None = Header(default=None)) -> dict[str, Any]:
+    """Everything the page needs before it can draw: the visitor it is, the
+    sample buttons, and what is left of today's budget."""
+    visitor = visitor_of(x_s2p_visitor)
+    return {
+        "visitor": visitor,
+        "backend": pg.backend_url(),
+        "key_present": bool(pg.demo_key()),
+        "samples": [sample_view(s) for s in pg.samples()],
+        "limits": limits_view(visitor),
+    }
+
+
+@app.get("/api/limits")
+def limits(x_s2p_visitor: str | None = Header(default=None)) -> dict[str, Any]:
+    return limits_view(visitor_of(x_s2p_visitor))
+
+
+# --- one file -----------------------------------------------------------------
+
+
+class ConvertRequest(BaseModel):
+    source: str = ""
+    filename: str = ""
+    companion_name: str = ""
+    companion_text: str = ""
+    refinement: str = ""
+    # Present on a refine — turn two of the same conversation, where the graph
+    # still has the last draft and every instruction so far (step 7.1).
+    thread_id: str = ""
+
+
+def convert_events(body: ConvertRequest, visitor: str) -> Iterator[dict[str, Any]]:
+    """Run one conversion and narrate it. The last event carries the answer."""
+    context = ({body.companion_name.strip(): body.companion_text}
+               if body.companion_text.strip() and body.companion_name.strip() else {})
+    client = pg.client(visitor=visitor)
+    seen: list[str] = []
+    final: dict[str, Any] = {}
+    run_id = ""
+    try:
+        thread_id = body.thread_id or client.threads.create()["thread_id"]
+        request = pg.payload(body.source, body.filename, context=context,
+                             refinement=body.refinement.strip())
+        for update in pg.stream(client, thread_id, request):
+            if update.kind == "run":
+                run_id = update.run_id
+                yield {"kind": "run", "run_id": run_id, "thread_id": thread_id}
+            elif update.kind == "node":
+                seen.append(update.node)
+                yield {"kind": "node", "node": update.node,
+                       "label": pg.progress_label(update.node, seen)}
+            elif update.kind == "state":
+                final = update.state
+    except Exception as exc:  # noqa: BLE001 — every failure here is somebody else's server
+        yield failure(exc)
+        return
+    card = pg.scorecard(final)
+    name = pg.download_name(body.filename)
+    yield {
+        "kind": "done",
+        "thread_id": thread_id,
+        "run_id": run_id,
+        "trail": [pg.progress_label(node, seen[:i]) for i, node in enumerate(seen, start=1)],
+        "card": card_view(card),
+        "diff": pg.unified_diff(body.source, card.code, body.filename or "selenium.ts", name)
+        if card.code else "",
+        "download_name": name,
+    }
+
+
+@app.post("/api/convert")
+def convert(body: ConvertRequest,
+            x_s2p_visitor: str | None = Header(default=None)) -> StreamingResponse:
+    complaint = pg.check_input(body.source, body.filename,
+                               companion_name=body.companion_name,
+                               companion_text=body.companion_text)
+    if complaint:
+        raise HTTPException(status_code=400, detail=complaint)
+    if body.thread_id and not THREAD.match(body.thread_id):
+        raise HTTPException(status_code=400, detail="That is not a thread id.")
+    return sse(convert_events(body, visitor_of(x_s2p_visitor)))
+
+
+class FeedbackRequest(BaseModel):
+    run_id: str
+    score: float = Field(ge=0.0, le=1.0)
+    comment: str = ""
+    source_text: str = ""
+    source_path: str = ""
+
+
+@app.post("/api/feedback")
+def feedback(body: FeedbackRequest,
+             x_s2p_visitor: str | None = Header(default=None)) -> dict[str, Any]:
+    answer = pg.send_feedback(
+        body.run_id, body.score, comment=body.comment, source_text=body.source_text,
+        source_path=body.source_path, visitor=visitor_of(x_s2p_visitor),
+    )
+    answer.setdefault("detail", "Thank you." if answer.get("stored") else "Not recorded.")
+    return answer
+
+
+# --- a whole suite ------------------------------------------------------------
+
+
+class Upload:
+    """What `playground.tree_from_uploads` expects: a `.name` and `.getvalue()`."""
+
+    def __init__(self, name: str, data: bytes):
+        self.name, self._data = name, data
+
+    def getvalue(self) -> bytes:
+        return self._data
+
+
+def patterns(only: str) -> list[str]:
+    return [p.strip() for p in only.split(",") if p.strip()]
+
+
+@app.post("/api/suite/plan")
+async def suite_plan(files: list[UploadFile] = File(default=[]),
+                     only: str = Form(default=""),
+                     x_s2p_visitor: str | None = Header(default=None)) -> dict[str, Any]:
+    """`s2p scan` over what was dropped, before a single model is called.
+
+    The tree goes back to the page as text — it is what the page will send to
+    `/api/suite/convert` — so this server keeps nothing between two requests.
+    """
+    uploads = [Upload(f.filename or "", await f.read()) for f in files]
+    tree, complaint = pg.tree_from_uploads(uploads)
+    if complaint:
+        raise HTTPException(status_code=400, detail=complaint)
+    if not tree:
+        raise HTTPException(status_code=400, detail="Drop a zip of the folder, or its files.")
+    return planned(tree, only, visitor_of(x_s2p_visitor))
+
+
+def planned(tree: dict[str, str], only: str, visitor: str) -> dict[str, Any]:
+    """The wave plan for a tree, and whether today's budget can pay for it."""
+    try:
+        plan = pg.plan_tree(tree, patterns(only))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not plan.convert:
+        raise HTTPException(
+            status_code=400,
+            detail="Nothing in there can be converted" + (" with that filter." if only else "."),
+        )
+    snapshot = pg.fetch_limits(visitor=visitor)
+    return {"tree": tree, "plan": plan_view(plan),
+            "unaffordable": pg.affordable(snapshot, plan.billable)}
+
+
+@app.get("/api/suite/sample")
+def suite_sample(only: str = "",
+                 x_s2p_visitor: str | None = Header(default=None)) -> dict[str, Any]:
+    """The sample suite, read from this machine, as a planned tree.
+
+    The same twelve files the README's numbers are about. Read here and sent
+    to the graph as text like any upload — so it is metered like any upload.
+    """
+    root = pg._SUITE
+    if not root.is_dir():
+        raise HTTPException(status_code=404, detail="The sample suite is not on this server.")
+    tree = {
+        path.relative_to(root).as_posix(): path.read_text(encoding="utf-8")
+        for path in sorted(root.rglob("*"))
+        if path.is_file() and path.suffix.lower() in SUFFIXES
+    }
+    return planned(tree, only, visitor_of(x_s2p_visitor))
+
+
+class SuiteRequest(BaseModel):
+    tree: dict[str, str]
+    only: str = ""
+    parallel: int = Field(default=4, ge=1, le=16)
+    attempts: int = Field(default=3, ge=1, le=3)
+    model: str = ""
+
+
+def suite_events(body: SuiteRequest, visitor: str) -> Iterator[dict[str, Any]]:
+    """Run a suite and tick files off as they land."""
+    only = patterns(body.only)
+    try:
+        plan = pg.plan_tree(body.tree, only)
+    except ValueError as exc:
+        yield {"kind": "error", "message": str(exc)}
+        return
+    client = pg.suite_client(visitor=visitor)
+    landed = 0
+    final: dict[str, Any] = {}
+    try:
+        thread_id = client.threads.create()["thread_id"]
+        request = pg.suite_payload(only=only, tree=body.tree)
+        context = pg.suite_context(model=body.model, max_attempts=body.attempts, user_id="")
+        config = pg.suite_config(waves=len(plan.waves), parallel=body.parallel)
+        yield {"kind": "start", "files": plan.files, "waves": len(plan.waves)}
+        for update in pg.stream(client, thread_id, request, assistant="suite",
+                                config=config, context=context):
+            if update.kind == "node":
+                for row in pg.rows_in(update.update):
+                    landed += 1
+                    yield {"kind": "file", "landed": landed, "of": plan.files,
+                           "row": {**asdict(row), "gates_line": row.gates_line}}
+                if update.node in pg.SUITE_NODE_LABELS and update.node != "convert_file":
+                    yield {"kind": "node", "node": update.node,
+                           "label": pg.SUITE_NODE_LABELS[update.node]}
+            elif update.kind == "state":
+                final = update.state
+    except Exception as exc:  # noqa: BLE001
+        yield failure(exc)
+        return
+    result = pg.suite_result(final)
+    yield {"kind": "done", "result": result_view(result)}
+
+
+@app.post("/api/suite/convert")
+def suite_convert(body: SuiteRequest,
+                  x_s2p_visitor: str | None = Header(default=None)) -> StreamingResponse:
+    if not body.tree:
+        raise HTTPException(status_code=400, detail="There is nothing to convert.")
+    return sse(suite_events(body, visitor_of(x_s2p_visitor)))
+
+
+class ZipRequest(BaseModel):
+    tree: dict[str, str]
+    markdown: str = ""
+
+
+@app.post("/api/suite/zip")
+def suite_zip(body: ZipRequest) -> Response:
+    if not body.tree:
+        raise HTTPException(status_code=400, detail="There is nothing to download.")
+    return Response(
+        pg.converted_zip(body.tree, body.markdown),
+        media_type="application/zip",
+        headers={"Content-Disposition": 'attachment; filename="playwright-suite.zip"'},
+    )
+
+
+# --- the page -----------------------------------------------------------------
+#
+# Registered last so `/api/*` and `/ok` win. Vite's output is `index.html` plus
+# hashed files under `assets/`, so the page itself is served uncached and the
+# assets forever.
+
+if (DIST / "assets").is_dir():
+    app.mount("/assets", StaticFiles(directory=DIST / "assets"), name="assets")
+
+
+@app.get("/{path:path}", include_in_schema=False)
+def page(path: str) -> Response:
+    """The React page, for any path that is not the API.
+
+    `favicon.svg` and friends live at the root of `dist`; everything else is the
+    single page, which routes itself.
+    """
+    if path.startswith("api/"):
+        raise HTTPException(status_code=404)
+    if path and (DIST / path).is_file():
+        return FileResponse(DIST / path)
+    index = DIST / "index.html"
+    if not index.is_file():
+        return JSONResponse(
+            {"detail": "The page is not built. Run `npm ci && npm run build` in ui/web."},
+            status_code=503,
+        )
+    return FileResponse(index, headers={"Cache-Control": "no-cache"})

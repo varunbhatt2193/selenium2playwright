@@ -34,4 +34,10 @@ dev = [
 # so it is a group you opt into with `uv run --group ui streamlit run ui/app.py`.
 ui = [
     "streamlit>=1.49",
+    # The web playground (ui/server.py): a FastAPI server that streams the
+    # graph's progress to a React page built in ui/web. Same group, because it
+    # is the same job — a front end for a deployment, never part of the agent.
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "python-multipart>=0.0.9",
 ]

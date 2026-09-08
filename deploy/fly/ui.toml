@@ -48,13 +48,13 @@ primary_region = "iad"
     interval = "30s"
     method = "GET"
     timeout = "10s"
-    # Streamlit's own health endpoint. `/` returns the app shell and would look
-    # healthy even if the server were failing to run the script.
-    path = "/_stcore/health"
+    # A route of ours, not `/`: the page is a static file and would look
+    # healthy with the API behind it broken.
+    path = "/ok"
 
 [[vm]]
   size = "shared-cpu-1x"
   # 512 MB. The graph's app needs 2 GB because tsc is memory-hungry; nothing
-  # here compiles anything, so this is a Python process holding some session
-  # state and a few uploaded files.
+  # here compiles anything, so this is a Python process serving a built page
+  # and relaying a few uploaded files.
   memory = "512mb"

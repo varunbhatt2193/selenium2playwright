@@ -1,4 +1,77 @@
-# Step 10.3 — the playground: a paste box in front of the agent
+# The playground: the page in front of the agent
+
+> **The page is React now (2026-09-08).** What follows this box is the original
+> step 10.3 walkthrough of the Streamlit page, kept because the reasoning in it —
+> visitor key, companion file, the two bugs only running it could find — is all
+> still true. The Streamlit file still runs locally (`uv run --group ui streamlit
+> run ui/app.py`) and is the only way to convert a folder **by path**. The
+> deployed page at **[varun-s2p.fly.dev](https://varun-s2p.fly.dev)** is the
+> React one described here.
+
+## The React page
+
+```bash
+cd ui/web && npm ci && npm run build          # once, and after any change to ui/web
+uv run --group ui uvicorn ui.server:app --port 8501
+```
+
+Or, for development with hot reload, `npm run dev` in `ui/web` serves the page on
+:5173 and proxies `/api` to the uvicorn server on :8501.
+
+Three pieces, and the split matters for the same reason it did with Streamlit:
+
+| piece | what it is | tested by |
+|---|---|---|
+| `ui/web` | the page: React + Vite + TypeScript, one theme, no UI framework | your eyes |
+| `ui/server.py` | seven FastAPI routes translating the page's requests into `playground.py` calls | `tests/test_web.py`, 19 tests |
+| `src/selenium2playwright/playground.py` | every decision — unchanged | `tests/test_playground.py` |
+
+`ui/server.py` holds no logic. It validates a visitor id, calls the same
+`playground` functions the Streamlit page called, and turns the result into
+JSON. The one new idea is **server-sent events**: `POST /api/convert` and
+`POST /api/suite/convert` answer with a stream of `data: {json}` lines — a
+`run` event carrying the run id, a `node` event per graph node with the same
+translated label the Streamlit page printed ("Converting to Playwright — attempt
+2"), and a final `done` event carrying the scorecard, the diff and the download
+name. The page reads that stream with `fetch` (EventSource cannot POST) and
+draws the agent trace as it arrives, which is the most interesting thing on the
+page: you watch the reflection loop go round.
+
+What the page shows, top to bottom:
+
+1. **Hero** — the sample suite's real numbers (12/12, ~20s) and the live budget
+   line from `GET /limits`, so the page says what is left before anyone spends it.
+2. **Live conversion** — six sample chips from the real suite, an editable
+   Selenium pane, a Playwright pane with syntax colour, a diff, and the
+   scorecard: a ring of gates passed, each gate PASS/FAIL with a one-line
+   explanation, the critic's verdict, which models did the work, the agent
+   trace, the TODO(review) ledger, Download and Copy, "Ask for a change" (a
+   second turn on the same thread) and 👍/👎.
+3. **Whole suite** — drop a zip (or press "Use the 12-file sample suite"), see the
+   wave plan and the price *before* the button, watch files tick off as they
+   land, then the result: per-file table, the whole-tree compile, the parity
+   ledger, every TODO, the report, and one button for the zip.
+4. **How it works** — the pipeline, and links to the source, the playbook and the
+   hard cases.
+
+Things a demo should know:
+
+- **The sample suite button reads `samples/selenium-suite` on the server** and
+  sends it as `source_tree` like any upload, so it is metered like any upload:
+  twelve conversions.
+- **The visitor id is per browser tab** (`sessionStorage`), minted by the server
+  and checked against `^pg-[0-9a-f]{12}$` on every request. Anything else in the
+  header is replaced, never trusted.
+- **Every refusal the guard would make is made first by the server with a 400
+  and a sentence**, and once more by the page before the button — same rule,
+  three places, so it arrives as a hint instead of a 403.
+- The page is built inside the Docker image (`deploy/fly/Dockerfile.ui`, Node
+  stage) and `ui/web/dist` is gitignored. A missing build answers `/` with a
+  503 that says to run `npm run build`, never a stack trace.
+
+---
+
+# Step 10.3 — the playground: a paste box in front of the agent (the original Streamlit page)
 
 Step 10.2 put the converter on the internet. Step 10.4 made the URL safe to hand
 out. Neither made it *visible*: `https://s2p.fly.dev` is a JSON API, and a person

@@ -27,3 +27,7 @@ playwright-report/
 .DS_Store
 .idea/
 .vscode/
+
+# The built page is produced inside the image (Dockerfile.ui, Node stage);
+# a local build must not shadow it.
+ui/web/dist/

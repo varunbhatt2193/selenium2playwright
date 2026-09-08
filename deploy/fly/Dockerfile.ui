@@ -2,9 +2,22 @@
 #
 # Deliberately NOT the graph's image. That one carries Node, a pinned TypeScript
 # compiler and ESLint, because the four gates shell out to them — 330 MB of
-# toolchain this page never touches. The playground draws widgets and makes HTTP
-# calls; everything that compiles anything happens on the other side of that
-# call. Two images because they are two jobs.
+# toolchain this page never touches. The playground serves a built page and
+# makes HTTP calls; everything that compiles anything happens on the other side
+# of that call. Two images because they are two jobs.
+#
+# Two stages. Node appears only in the first, to turn ui/web into static files;
+# the image that runs is Python plus ~300 KB of built page.
+
+FROM node:22-slim AS web
+WORKDIR /web
+# The lockfile first, in its own layer: the page changes far more often than
+# its dependencies do, so an edit to a component reuses `npm ci`.
+COPY ui/web/package.json ui/web/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY ui/web ./
+RUN npm run build
+
 FROM python:3.12-slim
 
 COPY --from=ghcr.io/astral-sh/uv:0.9.7 /uv /usr/local/bin/uv
@@ -13,7 +26,7 @@ WORKDIR /app
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 
 # Dependencies first, from the lockfile, in their own layer: they change far
-# less often than the page does, so an edit to ui/app.py reuses this.
+# less often than the page does, so an edit to ui/server.py reuses this.
 COPY pyproject.toml uv.lock README.md ./
 RUN mkdir -p src/selenium2playwright && touch src/selenium2playwright/__init__.py \
  && uv sync --frozen --group ui --no-install-project
@@ -23,19 +36,19 @@ RUN mkdir -p src/selenium2playwright && touch src/selenium2playwright/__init__.p
 # rather than a copy into site-packages, where parents[2] would be the Python
 # install and every path in the app would point at nothing.
 COPY src ./src
-COPY ui ./ui
-# The sample buttons read these files at runtime; they are the fastest way for
-# somebody who has never seen the tool to watch it work. node_modules and out/
-# are excluded by .dockerignore, so this is ~150 KB of TypeScript.
+COPY ui/server.py ui/app.py ./ui/
+COPY --from=web /web/dist ./ui/web/dist
+# The sample buttons and the sample-suite button read these files at runtime;
+# they are the fastest way for somebody who has never seen the tool to watch it
+# work. node_modules and out/ are excluded by .dockerignore, so this is ~150 KB
+# of TypeScript.
 COPY samples/selenium-suite ./samples/selenium-suite
 COPY samples/playwright-golden ./samples/playwright-golden
 RUN uv sync --frozen --group ui
 
 EXPOSE 8501
-# --server.address 0.0.0.0 because Fly's proxy reaches the machine over the
-# private network; a process bound to 127.0.0.1 is invisible to it. That is safe
-# here in a way it is not on a laptop: the only local-only input (a folder path)
-# is hidden by `folder_blocker()` the moment the backend is not this machine.
-CMD ["/app/.venv/bin/streamlit", "run", "ui/app.py", \
-     "--server.port", "8501", "--server.address", "0.0.0.0", \
-     "--server.headless", "true", "--browser.gatherUsageStats", "false"]
+# --host 0.0.0.0 because Fly's proxy reaches the machine over the private
+# network; a process bound to 127.0.0.1 is invisible to it. Safe here: the page
+# offers nothing that names a path on this machine.
+CMD ["/app/.venv/bin/uvicorn", "ui.server:app", \
+     "--host", "0.0.0.0", "--port", "8501", "--proxy-headers"]
