@@ -1,0 +1,24 @@
+# The demo app, pinned, on this machine — step 11.2.
+#
+#   docker compose -f deploy/the-internet/compose.yml up -d
+#   docker compose -f deploy/the-internet/compose.yml down
+#
+# Every fixture in this repository targets the-internet. Until now the browser
+# checks hit the public Heroku site: fine for a one-off measurement, wrong for a
+# gate that runs on every push (it is someone else's server, it rate-limits, and
+# it changes without telling us).
+#
+# The image is pinned BY DIGEST, not by tag. `latest` was last pushed in 2020 and
+# could move tomorrow; the digest cannot. This exact image is the app behind
+# every execution number in docs/phase-11.2-report.md.
+#
+# It is also an OLDER BUILD than production. One golden assertion depends on a
+# spelling upstream fixed after 2020, and that divergence is declared in
+# execution.KNOWN_APP_DIVERGENCES rather than papered over. See the report.
+services:
+  the-internet:
+    image: gprestes/the-internet@sha256:0c5f3d11d45264ff6363ed48b769d8a67c9fb2eea39cc0e07ead4f639cdacff1
+    container_name: s2p-the-internet
+    ports:
+      - "7080:5000"
+    restart: unless-stopped

@@ -215,3 +215,46 @@ it with the rubric hash, and every summary counts `judge_error` and
 cut-off is understood, the recommended judge is `openai:gpt-5.4`; a future
 increment can try `method="json_schema"` structured output (which the graph's
 critic already uses) to see whether text-mode replies escape the cut.
+
+## Addendum 2026-09-08 — measured in Step 11.2 (T12, T13)
+
+### T12 · An explicit wait longer than Playwright's default is thrown away
+`samples/selenium-suite/pages/DynamicLoadingPage.ts` waits **10 000 ms** for an
+element the demo inserts after about five seconds. The rules for waits are
+right — the wait is a Selenium artefact and it goes — but the conversion drops
+the *number* with it, and Playwright's default `expect` timeout is **5 000 ms**.
+The converted test then loses the race against the page it was written for. The
+golden keeps the budget explicitly (`toBeVisible({ timeout: 10000 })`) with a
+comment saying why.
+
+Found by the execution eval in **two independent runs**: the Phase 6.2 Opus
+single-file baseline and the Phase 9.3 whole-suite run. Reproduced 3 times out
+of 3 against the pinned local app, so it is a defect class and not a flake. No
+static gate can see it: the file compiles, lints, keeps every assertion, and
+contains no Selenium residue.
+
+*Candidate rule (NOT added):* an explicit timeout longer than Playwright's
+default is information, not noise — delete the wait, keep the budget on the
+assertion that replaces it. It stays a candidate because the working agreement
+is no playbook change without a green eval run, and one measured fixture is not
+a reason to edit the prompt. It belongs in the next eval-gated tuning pass, on
+rows that were not used to find it.
+
+### T13 · A page object cannot guess the name its caller will use
+Two runs with byte-identical configuration converted the same `SecureAreaPage`
+equally well and named its flash locator `flash` in one and `flashMessage` in
+the other. The golden caller says `securePage.flash`, so the first executes and
+the second does not. Across four saved runs, **every** execution failure on a
+page-object row was of this kind, while test rows — which are handed golden page
+objects, so their interface is supplied — passed 20 out of 20.
+
+This is not a converter defect and it must not be answered with a rule naming
+the golden's nouns; that would be fitting the prompt to a fixture. It is the
+same limit hard case 10 hit in 11.1b (*"call sites were not provided"*), seen
+from the other side: a single-file conversion has no way to know its callers.
+The unit that can be executed end to end is a **suite**, and the whole-tree run
+of the Phase 9.3 output confirms it — twelve files converted together, zero
+interface mismatches, and the only failure was T12 above.
+
+*Gate:* execution reports split `by_kind` and say this in the text, so a
+page-object execution percentage is never read as a converter score.

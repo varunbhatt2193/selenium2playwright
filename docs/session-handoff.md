@@ -1,4 +1,4 @@
-# Restart here — 2026-09-08 (Phase 11 started; ⛔ Anthropic API is limit-blocked until 2026-10-01)
+# Restart here — 2026-09-08 (Phase 11: 11.1a/11.1b/11.2 done; ⛔ Anthropic API is limit-blocked until 2026-10-01)
 
 ## Current position
 
@@ -102,12 +102,55 @@ Tracked in roadmap 11.3; written here too because roadmap.md is gitignored.
 
 **Phase 10 is complete. Phase 11 has started.** 11.1 was split into a and b on
 2026-09-08, because building the ruler and using it are different kinds of work:
-**11.1a is DONE** (no model spend, browser verification), **11.1b is next** (an
-eval-gated tuning loop with a real bill). Then 11.2 execution evals in CI, 11.3
+**11.1a is DONE** (no model spend, browser verification) and **11.1b is DONE**
+(on OpenAI, see the blocker below). **11.2 is DONE too** — execution evals and
+the CI gate, also with no model spend; read
+[phase-11.2-report.md](phase-11.2-report.md). Next is 11.3
 launch kit (drop the 🚧 banner, comparison table, cost numbers, **the suite demo
 video above**, LinkedIn assets). 11.3 is also where *hosting the playground
 itself* belongs: today the page runs on your laptop against the live backend,
 which is enough to demo and not enough to put in a CV link.
+
+### 11.2 is done: the code is executed, and CI checks the ruler
+
+Read [phase-11.2-report.md](phase-11.2-report.md). The four gates read the
+converted file and none of them can say whether it *works*. Now the saved
+conversions go into a browser against the demo app in a container:
+
+```bash
+docker compose -f deploy/the-internet/compose.yml up -d
+uv run python scripts/run_execution_eval.py --goldens --suite base     # the gate
+uv run python scripts/run_execution_eval.py --experiment out/11.1b/arm-c-playbook2
+uv run python scripts/run_execution_eval.py --tree out/9.3 --suite base
+```
+
+**No model is ever called here.** A finished experiment already contains the
+code it produced, so the execution number costs browser time and nothing else —
+which is why this step happened at all while the Anthropic account is blocked.
+
+Three things to carry forward:
+
+1. **Test rows 20/20; every page-object execution failure is a name.** Two runs
+   with byte-identical configuration wrote `flash` and `flashMessage` for the
+   same locator, and the golden caller says `flash`. Neither conversion is
+   wrong. Do **not** answer this with a playbook rule naming the golden's nouns
+   — that is fitting the prompt to a fixture. It is hard case 10's wall
+   (*"call sites were not provided"*) from the other side, and it belongs to
+   suite mode. Gap T13.
+2. **One real defect, found twice:** an explicit 10 000 ms wait dropped to
+   Playwright's 5 000 ms default (gap T12). Candidate rule, deliberately NOT
+   added — the next eval-gated tuning pass should measure it on rows that were
+   not used to find it.
+3. **The pinned app is not production.** `gprestes/the-internet` is pinned by
+   digest and is a 2020 build; one golden assertion depends on a spelling
+   upstream fixed later. The golden cannot be edited — its hash is inside the
+   published dataset — so the divergence is declared in
+   `execution.KNOWN_APP_DIVERGENCES`, excluded from pass/fail, and **the gate
+   fails if it ever starts passing**. Never "fix" that by editing a fixture.
+
+`.github/workflows/ci.yml` runs the offline suite and both browser gates on
+every push, with **no secrets**, so a pull request cannot spend money. The
+offline suite now passes on a machine with no credentials at all.
 
 ### 11.1a is done: the twelve hard cases are a second benchmark
 

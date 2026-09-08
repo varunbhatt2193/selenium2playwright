@@ -346,6 +346,17 @@ class _NoStore:
 
 
 class CommandLineTests(StoreHarness):
+    def setUp(self):
+        super().setUp()
+        # The CLI builds the configured model before it runs, so `convert` needs a
+        # key-shaped string even when every model reply is scripted. Pinning both
+        # here is what makes the suite runnable on a machine with no credentials
+        # at all — which is exactly the machine the CI gate runs on (step 11.2).
+        keys = patch.dict(os.environ, {"S2P_MODEL": "anthropic:claude-sonnet-5",
+                                       "ANTHROPIC_API_KEY": "sk-ant-offline-test"})
+        keys.start()
+        self.addCleanup(keys.stop)
+
     def cli(self, *argv):
         out, err = io.StringIO(), io.StringIO()
         with redirect_stdout(out), redirect_stderr(err):

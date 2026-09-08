@@ -1,0 +1,964 @@
+{
+  "schema_version": 1,
+  "scope": "Step 11.2 execution evals. Saved conversions replayed in a real browser against a pinned local app; no model was called and nothing was uploaded.",
+  "git_revision": "9d3755c4892a0cb73df6d8413952203291a2049e",
+  "regenerate": [
+    "docker compose -f deploy/the-internet/compose.yml up -d",
+    "uv run python scripts/run_execution_eval.py --goldens --suite base",
+    "uv run python scripts/run_execution_eval.py --goldens --suite hard",
+    "uv run python scripts/run_execution_eval.py --experiment <finished experiment dir>",
+    "uv run python scripts/run_execution_eval.py --tree out/9.3 --suite base"
+  ],
+  "goldens": {
+    "base": {
+      "passed": true,
+      "counts": {
+        "passed": 7,
+        "failed": 0,
+        "divergent": 1,
+        "stale_divergence": 0
+      },
+      "declared_divergences": 1,
+      "unexpected_tests": [],
+      "failures": [],
+      "elapsed_seconds": 13.68,
+      "generated_at_utc": "2026-09-08T01:52:47.723260Z",
+      "tree_sha256": {
+        "pages/AlertsPage.ts": "60a244f18e839c666a4afeb8e8a4561bc560710a0d6e6915613a87bede2c614a",
+        "pages/DynamicLoadingPage.ts": "c9a46bb21575c842bcb8f077f8c25790986f410190534aa769c4766aa410e253",
+        "pages/IframePage.ts": "d7399775a28786dde58b881713e59aa78b92663a455a6064de43c47e5eb7ac05",
+        "pages/LoginPage.ts": "e735f04f5aed8254e2cd71017dff970063a4be1d996df01d3fbbd95660c3c8f7",
+        "pages/UploadPage.ts": "6c189b16ba37fdcdbc47d8a4d0627aae34812e4d53d4ccb45ad909f9b1d91b72",
+        "pages/WindowsPage.ts": "4692a410f0008bcd2e3b2a8e7134ac61e63c190d29126029f54979afadf48b1f",
+        "tests/alerts.spec.ts": "2cc1c14d0dbf75ebc6524027a3c74e8b7c3c6cbaacae0e5f8bb1d3df25bd5f80",
+        "tests/dynamic-loading.spec.ts": "2d2eacaf6bc667959976b3008747281d5dcf2fb0c76de43f1ff0feda8cb197f8",
+        "tests/iframe.spec.ts": "0ca77f71cb1feb6a5773aadfef70e960be09ac6abf85b1d57219948078e9e07c",
+        "tests/login.spec.ts": "c29a08f96b02aace9ea7fc2283a58f598c12a602c434e62e8565ae2c15e09a01",
+        "tests/upload.spec.ts": "793037f5e4310f98c424d7072563a58c62747d6403e2c2e13ecbed0a27e5c5c3",
+        "tests/windows.spec.ts": "300da347bbbf302c793288c0e49ef21c31c77aa5d51ca1fdc26d2a3471eb8f5a"
+      }
+    },
+    "hard": {
+      "passed": true,
+      "counts": {
+        "passed": 7,
+        "failed": 0,
+        "divergent": 0,
+        "stale_divergence": 0
+      },
+      "declared_divergences": 0,
+      "unexpected_tests": [],
+      "failures": [],
+      "elapsed_seconds": 8.93,
+      "generated_at_utc": "2026-09-08T01:52:56.785841Z",
+      "tree_sha256": {
+        "pages/AddRemovePage.ts": "4529ad6dc0e73c3acfa60968f2eefc1f405cca8c2779b8a90d4f275e063e64dc",
+        "pages/BasePage.ts": "8af23fb8771886033432a2934cab97db389967acac13dd767498ce993e02c7fe",
+        "pages/DynamicControlsPage.ts": "7e4e0770f2acaf00228b68b9b99bc5226d5f13d9ea9513179c3700ac9949e7d4",
+        "pages/HoversPage.ts": "57b9d420f23b42b22a821bcd79ddc5b0fb9bc409366ba4ad5e804c451fac16b8",
+        "pages/NestedFramesPage.ts": "ba463634e010bc5782a2631f7133d533a90379c31100abb99b6291be0ff51556",
+        "pages/SecureAreaPage.ts": "144fd848fee2c9bacf7aeff21fdb76bfb93baee458d2054e70e5f6e9bf71abcb",
+        "tests/add-remove.spec.ts": "a1064d53671f5f3bbc540aa772aca47be420dd7c6db131712c2b50c01bb415a3",
+        "tests/dynamic-controls.spec.ts": "bac64442771232a3bd9bdafe1e0d431a4f0cdab6d4c45a09193883d12c6b0b08",
+        "tests/hovers.spec.ts": "76bdb206a65f854958317013bf7f7e74c232d090f5a40444ce3014eea118cd70",
+        "tests/nested-frames.spec.ts": "66941722efd2e00ec64fab4404d8e6055404ea6c2128835b33debf2aa61d68ef",
+        "tests/shared-session.spec.ts": "244db1d99d13b17193f16f88525e3f17ab13edfdd24ba34fe356e5d622ffa525"
+      }
+    }
+  },
+  "experiments": {
+    "out/6.2/experiment-20260906T055741Z-f4465fd0": {
+      "suite": "base",
+      "generated_at_utc": "2026-09-08T01:52:19.047996Z",
+      "aggregate": {
+        "scheduled": 12,
+        "executed": 11,
+        "passed": 9,
+        "statuses": {
+          "passed": 9,
+          "failed": 2,
+          "error": 0,
+          "not_run": 1
+        },
+        "pass_percent_of_scheduled": 75.0,
+        "pass_percent_of_executed": 81.82
+      },
+      "by_kind": {
+        "page-object": {
+          "scheduled": 6,
+          "executed": 5,
+          "passed": 4,
+          "statuses": {
+            "passed": 4,
+            "failed": 1,
+            "error": 0,
+            "not_run": 1
+          },
+          "pass_percent_of_scheduled": 66.67,
+          "pass_percent_of_executed": 80.0
+        },
+        "test": {
+          "scheduled": 6,
+          "executed": 6,
+          "passed": 5,
+          "statuses": {
+            "passed": 5,
+            "failed": 1,
+            "error": 0,
+            "not_run": 0
+          },
+          "pass_percent_of_scheduled": 83.33,
+          "pass_percent_of_executed": 83.33
+        }
+      },
+      "quadrants": {
+        "both_passed": [
+          "alerts-page",
+          "alerts-test",
+          "dynamic-loading-page",
+          "iframe-page",
+          "iframe-test",
+          "login-page",
+          "login-test",
+          "upload-test",
+          "windows-test"
+        ],
+        "static_passed_execution_failed": [
+          "dynamic-loading-test",
+          "upload-page"
+        ],
+        "static_failed_execution_passed": [],
+        "both_failed": []
+      },
+      "rows": {
+        "alerts-page": {
+          "kind": "page-object",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "72218035a40e2d540f842b5a0c8cda4c32317b6019a7711332716dcc3f09e83d",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "alerts-test": {
+          "kind": "test",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "493226698ad79b1dce065ad4de19a2e485164f1d843e72776499ce906535309b",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "dynamic-loading-page": {
+          "kind": "page-object",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "a5c87a749e2a26eb277c8173495ade0eba560c8c561f957c3ef73538d299bfec",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "dynamic-loading-test": {
+          "kind": "test",
+          "status": "failed",
+          "all_static_passed": true,
+          "code_sha256": "1ea2a7261e10b3819837f0a087f1f7f7432a22a8e415e9d3ff3a0e9a9cd17e2b",
+          "missing": [],
+          "failed": [
+            "waits for the dynamically inserted result"
+          ],
+          "reason": ""
+        },
+        "iframe-page": {
+          "kind": "page-object",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "7af6d7538dc0dae6b6d03fa0e66228847b9261ff33cb48ed85853dbfd8787a9a",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "iframe-test": {
+          "kind": "test",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "fd2dab476626d8a62dd31e0d273189714c8c70078821f01e7826fa8c00257f42",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "login-page": {
+          "kind": "page-object",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "88b575788c8e9d176200cb986939d121dbe8109fbbc3c19c12c978598f893d55",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "login-test": {
+          "kind": "test",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "146ce1173c4cbbce05424e531583aa9ecbc0618f3b2a38234e7a254707c1a488",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "upload-page": {
+          "kind": "page-object",
+          "status": "failed",
+          "all_static_passed": true,
+          "code_sha256": "62c39fc4560b40cec6fc8d6e7ac20206b3c02bb044d0fa424f8ffd45c3d9208d",
+          "missing": [],
+          "failed": [
+            "uploads a created file and verifies its name"
+          ],
+          "reason": ""
+        },
+        "upload-test": {
+          "kind": "test",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "5fc17f846caeb3d48058291f55e1d9c6735b91d313d4f98ee3b534ba11aad4e1",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "windows-page": {
+          "kind": "page-object",
+          "status": "not_run",
+          "all_static_passed": false,
+          "code_sha256": null,
+          "missing": [],
+          "failed": [],
+          "reason": "conversion produced no code (failed)"
+        },
+        "windows-test": {
+          "kind": "test",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "2b769ff790486178560273164067db24654b1715d24002d84b21012a6a71c5b2",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        }
+      }
+    },
+    "out/11.1b/baseline-gpt54": {
+      "suite": "hard",
+      "generated_at_utc": "2026-09-08T01:51:07.719376Z",
+      "aggregate": {
+        "scheduled": 11,
+        "executed": 11,
+        "passed": 10,
+        "statuses": {
+          "passed": 10,
+          "failed": 1,
+          "error": 0,
+          "not_run": 0
+        },
+        "pass_percent_of_scheduled": 90.91,
+        "pass_percent_of_executed": 90.91
+      },
+      "by_kind": {
+        "page-object": {
+          "scheduled": 6,
+          "executed": 6,
+          "passed": 5,
+          "statuses": {
+            "passed": 5,
+            "failed": 1,
+            "error": 0,
+            "not_run": 0
+          },
+          "pass_percent_of_scheduled": 83.33,
+          "pass_percent_of_executed": 83.33
+        },
+        "test": {
+          "scheduled": 5,
+          "executed": 5,
+          "passed": 5,
+          "statuses": {
+            "passed": 5,
+            "failed": 0,
+            "error": 0,
+            "not_run": 0
+          },
+          "pass_percent_of_scheduled": 100.0,
+          "pass_percent_of_executed": 100.0
+        }
+      },
+      "quadrants": {
+        "both_passed": [
+          "add-remove-test",
+          "base-page",
+          "dynamic-controls-page",
+          "dynamic-controls-test",
+          "hovers-page",
+          "hovers-test",
+          "nested-frames-test",
+          "shared-session-page",
+          "shared-session-test"
+        ],
+        "static_passed_execution_failed": [],
+        "static_failed_execution_passed": [
+          "add-remove-page"
+        ],
+        "both_failed": [
+          "nested-frames-page"
+        ]
+      },
+      "rows": {
+        "add-remove-page": {
+          "kind": "page-object",
+          "status": "passed",
+          "all_static_passed": false,
+          "code_sha256": "7bc7f98dbe6c05602ee7e9d222e37cf2b64663bdc4fe353c203b7d37aafbea26",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "add-remove-test": {
+          "kind": "test",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "38b40da87b038318f28298af1dcd12f24d94aa675f0e3afe5de6037139d00ce7",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "base-page": {
+          "kind": "page-object",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "bb949e07e29b3485252da9e6b77940ec32a0bc9c6c7472ba39496a425fa2e74a",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "dynamic-controls-page": {
+          "kind": "page-object",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "e939895ad0c97837e0c57d84a43f1be6d6ddc5d5e21684f928bc189c4255a798",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "dynamic-controls-test": {
+          "kind": "test",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "2c66618d3d1aa654ba2013ca39ccf33501364f39a53e7720cd98a8d801afb781",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "hovers-page": {
+          "kind": "page-object",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "31bb009a8fbe6bea54777742e01ed2baf08f1ad01df029c5e220de5791ef309b",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "hovers-test": {
+          "kind": "test",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "9cf883ea744e9fad2e9f81f2d7e60b50736cea260b3bf869b9d6ce6bdf44a529",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "nested-frames-page": {
+          "kind": "page-object",
+          "status": "failed",
+          "all_static_passed": false,
+          "code_sha256": "bc732cce5dbe3286b9518a4a34cfe654b2232bd62c451880dd6511c8089d35db",
+          "missing": [],
+          "failed": [
+            "reads the middle frame and then the bottom frame"
+          ],
+          "reason": ""
+        },
+        "nested-frames-test": {
+          "kind": "test",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "b2d2b4a200a558fa4dcd95d472af7b462673b12aa98ef6f93cd77af545a17f29",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "shared-session-page": {
+          "kind": "page-object",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "4acd194f51e6a1fb95483f402fabf5e4151dc792a8023a7c1b98b283ed23339b",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "shared-session-test": {
+          "kind": "test",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "b56edf7e82781a991e852f91f9133af2bce275a892952f4837772cf800a77b57",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        }
+      }
+    },
+    "out/11.1b/arm-a-baseline": {
+      "suite": "hard",
+      "generated_at_utc": "2026-09-08T01:49:35.145492Z",
+      "aggregate": {
+        "scheduled": 11,
+        "executed": 11,
+        "passed": 9,
+        "statuses": {
+          "passed": 9,
+          "failed": 2,
+          "error": 0,
+          "not_run": 0
+        },
+        "pass_percent_of_scheduled": 81.82,
+        "pass_percent_of_executed": 81.82
+      },
+      "by_kind": {
+        "page-object": {
+          "scheduled": 6,
+          "executed": 6,
+          "passed": 4,
+          "statuses": {
+            "passed": 4,
+            "failed": 2,
+            "error": 0,
+            "not_run": 0
+          },
+          "pass_percent_of_scheduled": 66.67,
+          "pass_percent_of_executed": 66.67
+        },
+        "test": {
+          "scheduled": 5,
+          "executed": 5,
+          "passed": 5,
+          "statuses": {
+            "passed": 5,
+            "failed": 0,
+            "error": 0,
+            "not_run": 0
+          },
+          "pass_percent_of_scheduled": 100.0,
+          "pass_percent_of_executed": 100.0
+        }
+      },
+      "quadrants": {
+        "both_passed": [
+          "add-remove-page",
+          "add-remove-test",
+          "base-page",
+          "dynamic-controls-page",
+          "dynamic-controls-test",
+          "hovers-page",
+          "hovers-test",
+          "nested-frames-test",
+          "shared-session-test"
+        ],
+        "static_passed_execution_failed": [
+          "nested-frames-page",
+          "shared-session-page"
+        ],
+        "static_failed_execution_passed": [],
+        "both_failed": []
+      },
+      "rows": {
+        "add-remove-page": {
+          "kind": "page-object",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "e9bb83f82b9afb88f179fc917ce565f308db15f8eb59382c615669e4bd255466",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "add-remove-test": {
+          "kind": "test",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "c6a83c28732e3f6d9d66ac7c2d54386858ec8502479a17b3243d85b49018c2ef",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "base-page": {
+          "kind": "page-object",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "af6eb43093b41d359e4106cc18f84535eacfeca177d3bbb08aa10e879dc09100",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "dynamic-controls-page": {
+          "kind": "page-object",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "0bf69f61f76f5a0657f72f838e2bf9882277d9d93904988feee9d91d1b6f821f",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "dynamic-controls-test": {
+          "kind": "test",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "2c66618d3d1aa654ba2013ca39ccf33501364f39a53e7720cd98a8d801afb781",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "hovers-page": {
+          "kind": "page-object",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "1923afd828ce588a7e3f4797fe1e5c99776ff3b90ff816197e04f64441be79ab",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "hovers-test": {
+          "kind": "test",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "8834b6ff9d9489e8d86c63b2e34dafccaca271fd1cf601e03846420e7925cfd8",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "nested-frames-page": {
+          "kind": "page-object",
+          "status": "failed",
+          "all_static_passed": true,
+          "code_sha256": "69ad68cf1d9fdae6839beb770df99e25ac914e7501a5d7336a4848383a67687b",
+          "missing": [],
+          "failed": [
+            "reads the middle frame and then the bottom frame"
+          ],
+          "reason": ""
+        },
+        "nested-frames-test": {
+          "kind": "test",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "b2d2b4a200a558fa4dcd95d472af7b462673b12aa98ef6f93cd77af545a17f29",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "shared-session-page": {
+          "kind": "page-object",
+          "status": "failed",
+          "all_static_passed": true,
+          "code_sha256": "53c7aee299f40f22f9fdd63a6c6fdd17cf7c8aa73f2e64ba7c8e2e9c91bdbc1e",
+          "missing": [],
+          "failed": [
+            "lands on the secure area after the shared login",
+            "still shows the secure area after a reload"
+          ],
+          "reason": ""
+        },
+        "shared-session-test": {
+          "kind": "test",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "d525b5787695aeacc443bcd39ca25bd2ea12542a42d0a244741ca4ce3caa7de3",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        }
+      }
+    },
+    "out/11.1b/arm-b-playbook": {
+      "suite": "hard",
+      "generated_at_utc": "2026-09-08T01:50:06.911290Z",
+      "aggregate": {
+        "scheduled": 11,
+        "executed": 11,
+        "passed": 9,
+        "statuses": {
+          "passed": 9,
+          "failed": 2,
+          "error": 0,
+          "not_run": 0
+        },
+        "pass_percent_of_scheduled": 81.82,
+        "pass_percent_of_executed": 81.82
+      },
+      "by_kind": {
+        "page-object": {
+          "scheduled": 6,
+          "executed": 6,
+          "passed": 4,
+          "statuses": {
+            "passed": 4,
+            "failed": 2,
+            "error": 0,
+            "not_run": 0
+          },
+          "pass_percent_of_scheduled": 66.67,
+          "pass_percent_of_executed": 66.67
+        },
+        "test": {
+          "scheduled": 5,
+          "executed": 5,
+          "passed": 5,
+          "statuses": {
+            "passed": 5,
+            "failed": 0,
+            "error": 0,
+            "not_run": 0
+          },
+          "pass_percent_of_scheduled": 100.0,
+          "pass_percent_of_executed": 100.0
+        }
+      },
+      "quadrants": {
+        "both_passed": [
+          "add-remove-page",
+          "add-remove-test",
+          "base-page",
+          "dynamic-controls-test",
+          "hovers-page",
+          "hovers-test",
+          "nested-frames-test",
+          "shared-session-test"
+        ],
+        "static_passed_execution_failed": [
+          "nested-frames-page",
+          "shared-session-page"
+        ],
+        "static_failed_execution_passed": [
+          "dynamic-controls-page"
+        ],
+        "both_failed": []
+      },
+      "rows": {
+        "add-remove-page": {
+          "kind": "page-object",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "98c430dbad0840a60a73deed6ed600b3f31e5313701baab8ad466035ed73cdfd",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "add-remove-test": {
+          "kind": "test",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "c6a83c28732e3f6d9d66ac7c2d54386858ec8502479a17b3243d85b49018c2ef",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "base-page": {
+          "kind": "page-object",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "3cbb460eefd0b88c74a39183bf6b10583ca2de28ca1e4a530479afe201f74875",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "dynamic-controls-page": {
+          "kind": "page-object",
+          "status": "passed",
+          "all_static_passed": false,
+          "code_sha256": "b11d19e0271c6a1b66bd8bffb5f799647289aa9c086deb48ec34c21bf0d5d6ec",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "dynamic-controls-test": {
+          "kind": "test",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "2c66618d3d1aa654ba2013ca39ccf33501364f39a53e7720cd98a8d801afb781",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "hovers-page": {
+          "kind": "page-object",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "f82d7e3decaa5db87cd8830d00af9d751982ef825ab2329a018090180edac11e",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "hovers-test": {
+          "kind": "test",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "2e2b7cbf44c0ce5a41149ffbcbb6ff01d1af64dcaf7f49531ca239387579b569",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "nested-frames-page": {
+          "kind": "page-object",
+          "status": "failed",
+          "all_static_passed": true,
+          "code_sha256": "4c0937ae5f51450df4b5a95f435de44eb86bcabafaaf079fe9176a4c2a13d70b",
+          "missing": [],
+          "failed": [
+            "reads the middle frame and then the bottom frame"
+          ],
+          "reason": ""
+        },
+        "nested-frames-test": {
+          "kind": "test",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "b2d2b4a200a558fa4dcd95d472af7b462673b12aa98ef6f93cd77af545a17f29",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "shared-session-page": {
+          "kind": "page-object",
+          "status": "failed",
+          "all_static_passed": true,
+          "code_sha256": "32d732dbf6020536c31f69b0f8f6aee51880d506879e9bcba66f015149832708",
+          "missing": [],
+          "failed": [
+            "lands on the secure area after the shared login",
+            "still shows the secure area after a reload"
+          ],
+          "reason": ""
+        },
+        "shared-session-test": {
+          "kind": "test",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "9a3e7d7b1903cbf7300c4cfc5ffad91506dd714fd5f2c4bb6a25e4a1ed08c8b7",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        }
+      }
+    },
+    "out/11.1b/arm-c-playbook2": {
+      "suite": "hard",
+      "generated_at_utc": "2026-09-08T01:50:35.634548Z",
+      "aggregate": {
+        "scheduled": 11,
+        "executed": 11,
+        "passed": 8,
+        "statuses": {
+          "passed": 8,
+          "failed": 3,
+          "error": 0,
+          "not_run": 0
+        },
+        "pass_percent_of_scheduled": 72.73,
+        "pass_percent_of_executed": 72.73
+      },
+      "by_kind": {
+        "page-object": {
+          "scheduled": 6,
+          "executed": 6,
+          "passed": 3,
+          "statuses": {
+            "passed": 3,
+            "failed": 3,
+            "error": 0,
+            "not_run": 0
+          },
+          "pass_percent_of_scheduled": 50.0,
+          "pass_percent_of_executed": 50.0
+        },
+        "test": {
+          "scheduled": 5,
+          "executed": 5,
+          "passed": 5,
+          "statuses": {
+            "passed": 5,
+            "failed": 0,
+            "error": 0,
+            "not_run": 0
+          },
+          "pass_percent_of_scheduled": 100.0,
+          "pass_percent_of_executed": 100.0
+        }
+      },
+      "quadrants": {
+        "both_passed": [
+          "add-remove-page",
+          "add-remove-test",
+          "base-page",
+          "dynamic-controls-test",
+          "hovers-page",
+          "hovers-test",
+          "nested-frames-test",
+          "shared-session-test"
+        ],
+        "static_passed_execution_failed": [
+          "nested-frames-page",
+          "shared-session-page"
+        ],
+        "static_failed_execution_passed": [],
+        "both_failed": [
+          "dynamic-controls-page"
+        ]
+      },
+      "rows": {
+        "add-remove-page": {
+          "kind": "page-object",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "54c444b5b263f349c0f147ae904d4b228a0889d8610c06147b3721329e2c2641",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "add-remove-test": {
+          "kind": "test",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "c6a83c28732e3f6d9d66ac7c2d54386858ec8502479a17b3243d85b49018c2ef",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "base-page": {
+          "kind": "page-object",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "dc7a3a4dec35e6dd8efcc3401e9ef742ee8e648712a1347054b138eccae6d26e",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "dynamic-controls-page": {
+          "kind": "page-object",
+          "status": "failed",
+          "all_static_passed": false,
+          "code_sha256": "8243693480a59513a1eb5b4bd73984b10f0ae13b1913fdff96aca8b9ad7444f0",
+          "missing": [],
+          "failed": [
+            "removes the checkbox and reports it gone"
+          ],
+          "reason": ""
+        },
+        "dynamic-controls-test": {
+          "kind": "test",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "2c66618d3d1aa654ba2013ca39ccf33501364f39a53e7720cd98a8d801afb781",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "hovers-page": {
+          "kind": "page-object",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "1923afd828ce588a7e3f4797fe1e5c99776ff3b90ff816197e04f64441be79ab",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "hovers-test": {
+          "kind": "test",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "8834b6ff9d9489e8d86c63b2e34dafccaca271fd1cf601e03846420e7925cfd8",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "nested-frames-page": {
+          "kind": "page-object",
+          "status": "failed",
+          "all_static_passed": true,
+          "code_sha256": "fef14f35ded7eb770fd64f5ed0f046535b6056900ff573036ecc41472e050e46",
+          "missing": [],
+          "failed": [
+            "reads the middle frame and then the bottom frame"
+          ],
+          "reason": ""
+        },
+        "nested-frames-test": {
+          "kind": "test",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "b2d2b4a200a558fa4dcd95d472af7b462673b12aa98ef6f93cd77af545a17f29",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        },
+        "shared-session-page": {
+          "kind": "page-object",
+          "status": "failed",
+          "all_static_passed": true,
+          "code_sha256": "b0d3a2d01a3d9785a09dc266f077de3571555214aac250da4e582c83ce4e7f3e",
+          "missing": [],
+          "failed": [
+            "lands on the secure area after the shared login",
+            "still shows the secure area after a reload"
+          ],
+          "reason": ""
+        },
+        "shared-session-test": {
+          "kind": "test",
+          "status": "passed",
+          "all_static_passed": true,
+          "code_sha256": "b56edf7e82781a991e852f91f9133af2bce275a892952f4837772cf800a77b57",
+          "missing": [],
+          "failed": [],
+          "reason": ""
+        }
+      }
+    }
+  },
+  "tree": {
+    "source": "out/9.3",
+    "counts": {
+      "passed": 6,
+      "failed": 1,
+      "divergent": 1,
+      "stale_divergence": 0
+    },
+    "passed": false,
+    "failures": [
+      "tests/dynamic-loading.spec.ts :: waits for the dynamically inserted result -> failed — Error: expect(locator).toHaveText(expected) failed"
+    ],
+    "generated_at_utc": "2026-09-08T01:52:33.440006Z",
+    "tree_sha256": {
+      "pages/AlertsPage.ts": "1cd91448edb4e38eb71bbc4a7a1ae2b296d5de1415cfeb9472e75e225a69a663",
+      "pages/DynamicLoadingPage.ts": "148a5be6e27d41d1b8cffd1414c6f84a897878d407027a84e3b3d560d7928d61",
+      "pages/IframePage.ts": "a5d113c5bbf377d02150cbbb9d8f20c7c7df2de15c7264b992d80600285cee50",
+      "pages/LoginPage.ts": "6ca42e394651a9478f8c530e037bb5ccbda827f121009d4432bd30b4a48e3212",
+      "pages/UploadPage.ts": "ca6595f36da517a98a1cdb8fca73dbfcc73cd79b4b43104dfaa201885795fe4a",
+      "pages/WindowsPage.ts": "d5c3fc6628208259cc774b889b4c9de2a57d0e55e8fafb375e8dbdb61e48b287",
+      "tests/alerts.spec.ts": "277d34443b052840b32091384048a4bb5e669f683d79a343b4d50ad23a380b41",
+      "tests/dynamic-loading.spec.ts": "1ea2a7261e10b3819837f0a087f1f7f7432a22a8e415e9d3ff3a0e9a9cd17e2b",
+      "tests/iframe.spec.ts": "ee9236e589fbb4965bac8c590df1c4bb5b74aac81422fbd8227ad3bcabf77ffb",
+      "tests/login.spec.ts": "146ce1173c4cbbce05424e531583aa9ecbc0618f3b2a38234e7a254707c1a488",
+      "tests/upload.spec.ts": "60d7be6b8a7adfda5290ffd768159849f783f3e64dd6440b855bf9a03e356d2e",
+      "tests/windows.spec.ts": "1c6ae74615653d0e86fed14366bcf7c7fe71bbf02bf46d69cb149cce202f93b3"
+    }
+  },
+  "app": {
+    "base_url": "http://127.0.0.1:7080",
+    "image": "gprestes/the-internet@sha256:0c5f3d11d45264ff6363ed48b769d8a67c9fb2eea39cc0e07ead4f639cdacff1",
+    "version": "0.58.0"
+  }
+}

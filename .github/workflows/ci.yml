@@ -1,0 +1,122 @@
+# The regression gate — step 11.2.
+#
+# Two jobs, no secrets, no model calls, no LangSmith. A pull request cannot
+# spend money here, and a fork's PR runs the same checks the maintainer does.
+#
+#   offline-checks   the whole unit suite, which drives the real gates (tsc,
+#                    ESLint, the AST scripts) against scripted model replies
+#   execution-gate   the golden fixtures, run in a real browser against a pinned
+#                    local copy of the demo app
+#
+# The second job is the one this step exists for. Every converter score in this
+# repository is measured against those fixtures; if a fixture, the sandbox or a
+# dependency bump quietly breaks them, every published percentage silently
+# starts meaning something else. This gate catches that on the commit that
+# caused it.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  offline-checks:
+    name: Offline checks (485 tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: sandbox/package-lock.json
+
+      # The four gates shell out to this pinned toolchain. Without it most of
+      # the suite would be testing nothing at all.
+      - name: Install the validator sandbox
+        run: npm ci
+        working-directory: sandbox
+
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+
+      - name: Install Python dependencies
+        run: uv sync --frozen
+
+      # No credentials are set on purpose: every model reply in the suite is
+      # scripted, and a test that needs a real key is a test that would charge
+      # this repository to run.
+      - name: Run the offline suite
+        run: uv run python -m unittest discover -s tests
+
+  execution-gate:
+    name: Execution gate (${{ matrix.suite }} fixtures in a browser)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [base, hard]
+    services:
+      # The demo app, pinned by digest — see deploy/the-internet/compose.yml for
+      # why the digest and not the tag, and for the one place this 2020 build
+      # disagrees with production.
+      the-internet:
+        image: gprestes/the-internet@sha256:0c5f3d11d45264ff6363ed48b769d8a67c9fb2eea39cc0e07ead4f639cdacff1
+        ports:
+          - 7080:5000
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: samples/package-lock.json
+
+      - name: Install the sample suites
+        run: npm ci
+        working-directory: samples
+
+      - name: Install the browser
+        run: npx playwright install --with-deps chromium
+        working-directory: samples
+
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+
+      - name: Install Python dependencies
+        run: uv sync --frozen
+
+      # Exit 1 = a fixture ran red or a declared app divergence went stale.
+      # Exit 2 = the app never answered, which is an infrastructure failure and
+      # must not be reported as a passing suite.
+      - name: Run the golden fixtures in a browser
+        run: uv run python scripts/run_execution_eval.py --goldens --suite ${{ matrix.suite }}
+
+      - name: Keep the receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: execution-gate-${{ matrix.suite }}
+          path: out/11.2/
+          if-no-files-found: warn
+          retention-days: 14
