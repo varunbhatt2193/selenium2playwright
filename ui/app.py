@@ -653,6 +653,14 @@ with suite_tab:
                            "every file sent, including any carried across "
                            "untouched, because the meter cannot tell them apart "
                            "without doing the scan itself.")
+                # Metering is per file, so a suite has a price before it has a
+                # result — and a price the demo cannot pay should stop the
+                # button rather than the request. A 429 after a click that
+                # looked fine is the worst version of the same refusal.
+                too_much = pg.affordable(limits, plan.billable)
+                if too_much:
+                    st.warning(too_much)
+                    plan = None
             for number, wave in enumerate(plan.waves, start=1):
                 with st.expander(f"Wave {number} — {len(wave)} file(s)",
                                  expanded=number == 1):

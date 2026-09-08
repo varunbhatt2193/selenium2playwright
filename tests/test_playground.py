@@ -1034,3 +1034,36 @@ class OldBackendTests(unittest.TestCase):
         said = pg.explain_status(403, "`root` is not available on the public demo.")
         self.assertNotIn("Redeploy", said)
         self.assertIn("`root`", said)
+
+
+class AffordabilityTests(unittest.TestCase):
+    """Saying the price before the click, now that a suite has one."""
+
+    SNAPSHOT = {"budget": {"used": 0, "limit": 41, "remaining": 41},
+                "per_visitor": {"daily": 10, "burst": 3, "window_s": 60}}
+
+    def test_a_suite_inside_both_ceilings_is_fine(self):
+        self.assertEqual(pg.affordable(self.SNAPSHOT, 8), "")
+
+    def test_a_suite_bigger_than_the_per_visitor_cap_can_never_run_here(self):
+        # The advice has to be "convert fewer at a time", not "come back
+        # tomorrow": this one is a shape, not a balance.
+        said = pg.affordable(self.SNAPSHOT, 12)
+        self.assertIn("12 files", said)
+        self.assertIn("10 conversions per visitor", said)
+        self.assertIn("Only these files", said)
+
+    def test_a_suite_bigger_than_what_is_left_today_is_a_different_sentence(self):
+        snapshot = {**self.SNAPSHOT, "budget": {"used": 38, "limit": 41, "remaining": 3}}
+        said = pg.affordable(snapshot, 8)
+        self.assertIn("3 are left", said)
+        self.assertIn("midnight UTC", said)
+
+    def test_a_backend_that_did_not_answer_is_not_treated_as_a_refusal(self):
+        # `fetch_limits` returns {"error": …} when it cannot reach the meter.
+        # Blocking the button on that would turn a sidebar warning into a dead
+        # page; the guard is still there to say no.
+        self.assertEqual(pg.affordable({"error": "The backend did not answer."}, 12), "")
+
+    def test_nothing_to_convert_costs_nothing(self):
+        self.assertEqual(pg.affordable(self.SNAPSHOT, 0), "")

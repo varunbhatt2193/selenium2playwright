@@ -748,6 +748,39 @@ def check_suite(root: str, out_root: str, only: list[str] | None = None) -> str:
     return ""
 
 
+def affordable(snapshot: dict[str, Any], files: int) -> str:
+    """Why this suite cannot be paid for, or "" when it can.
+
+    Metering is per file now, so a suite has a price before it has a result and
+    the page can say it in advance. Two ceilings, and they fail differently:
+
+    * the **per-visitor daily cap** is a hard shape — a suite bigger than it can
+      never run here, today or tomorrow, so the advice is to convert fewer files
+      at a time rather than to come back later;
+    * the **shared budget** is a number that refills at midnight UTC.
+
+    What this deliberately does not do is guess how much of their own allowance
+    the visitor has already spent. `/limits` reports the caps and the *global*
+    usage, not one visitor's, so a page that subtracted anyway would be
+    inventing a number. The guard is still the thing that knows; this only
+    catches what is knowable before the click, which is most of it.
+    """
+    if files <= 0:
+        return ""
+    per = snapshot.get("per_visitor") or {}
+    cap = per.get("daily")
+    if isinstance(cap, int) and files > cap:
+        return (f"This suite is {files} files and the demo allows {cap} conversions "
+                f"per visitor per day. Convert fewer at a time with “Only these "
+                f"files”, or run it against your own machine.")
+    budget = snapshot.get("budget") or {}
+    remaining = budget.get("remaining")
+    if isinstance(remaining, int) and files > remaining:
+        return (f"This suite needs {files} conversions and {remaining} are left in "
+                "today's shared budget. It resets at midnight UTC.")
+    return ""
+
+
 def suite_payload(root: str = "", out_root: str = "", only: list[str] | None = None,
                   report_path: str = "", tree: dict[str, str] | None = None) -> dict[str, Any]:
     """`SuiteState`'s inputs, in whichever of the two shapes the caller has.
