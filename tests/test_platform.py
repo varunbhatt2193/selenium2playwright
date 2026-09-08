@@ -18,7 +18,7 @@ fails at server start (or, worse, does not fail at all):
     wraps it.
 """
 
-import importlib
+import importlib.util
 import inspect
 import json
 import os
@@ -224,22 +224,46 @@ class DeployConfigTests(unittest.TestCase):
 class SandboxLocationTests(unittest.TestCase):
     """The toolchain lives in the repo, unless something says otherwise."""
 
-    def reloaded(self, **environ) -> object:
-        with patch.dict(os.environ, environ, clear=False):
-            return importlib.reload(env)
+    def probed(self, **environ) -> object:
+        """A private copy of `env`, loaded under `environ`. Never the shared one.
 
-    def tearDown(self):
-        # Leave the module as the rest of the suite expects to find it.
-        importlib.reload(env)
+        `importlib.reload(env)` was the obvious spelling, and it was a bug that
+        outlived its own tearDown. Reload re-executes the module and binds
+        `SANDBOX` to a **new** Path, while the four gates still hold the object
+        they imported at start-up. The values matched, so it looked harmless —
+        but `OneSandboxTests` asserts *identity*, deliberately, and identity was
+        gone the moment any test in this class ran. Reloading again to clean up
+        could not fix that: another reload is another new object, so the four
+        assertions failed for whoever ran after this class, in a file they had
+        not touched.
+
+        Loading a separate module object answers the same question — what does
+        this file compute under this environment? — and leaves `sys.modules`
+        alone, so no other test can notice this one ran.
+        """
+        spec = importlib.util.spec_from_file_location("env_probe", env.__file__)
+        module = importlib.util.module_from_spec(spec)
+        with patch.dict(os.environ, environ, clear=False):
+            spec.loader.exec_module(module)
+        return module
 
     def test_it_defaults_to_the_folder_in_this_repository(self):
-        fresh = self.reloaded(S2P_SANDBOX="")
+        fresh = self.probed(S2P_SANDBOX="")
         self.assertEqual(fresh.SANDBOX, fresh.REPO_ROOT / "sandbox")
         self.assertTrue((fresh.SANDBOX / "package.json").is_file())
 
     def test_and_an_absolute_override_wins(self):
-        fresh = self.reloaded(S2P_SANDBOX=CONTAINER_SANDBOX)
+        fresh = self.probed(S2P_SANDBOX=CONTAINER_SANDBOX)
         self.assertEqual(fresh.SANDBOX, Path(CONTAINER_SANDBOX))
+
+    def test_probing_leaves_the_shared_module_alone(self):
+        # The regression itself: the gates bind `SANDBOX` at import, so anything
+        # that rebinds it here breaks an identity assertion in a class that
+        # never ran this code. Cheap to assert, and it is the whole reason the
+        # method above does not reload.
+        before = env.SANDBOX
+        self.probed(S2P_SANDBOX=CONTAINER_SANDBOX)
+        self.assertIs(env.SANDBOX, before)
 
 
 

@@ -27,7 +27,10 @@ def run_of(*tests, errors=(), rewrites=0, ran=True):
             "errors": list(errors), "tests": list(tests)}
 
 
-def test_of(spec, name, status="passed", error=""):
+def case_of(spec, name, status="passed", error=""):
+    # Not `test_of`: pytest collects any module-level `test_*` as a test,
+    # then reads its parameters as fixture names and errors at setup. It
+    # was one red line in every full run that meant nothing.
     return {"spec": spec, "name": name, "status": status, "duration_ms": 5, "error": error}
 
 
@@ -97,20 +100,20 @@ class ScoringTests(unittest.TestCase):
     def test_a_test_that_never_ran_fails_the_row(self):
         """A converted file that quietly drops a case must not report 'all green'."""
         result = ex.score("hard", ["reads the middle frame", "reads the bottom frame"],
-                          run_of(test_of("tests/nested-frames.spec.ts", "reads the middle frame")))
+                          run_of(case_of("tests/nested-frames.spec.ts", "reads the middle frame")))
         self.assertEqual(result["status"], "failed")
         self.assertEqual(result["missing"], ["reads the bottom frame"])
 
     def test_a_declared_app_divergence_does_not_fail_the_row(self):
         result = ex.score("base", ["accepts a JavaScript alert"],
-                          run_of(test_of("tests/alerts.spec.ts", "accepts a JavaScript alert", "failed")))
+                          run_of(case_of("tests/alerts.spec.ts", "accepts a JavaScript alert", "failed")))
         self.assertEqual(result["status"], "passed")
         self.assertEqual(len(result["divergences"]), 1)
         self.assertEqual(result["failed"], [])
 
     def test_an_undeclared_failure_still_fails(self):
         result = ex.score("base", ["dismisses a JavaScript confirmation"],
-                          run_of(test_of("tests/alerts.spec.ts", "dismisses a JavaScript confirmation", "failed")))
+                          run_of(case_of("tests/alerts.spec.ts", "dismisses a JavaScript confirmation", "failed")))
         self.assertEqual(result["status"], "failed")
 
     def test_a_suite_that_could_not_run_is_an_error_not_a_failure(self):
@@ -118,7 +121,7 @@ class ScoringTests(unittest.TestCase):
         self.assertEqual(result["status"], "error")
 
     def test_an_extra_test_is_reported_but_not_fatal(self):
-        result = ex.score("hard", ["a"], run_of(test_of("tests/a.spec.ts", "a"), test_of("tests/a.spec.ts", "b")))
+        result = ex.score("hard", ["a"], run_of(case_of("tests/a.spec.ts", "a"), case_of("tests/a.spec.ts", "b")))
         self.assertEqual((result["status"], result["unexpected"]), ("passed", ["b"]))
 
 
@@ -137,14 +140,14 @@ class DivergenceTests(unittest.TestCase):
     def test_a_divergence_that_starts_passing_fails_the_gate(self):
         expected = {"tests/alerts.spec.ts": ["accepts a JavaScript alert"]}
         _, failures, _ = scorecard.verdicts(
-            "base", expected, run_of(test_of("tests/alerts.spec.ts", "accepts a JavaScript alert")))
+            "base", expected, run_of(case_of("tests/alerts.spec.ts", "accepts a JavaScript alert")))
         self.assertEqual(len(failures), 1)
         self.assertIn("stale", failures[0])
 
     def test_a_divergence_that_keeps_failing_is_accepted(self):
         expected = {"tests/alerts.spec.ts": ["accepts a JavaScript alert"]}
         checks, failures, _ = scorecard.verdicts(
-            "base", expected, run_of(test_of("tests/alerts.spec.ts", "accepts a JavaScript alert", "failed")))
+            "base", expected, run_of(case_of("tests/alerts.spec.ts", "accepts a JavaScript alert", "failed")))
         self.assertEqual(failures, [])
         self.assertEqual(checks[0]["verdict"], "divergent")
 
