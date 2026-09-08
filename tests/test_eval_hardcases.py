@@ -17,6 +17,8 @@ from dataclasses import replace
 from pathlib import Path
 
 from selenium2playwright.eval_collection import build_collection
+from selenium2playwright.eval_plan import build_plan
+from selenium2playwright.eval_report import assemble_report, render_markdown
 from selenium2playwright.eval_hard_collection import (
     build_hard_collection, check_evidence, check_manifest,
 )
@@ -24,6 +26,7 @@ from selenium2playwright.eval_hardcases import (
     CASES, COVERED_BY_BASE_DATASET, GOLDEN_DIR, HARD_CASES,
     PLANNED_BROWSER_TEST_COUNTS, SOURCE_DIR,
 )
+from test_eval_experiment import fixed_records
 
 ROOT = Path(__file__).resolve().parents[1]
 SAMPLES = ROOT / "samples"
@@ -207,6 +210,71 @@ class CollectionTests(unittest.TestCase):
             with self.assertRaises(ValueError) as caught:
                 build_hard_collection(copy, EVIDENCE)
             self.assertIn("changed since browser/static verification", str(caught.exception))
+
+
+class HardCaseScorecardTests(unittest.TestCase):
+    """The per-hard-case view is the deliverable of 11.1b; it must not overcount.
+
+    These use synthetic all-passing records: the question here is whether the
+    grouping arithmetic is right, not how the converter scores.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.plan = build_plan(ROOT, benchmark="hard")
+
+    def report(self, records):
+        return assemble_report(self.plan, records, {})
+
+    def test_the_groups_are_exactly_the_hard_cases_the_fixtures_claim(self):
+        report = self.report(fixed_records(self.plan))
+        claimed = sorted({number for case in CASES for number in case.covers})
+        self.assertEqual(sorted(int(k) for k in report["by_hard_case"]), claimed)
+
+    def test_group_sizes_match_the_manifest(self):
+        report = self.report(fixed_records(self.plan))
+        for number, group in report["by_hard_case"].items():
+            expected = sum(1 for case in CASES if int(number) in case.covers)
+            with self.subTest(number):
+                self.assertEqual(group["scheduled"], expected)
+
+    def test_overlapping_groups_do_not_sum_to_the_experiment_total(self):
+        """A row exercises several patterns; that is the point, and it must be visible."""
+        report = self.report(fixed_records(self.plan))
+        summed = sum(group["scheduled"] for group in report["by_hard_case"].values())
+        self.assertGreater(summed, report["aggregate"]["scheduled"])
+
+    def test_one_failing_row_fails_every_pattern_it_exercises(self):
+        records = fixed_records(self.plan)
+        target = next(r for r in records
+                      if self.plan["examples"][r["example_id"]]["metadata"]["case_id"] == "base-page")
+        for item in target["feedback"]:
+            if item["key"] == "compiles":
+                item["score"] = 0
+            if item["key"] == "compiles_status":
+                item["value"] = "failed"
+            if item.get("evaluator_info", {}).get("gate") == "compile":
+                item["evaluator_info"]["status"] = "failed"
+                item["evaluator_info"]["report"]["passed"] = False
+        report = self.report(records)
+        # base-page claims 10 and 1; both groups lose exactly one all-static pass.
+        for number in ("1", "10"):
+            group = report["by_hard_case"][number]
+            with self.subTest(number):
+                self.assertEqual(group["all_static_passed"], group["scheduled"] - 1)
+        self.assertEqual(report["by_hard_case"]["7"]["all_static_passed"],
+                         report["by_hard_case"]["7"]["scheduled"])
+
+    def test_the_scorecard_names_the_pattern_not_only_its_number(self):
+        markdown = render_markdown(self.report(fixed_records(self.plan)))
+        self.assertIn("## Per hard case", markdown)
+        self.assertIn(HARD_CASES[7], markdown)
+
+    def test_the_phase_6_1_benchmark_renders_no_hard_case_section(self):
+        base_plan = build_plan(ROOT)
+        report = assemble_report(base_plan, fixed_records(base_plan), {})
+        self.assertEqual(report["by_hard_case"], {})
+        self.assertNotIn("## Per hard case", render_markdown(report))
 
 
 class BaseDatasetUnchangedTests(unittest.TestCase):

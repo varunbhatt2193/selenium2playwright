@@ -1,4 +1,4 @@
-# Restart here — 2026-09-08 (Phase 10 complete; Phase 11 started: the twelve hard cases are a benchmark)
+# Restart here — 2026-09-08 (Phase 11 started; ⛔ Anthropic API is limit-blocked until 2026-10-01)
 
 ## Current position
 
@@ -154,13 +154,54 @@ hard case 12 uses returned promise chains (no `await` keyword in the file, same
 conversion task). Implicit v3 ordering is not covered. Under hard case 8 only
 hover is exercised — drag-and-drop and modifier clicks are still open.
 
-**11.1b is the next step:** run the converter against that dataset (the 6.2
-experiment runner and 6.4 judge already exist), publish the per-hard-case
-scorecard *including failures*, then iterate the playbook — every change gated
-by a green eval run. Reserve at least two hard cases from the tuning loop so the
-benchmark does not become the thing the prompt is fitted to. This one costs real
-model spend, so it needs a model decision first (sonnet to iterate, opus for the
-published number).
+### ⛔ 11.1b is blocked: the Anthropic account has hit its usage limit
+
+Varun chose **Opus for both** the iteration and the published number on
+2026-09-08. The plumbing shipped (`53ec192`) and the baseline was launched.
+Every one of the 11 rows failed in under a second:
+
+```
+400 invalid_request_error: You have reached your specified API usage limits.
+You will regain access on 2026-10-01 at 00:00 UTC.        req_011Ceq2Ec5hDUtBYe5H3mXJy
+```
+
+**It is account-wide, not Opus-specific.** A one-token probe on
+`claude-sonnet-5` returns the identical error. **The live deployment is down
+too** — `uv run python scripts/call_deployment.py samples/selenium-hard-suite/pages/HoversPage.ts
+--url https://s2p.fly.dev` came back `needs-review after 1 attempt, gates (none
+ran)`. So <https://s2p.fly.dev> and the playground currently convert nothing for
+anybody. Fly is still billing for the machines.
+
+**Zero tokens were spent** on the failed run. Its LangSmith experiment,
+`s2p-11.1b-claude-opus-5-attempts3-f6b74c60`, is an **outage record, not a
+converter score** — never compare a later run against it. Artifacts:
+`out/11.1b/baseline-opus/`.
+
+**Three ways out, all Varun's call:** raise or remove the limit at Console →
+Settings (this is very likely the spend cap he was advised to set after 10.4);
+wait for 2026-10-01; or run on OpenAI with `--model openai:...`, which he
+explicitly did *not* choose — a cross-provider number is not comparable to the
+6.2–6.5 baselines.
+
+**What already works, ready to run the moment access returns:**
+
+```bash
+uv run python scripts/run_eval_experiment.py --benchmark hard            # preview, no network
+uv run python scripts/run_eval_experiment.py --benchmark hard --run      # the baseline
+```
+
+`BENCHMARKS` in `eval_plan.py` binds each collection builder to its upload
+receipt, so an edited fixture stops the run rather than scoring the converter
+against rows that are no longer in the cloud. Reports now carry a
+`by_hard_case` dimension and a **Per hard case** table. Those groups **overlap
+on purpose** — a row exercises several patterns, so the group counts do not sum
+to the experiment total; the question is "is pattern 7 handled?", not "did file
+X pass?".
+
+**Then, in order:** run the baseline, publish the per-hard-case scorecard
+*including failures*, then iterate the playbook — every change gated by a green
+eval run (working-agreement rule 6). Reserve at least two hard cases from the
+tuning loop so the benchmark does not become the thing the prompt is fitted to.
 
 The managed platform is the part that failed, and it is history now: 10.1 put
 the graphs behind `langgraph dev`; 10.2 made them *deployable*: the file travels
@@ -216,7 +257,7 @@ plain-English walkthrough with check-yourself questions, then wait for his
 review. **Always end a turn that hands control back with an explicit "waiting on
 you" line** (asked 2026-09-06 — a pause must never be implied).
 
-**442 offline tests pass** (`uv run python -m unittest discover -s tests`, ~163 s
+**448 offline tests pass** (`uv run python -m unittest discover -s tests`, ~163 s
 — not `-t .`, and pytest is not installed). The suite is terminal-width
 independent from 40 to 200 columns as of 9.3.
 
