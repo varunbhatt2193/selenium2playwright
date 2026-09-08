@@ -41,6 +41,7 @@ attempt 2") is the most interesting thing on the page.
 from __future__ import annotations
 
 import json
+import os
 import re
 from collections.abc import Iterator
 from dataclasses import asdict
@@ -407,17 +408,25 @@ def built_file(path: str) -> Path | None:
     replace the left-hand side outright, so `//etc/passwd` becomes `/etc/passwd`.
     Either one, on Fly, reaches `/proc/self/environ` and the key inside it.
 
-    So resolve first and ask where the answer landed. `DIST` is resolved at
-    import, and a real file under it always has it among its parents — a
-    traversal, an absolute path, and a symlink pointing out of the tree all fail
-    that question, which `is_file()` alone never asked.
+    So normalize first, then confirm the answer is still under `dist`. The
+    trailing separator is the point of `root + os.sep`: without it a sibling
+    directory named `dist-evil` starts with `dist` and passes.
+
+    Written in `os.path` rather than pathlib on purpose, and this is the whole
+    reason: the same check spelled `(DIST / path).resolve()` and
+    `DIST not in candidate.parents` is one CodeQL does not recognize — it reads
+    `Path.resolve()` as the filesystem access the query is warning about, so
+    `py/path-injection` survives a fix that works. `realpath` plus `startswith`
+    is the shape its own remediation shows, which keeps the Security tab a list
+    of things that are actually wrong.
     """
     if not path:
         return None
-    candidate = (DIST / path).resolve()
-    if DIST not in candidate.parents or not candidate.is_file():
+    root = os.path.realpath(DIST)
+    candidate = os.path.realpath(os.path.join(root, path))
+    if not candidate.startswith(root + os.sep) or not os.path.isfile(candidate):
         return None
-    return candidate
+    return Path(candidate)
 
 
 @app.get("/{path:path}", include_in_schema=False)
