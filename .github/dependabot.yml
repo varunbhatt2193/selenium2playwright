@@ -30,6 +30,18 @@ updates:
       samples-minor-patch:
         update-types: [minor, patch]
 
+  # The playground page. Unlike the two above, these dependencies are bundled
+  # and shipped to every visitor's browser, so a known flaw here is one the
+  # public site serves.
+  - package-ecosystem: npm
+    directory: /ui/web
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      playground-minor-patch:
+        update-types: [minor, patch]
+
   - package-ecosystem: github-actions
     directory: /
     schedule:
