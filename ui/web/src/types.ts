@@ -110,6 +110,9 @@ export type SuiteResult = {
   compiles: boolean
   tree_files: number
   tree_findings: string[]
+  // The same findings, split by whether this run is answerable for them.
+  tree_findings_mine: string[]
+  tree_findings_carried: string[]
   tree_error: string
   kept: number
   renamed: number

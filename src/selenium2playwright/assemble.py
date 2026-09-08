@@ -128,6 +128,8 @@ class Assembly:
 
     tree: ValidationReport | None = None  # the whole-tree compile
     tree_error: str = ""  # why there is no tree report, when there is none
+    # Whole-tree findings by whose fault they can be; see `split_tree_findings`.
+    split: dict = field(default_factory=dict)
     files: int = 0  # how many .ts files were compiled together
     ledgers: tuple[FileLedger, ...] = ()
     todos: tuple[TodoEntry, ...] = ()
@@ -534,6 +536,53 @@ def scorecard(outcomes: list, manifest, assembly_parts: dict) -> dict:
     }
 
 
+def owned_findings(assembly) -> tuple[tuple, tuple]:
+    """(errors this run answers for, errors in files it carried across unconverted).
+
+    Fails **closed**. An assembly with no split — one built by hand, or by an
+    older graph — has not told us that any finding belongs to somebody else, and
+    the safe reading of silence on a quality gate is that they are all ours. The
+    opposite default would turn a missing key into a green tree.
+    """
+    split = getattr(assembly, "split", None) or {}
+    if not split:
+        return tuple(assembly.tree.findings if assembly.tree else ()), ()
+    return (tuple(split.get("converted", ())) + tuple(split.get("companion", ())),
+            tuple(split.get("unconverted", ())))
+
+
+def split_tree_findings(tree, outcomes: list, manifest) -> dict:
+    """Sort whole-tree errors by whose fault they can be.
+
+    The tree is compiled as one project, so its errors land in whatever file
+    `tsc` was reading — and that file is very often one this run never touched.
+    A suite past the demo's cap carries Selenium files across unconverted; they
+    cannot compile in a Playwright sandbox, and saying "the tree does NOT
+    compile" because of them blames the converter for its own input.
+
+    Three buckets, because two would lie in the other direction:
+
+      converted   errors in a file this run produced. The only number that is
+                  a verdict on the conversion, and the only one that goes red.
+      unconverted Selenium the run carried across untouched. Expected: it never
+                  claimed to be Playwright, and the sandbox has no Selenium.
+      companion   everything else carried across — a file with no Selenium left
+                  in it that still does not compile. This is the interesting
+                  bucket: a caller whose companion's API just moved under it.
+                  Not counted against the conversion, never hidden either.
+    """
+    converted = {o.path for o in outcomes}
+    selenium_left = {f.path for f in (manifest.files if manifest else ())
+                     if f.path not in converted
+                     and getattr(f.classification, "automation", "") == "selenium"}
+    buckets: dict[str, list] = {"converted": [], "unconverted": [], "companion": []}
+    for finding in (tree.findings if tree else ()):
+        where = ("converted" if finding.file in converted
+                 else "unconverted" if finding.file in selenium_left else "companion")
+        buckets[where].append(finding)
+    return buckets
+
+
 def assemble(root: Path, out_root: Path, manifest, outcomes: list) -> Assembly:
     """The four facts, in the order they are cheapest to trust.
 
@@ -545,17 +594,25 @@ def assemble(root: Path, out_root: Path, manifest, outcomes: list) -> Assembly:
     tree, tree_error = compile_tree(tree_files)
     built, notes = ledgers(root, out_root, outcomes)
     todos = todo_ledger(out_root, outcomes)
+    split = split_tree_findings(tree, outcomes, manifest)
     card = scorecard(outcomes, manifest, {
         "tree_files": len(tree_files),
-        "tree_compiles": tree is not None and tree.passed,
+        # Green when nothing the run produced is broken. Errors in files it
+        # carried across untouched are reported in their own right below, and
+        # are not a verdict on a conversion that never happened.
+        "tree_compiles": tree is not None and not split["converted"] and not split["companion"],
         "tree_errors": len(tree.findings) if tree else 0,
+        "tree_errors_converted": len(split["converted"]),
+        "tree_errors_unconverted": len(split["unconverted"]),
+        "tree_errors_companion": len(split["companion"]),
         "todos": len(todos),
         "api": {verdict: sum(ledger.count(verdict) for ledger in built)
                 for verdict in ("kept", "renamed", "removed")},
         "unexplained_removals": sum(ledger.unexplained for ledger in built),
     })
     return Assembly(tree=tree, tree_error=tree_error, files=len(tree_files), ledgers=tuple(built),
-                    todos=tuple(todos), scorecard=card, notes=tuple(notes))
+                    todos=tuple(todos), scorecard=card, notes=tuple(notes),
+                    split=({k: tuple(v) for k, v in split.items()}))
 
 
 # --- the report --------------------------------------------------------------
@@ -580,11 +637,20 @@ def headline(outcomes: list, assembly: Assembly) -> str:
     counts = assembly.scorecard.get("statuses", {})
     parts = [f"{len(outcomes)} file(s) converted"]
     parts.append(", ".join(f"{n} {name}" for name, n in counts.items() if n))
+    owned, carried_findings = owned_findings(assembly)
+    mine, carried = len(owned), len(carried_findings)
     if assembly.tree is None:
         parts.append("the whole-tree compile did not run")
+    elif assembly.tree.passed:
+        parts.append("the tree compiles as one project")
+    elif not mine:
+        # Everything tsc complained about is input this run carried across
+        # untouched. Saying "the tree does NOT compile" here reads as a verdict
+        # on the conversion, and it is not one.
+        parts.append(f"the converted files compile ({carried} error(s) in files "
+                     "carried across unconverted)")
     else:
-        parts.append("the tree compiles as one project" if assembly.tree.passed
-                     else f"the tree does NOT compile ({len(assembly.tree.findings)} error(s))")
+        parts.append(f"the converted files do NOT compile ({mine} error(s))")
     todos = len(assembly.todos)
     parts.append("no open TODOs" if not todos else f"{todos} open TODO(review) task(s)")
     return " · ".join(parts)
@@ -621,24 +687,43 @@ def render(root: Path, out_root: Path, manifest, outcomes: list, assembly: Assem
     lines += table(["", ""], facts)
 
     lines += ["## 1. Does the tree compile as one project?", ""]
+    # The errors this run is answerable for: files it produced, plus files it
+    # left alone that stopped compiling anyway. Selenium it never converted is
+    # counted separately — see `split_tree_findings`.
+    mine_findings, stale = owned_findings(assembly)
     if assembly.tree is None:
         lines += [f"**Unknown** — {assembly.tree_error}. Every other number below still holds; "
                   "this one gate could not be run.", ""]
-    elif assembly.tree.passed:
+    elif assembly.tree.passed or not mine_findings:
         lines += [f"**Yes.** `tsc --noEmit` over all {assembly.files} TypeScript file(s) in the "
                   "output at once — converted files, copied support files, and the imports "
                   "between them — reports no errors.", "",
                   "This is the check no per-file gate can do: a page object is compiled here "
                   "against *every* spec that calls it, not just the one it was converted with.", ""]
+        if stale:
+            # A pass with an asterisk, and the asterisk is worth a paragraph:
+            # tsc did report errors, they are simply all in Selenium this run
+            # never claimed to convert.
+            files = sorted({f.file for f in stale})
+            lines += [f"`tsc` did report {len(stale)} error(s), and every one of them is in a "
+                      f"file carried across **unconverted** ({len(files)}: "
+                      + ", ".join(f"`{f}`" for f in files[:6])
+                      + (", …" if len(files) > 6 else "") + "). Those files are still Selenium "
+                      "and there is no Selenium in a Playwright project, so they cannot compile "
+                      "and were never expected to. Convert them and the errors go with them.", ""]
     else:
         lines += [f"**No.** `tsc --noEmit` over all {assembly.files} file(s) reports "
-                  f"{len(assembly.tree.findings)} error(s). The per-file gates passed because each "
-                  "file was compiled only against the companions it imported; these are the "
-                  "problems that only exist between files.", ""]
+                  f"{len(mine_findings)} error(s) that this run is answerable for. The per-file "
+                  "gates passed because each file was compiled only against the companions it "
+                  "imported; these are the problems that only exist between files.", ""]
         lines += table(["file", "line", "code", "error"],
-                       [[f.file, f.line or "", f.code, f.message] for f in assembly.tree.findings[:40]])
-        if len(assembly.tree.findings) > 40:
-            lines += [f"…and {len(assembly.tree.findings) - 40} more.", ""]
+                       [[f.file, f.line or "", f.code, f.message] for f in mine_findings[:40]])
+        if len(mine_findings) > 40:
+            lines += [f"…and {len(mine_findings) - 40} more.", ""]
+        if stale:
+            lines += [f"A further {len(stale)} error(s) are in files carried across "
+                      "**unconverted** — still Selenium, so they cannot compile in a Playwright "
+                      "project. They are not counted above.", ""]
 
     lines += ["## 2. Scorecard", ""]
     lines += table(["wave", "file", "result", "laps", "gates", "critic", "TODOs", "secs"],

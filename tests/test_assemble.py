@@ -21,6 +21,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from selenium2playwright import assemble, cli, suite, suite_graph
+from selenium2playwright.classify import classify
 from selenium2playwright.schemas import ConversionReport, ConversionResult, Critique, ValidationReport
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -331,7 +332,7 @@ class ReportTests(unittest.TestCase):
             {"gate": "compile", "file": "tests/login.spec.ts", "line": 2, "code": "TS2554",
              "message": "Expected 2 arguments, but got 1."}])
         failing = self.render(assemble.Assembly(tree=broken, files=2, scorecard=built.scorecard))
-        self.assertIn("the tree does NOT compile (1 error(s))", failing.splitlines()[2])
+        self.assertIn("the converted files do NOT compile (1 error(s))", failing.splitlines()[2])
         self.assertIn("TS2554", failing)
 
     def test_a_message_with_a_pipe_cannot_break_the_table(self):
@@ -356,6 +357,63 @@ class ReportTests(unittest.TestCase):
         self.assertTrue(document["tree"]["compiles"])
         self.assertEqual(document["parity"][0]["path"], "pages/LoginPage.ts")
         self.assertEqual(document["scorecard"]["gates"]["compile"], {"passed": 1, "of": 1})
+
+
+class TreeVerdictSplitTests(unittest.TestCase):
+    """Whole-tree errors are a verdict on the conversion only where it converted."""
+
+    def finding(self, path, code="TS2307", message="Cannot find module 'selenium-webdriver'."):
+        return {"gate": "compile", "file": path, "line": 1, "code": code, "message": message}
+
+    def manifest_of(self, converted, carried):
+        files = []
+        for path in converted + carried:
+            source = ('import { WebDriver } from "selenium-webdriver";\n'
+                      f"export class C{len(files)} {{}}\n")
+            files.append(suite.SuiteFile(
+                path=path, kind="page-object",
+                action=suite.CONVERT if path in converted else suite.COPY,
+                reason="", classification=classify(source, path)))
+        return suite.Manifest(root="r", files=tuple(files), waves=())
+
+    def test_errors_only_in_carried_selenium_are_not_a_failed_conversion(self):
+        """The cap's own doing: unconverted Selenium cannot compile, and never could."""
+        tree = ValidationReport(gate="compile", passed=False, findings=[
+            self.finding("pages/Left.ts"), self.finding("pages/AlsoLeft.ts")])
+        outcomes = [outcome("pages/Done.ts")]
+        manifest = self.manifest_of(["pages/Done.ts"], ["pages/Left.ts", "pages/AlsoLeft.ts"])
+        split = assemble.split_tree_findings(tree, outcomes, manifest)
+        self.assertEqual(len(split["converted"]), 0)
+        self.assertEqual(len(split["unconverted"]), 2)
+        self.assertEqual(len(split["companion"]), 0)
+
+    def test_an_error_in_a_converted_file_still_counts(self):
+        tree = ValidationReport(gate="compile", passed=False, findings=[
+            self.finding("pages/Done.ts", "TS2554", "Expected 2 arguments, but got 1.")])
+        manifest = self.manifest_of(["pages/Done.ts"], ["pages/Left.ts"])
+        split = assemble.split_tree_findings(tree, [outcome("pages/Done.ts")], manifest)
+        self.assertEqual(len(split["converted"]), 1)
+
+    def test_a_carried_file_with_no_selenium_left_is_our_problem(self):
+        """The caller whose companion's API moved under it — never quietly excused."""
+        tree = ValidationReport(gate="compile", passed=False, findings=[
+            self.finding("pages/Caller.ts", "TS2339", "Property 'driver' does not exist.")])
+        files = (suite.SuiteFile(path="pages/Done.ts", kind="page-object", action=suite.CONVERT,
+                                 reason="", classification=classify("import x from 'selenium-webdriver';", "a.ts")),
+                 suite.SuiteFile(path="pages/Caller.ts", kind="support", action=suite.COPY,
+                                 reason="", classification=classify("export const a = 1;\n", "b.ts")))
+        split = assemble.split_tree_findings(
+            tree, [outcome("pages/Done.ts")], suite.Manifest(root="r", files=files, waves=()))
+        self.assertEqual(len(split["companion"]), 1)
+        self.assertEqual(len(split["unconverted"]), 0)
+
+    def test_a_missing_split_means_every_error_is_ours(self):
+        """Fail closed: silence about ownership must never render as a green tree."""
+        tree = ValidationReport(gate="compile", passed=False, findings=[
+            self.finding("anything.ts", "TS2554", "Expected 2 arguments, but got 1.")])
+        mine, carried = assemble.owned_findings(assemble.Assembly(tree=tree, files=1))
+        self.assertEqual(len(mine), 1)
+        self.assertEqual(carried, ())
 
 
 class CapNoteInReportTests(unittest.TestCase):

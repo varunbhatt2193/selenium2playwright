@@ -1050,6 +1050,11 @@ class SuiteResult:
     compiles: bool = False
     tree_files: int = 0
     tree_findings: list[str] = field(default_factory=list)
+    # `tree_findings`, split by whether this run is answerable for them: files
+    # it produced (plus files it left alone that stopped compiling anyway),
+    # against Selenium it carried across and never claimed to convert.
+    tree_findings_mine: list[str] = field(default_factory=list)
+    tree_findings_carried: list[str] = field(default_factory=list)
     tree_error: str = ""
     kept: int = 0
     renamed: int = 0
@@ -1085,8 +1090,15 @@ class SuiteResult:
     def headline(self) -> str:
         counts = self.totals
         parts = [f"{n} {name}" for name, n in counts.items() if n]
-        tree = "tree compiles" if self.compiles else (
-            "tree does not compile" if self.assembled else "tree not compiled")
+        if not self.assembled:
+            tree = "tree not compiled"
+        elif not self.compiles:
+            tree = "converted files do not compile"
+        elif self.tree_findings_carried:
+            tree = (f"converted files compile · {len(self.tree_findings_carried)} error(s) "
+                    "in files carried across unconverted")
+        else:
+            tree = "tree compiles"
         return " · ".join([*parts, tree, f"{self.elapsed:.1f}s"])
 
 
@@ -1108,12 +1120,25 @@ def suite_result(state: dict[str, Any]) -> SuiteResult:
                            elapsed=float(state.get("elapsed") or 0.0))
 
     tree = _get(assembly, "tree")
-    findings = [
-        f"{_get(f, 'file', '')}"
-        + (f":{_get(f, 'line')}" if _get(f, "line") else "")
-        + f" {_get(f, 'code', '')} {_get(f, 'message', '')}"
-        for f in (_get(tree, "findings", []) or [])
-    ] if tree else []
+
+    def _lines(items) -> list[str]:
+        return [f"{_get(f, 'file', '')}"
+                + (f":{_get(f, 'line')}" if _get(f, "line") else "")
+                + f" {_get(f, 'code', '')} {_get(f, 'message', '')}"
+                for f in (items or [])]
+
+    findings = _lines(_get(tree, "findings", [])) if tree else []
+    # The same errors, sorted by whose fault they can be. `assemble` did the
+    # sorting; the page must not re-derive it and drift.
+    # Fails closed, like `assemble.owned_findings`: an assembly that did not say
+    # which findings belong to whom has not said any of them belong to somebody
+    # else, and a missing key must never read as a green tree.
+    split = _get(assembly, "split") or {}
+    if split:
+        mine = _lines(_get(split, "converted", [])) + _lines(_get(split, "companion", []))
+        stale = _lines(_get(split, "unconverted", []))
+    else:
+        mine, stale = findings, []
 
     kept = renamed = removed = unexplained = 0
     losses: list[tuple[str, str, str, str]] = []
@@ -1137,9 +1162,11 @@ def suite_result(state: dict[str, Any]) -> SuiteResult:
     return SuiteResult(
         rows=rows,
         elapsed=float(state.get("elapsed") or 0.0),
-        compiles=bool(tree is not None and _get(tree, "passed", False)),
+        compiles=bool(tree is not None and not mine),
         tree_files=int(_get(assembly, "files", 0) or 0),
         tree_findings=findings,
+        tree_findings_mine=mine,
+        tree_findings_carried=stale,
         tree_error=str(_get(assembly, "tree_error", "")),
         kept=kept, renamed=renamed, removed=removed, unexplained=unexplained,
         losses=losses,

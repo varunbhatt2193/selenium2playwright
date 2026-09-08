@@ -806,7 +806,7 @@ class SuiteResultTests(unittest.TestCase):
         self.assertEqual(result.totals["passed"], 2)
         self.assertFalse(result.passed)
         self.assertIn("tests/login.spec.ts:8 TS2554", result.tree_findings[0])
-        self.assertIn("tree does not compile", result.headline)
+        self.assertIn("converted files do not compile", result.headline)
 
     def test_a_compile_that_could_not_run_is_not_green_either(self):
         # Unknown is never a pass — `assemble.Assembly.compiles` makes the same

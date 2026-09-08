@@ -297,7 +297,11 @@ export default function SuiteLab({ limits, onSpent }: Props) {
             <div className="stat-row">
               <Stat label="Passed" value={`${counts.passed ?? 0}/${result.rows.length}`} tone={result.rows.length && counts.passed === result.rows.length ? 'good' : 'warn'} />
               <Stat label="Needs review" value={String(counts['needs-review'] ?? 0)} tone={counts['needs-review'] ? 'warn' : 'idle'} />
-              <Stat label="Tree compiles" value={result.compiles ? 'YES' : 'NO'} tone={result.compiles ? 'good' : 'bad'} />
+              <Stat
+                label="Converted files compile"
+                value={result.compiles ? 'YES' : 'NO'}
+                tone={result.compiles ? 'good' : 'bad'}
+              />
               <Stat label="Elapsed" value={`${Math.round(result.elapsed)}s`} tone="idle" />
             </div>
 
@@ -363,7 +367,10 @@ export default function SuiteLab({ limits, onSpent }: Props) {
                     <Check size={16} />
                     <span>
                       <strong>{result.tree_files} files compile together.</strong>
-                      <small>The converted folder was compiled as one project. No findings from tsc.</small>
+                      <small>
+                        The converted folder was compiled as one project. No findings from tsc in anything this run
+                        produced.
+                      </small>
                     </span>
                   </div>
                 ) : result.tree_error ? (
@@ -371,10 +378,24 @@ export default function SuiteLab({ limits, onSpent }: Props) {
                 ) : (
                   <>
                     <div className="error-box soft">
-                      The converted folder does not compile as one project — {result.tree_findings.length} finding(s).
+                      The converted files do not compile as one project — {result.tree_findings_mine.length} finding(s).
                     </div>
-                    <Code code={result.tree_findings.join('\n')} language="plain" lineNumbers={false} />
+                    <Code code={result.tree_findings_mine.join('\n')} language="plain" lineNumbers={false} />
                   </>
+                )}
+
+                {result.tree_findings_carried.length > 0 && (
+                  <details className="trail-details">
+                    <summary>
+                      {result.tree_findings_carried.length} error(s) in files carried across unconverted — not counted
+                      above
+                    </summary>
+                    <p className="muted-copy">
+                      These files are still Selenium, and there is no Selenium in a Playwright project, so they cannot
+                      compile and were never expected to. Convert them and the errors go with them.
+                    </p>
+                    <Code code={result.tree_findings_carried.join('\n')} language="plain" lineNumbers={false} />
+                  </details>
                 )}
 
                 <p className="muted-copy">
