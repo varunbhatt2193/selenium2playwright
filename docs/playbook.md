@@ -104,14 +104,23 @@ rules by number.*
       `scrollIntoViewIfNeeded()` before a `click()` is not a conversion, it is
       the Selenium habit kept alive.
     - setting a field's value through JS → `fill()`.
+    - polling the DOM for a state change (`driver.wait` on a JS predicate) →
+      the web-first assertion or `locator.waitFor({ state })` that names the
+      state, never `page.waitForFunction`.
     Keep `locator.evaluate()` only when the script **is** the thing under test:
     reading a computed style, calling a page API with no UI, asserting on
     something the DOM only exposes to JavaScript. Never emit `evaluate()` merely
-    to reproduce a click or a scroll, and never reference DOM types
-    (`HTMLButtonElement`, `document`, `window`) — the validation project has no
-    `DOM` lib, so that does not compile. If it is genuinely unclear whether the
-    script was a workaround or the subject, emit the closest faithful code plus
-    a `TODO(review)` saying which of the two you could not decide.
+    to reproduce a click or a scroll.
+    **No browser-side callback may reference DOM globals or DOM types** —
+    `document`, `window`, `HTMLButtonElement`, `HTMLInputElement` and friends
+    are unavailable in the validation project (its `lib` is `ES2022`, no `DOM`),
+    so `evaluate`, `evaluateHandle`, `waitForFunction` and `$$eval` bodies that
+    mention them fail the compile gate. Reach for a Playwright API that
+    expresses the same intent instead: `toBeEnabled`, `toBeVisible`,
+    `toHaveValue`, `toHaveCount`, `waitFor({ state: "detached" })`.
+    If it is genuinely unclear whether the script was a workaround or the
+    subject, emit the closest faithful code plus a `TODO(review)` saying which
+    of the two you could not decide.
 
 27. **Frames are scoped, not entered.** `switchTo().frame(x)` and
     `switchTo().defaultContent()` move one global cursor, so Selenium page

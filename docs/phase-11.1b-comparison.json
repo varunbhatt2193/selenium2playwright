@@ -1,0 +1,947 @@
+{
+  "schema_version": 1,
+  "comparable": true,
+  "issues": [],
+  "edited_files": [
+    "docs/playbook.md"
+  ],
+  "held_fixed": {
+    "dataset_id": "897199c5-f591-42d4-938e-9e6ec64fc8ed",
+    "dataset_version": "2026-09-08T00:13:23.005331+00:00",
+    "collection_sha256": "b233d4c101fde8464611264aa8732f1fff2ef98700fd920da264cc2262b385ba",
+    "model": "openai:gpt-5.4",
+    "critic_model": "openai:gpt-5.4",
+    "max_attempts": 3,
+    "evaluator_version": "deterministic-v1"
+  },
+  "arms": {
+    "before": {
+      "experiment": {
+        "name": "s2p-11.1b-gpt-5.4-attempts3-a7d0e95c",
+        "id": "65031644-01a2-4fd7-b7af-413db0b7d552",
+        "url": "https://smith.langchain.com/o/32ac11b4-3e72-4765-a59b-5dc1bcd32cbe/datasets/897199c5-f591-42d4-938e-9e6ec64fc8ed/compare?selectedSessions=65031644-01a2-4fd7-b7af-413db0b7d552",
+        "mode": "live_converter",
+        "elapsed_seconds": 140.49350524999318
+      },
+      "max_attempts": 3,
+      "model": "openai:gpt-5.4",
+      "critic_model": "openai:gpt-5.4",
+      "phase": "11.1b",
+      "configuration_sha256": "39a0cf68299dbff92d0f12e8154db7ad96ac3761eb58987bb618bfe59d629ccb",
+      "git_revision": "56db849f8a83d8331b290b58502155d464eb3950",
+      "git_dirty": false,
+      "local_complete": true,
+      "provider_error_rows": [],
+      "cloud_status": "verified",
+      "scheduled": 11,
+      "passes": {
+        "compiles": 11,
+        "residue_free": 11,
+        "typed_lint_pass": 11,
+        "parity_pass": 11,
+        "all_static_passed": 11,
+        "graph_report_passed": 6
+      },
+      "percent": {
+        "compiles": 100.0,
+        "residue_free": 100.0,
+        "typed_lint_pass": 100.0,
+        "parity_pass": 100.0,
+        "all_static_passed": 100.0,
+        "graph_report_passed": 54.55
+      },
+      "attempt_counts": {
+        "1": 6,
+        "2": 2,
+        "3": 3
+      },
+      "with_draft": {
+        "rows": 11,
+        "no_draft_rows": 0,
+        "all_static_passed": 11,
+        "graph_report_passed": 6,
+        "repaired_rows": 5
+      },
+      "actor_calls": {
+        "total": 19,
+        "known_subtotal": 19,
+        "known_rows": 11,
+        "missing_rows": 0
+      },
+      "target_seconds": {
+        "total": "138.3473210399970377",
+        "known_subtotal": "138.3473210399970377",
+        "known_rows": 11,
+        "missing_rows": 0
+      },
+      "actor_total_tokens": {
+        "total": "58590",
+        "known_subtotal": "58590",
+        "known_rows": 11,
+        "missing_rows": 0
+      },
+      "critic_total_tokens": {
+        "total": "63503",
+        "known_subtotal": "63503",
+        "known_rows": 11,
+        "missing_rows": 0
+      },
+      "langsmith_root_cost_usd": {
+        "total": "0.3940640",
+        "known_subtotal": "0.3940640",
+        "known_rows": 11,
+        "missing_rows": 0
+      },
+      "rows": {
+        "add-remove-page": {
+          "graph_status": "needs-review",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 2,
+          "all_static": true,
+          "todos": 1,
+          "target_seconds": 12.601768583001103,
+          "actor_tokens": 5458,
+          "critic_tokens": 5969,
+          "cost_usd": "0.0283215"
+        },
+        "add-remove-test": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 3.8316324580082437,
+          "actor_tokens": 2439,
+          "critic_tokens": 2928,
+          "cost_usd": "0.0120355"
+        },
+        "base-page": {
+          "graph_status": "needs-review",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 3,
+          "all_static": true,
+          "todos": 1,
+          "target_seconds": 32.20800233299087,
+          "actor_tokens": 10787,
+          "critic_tokens": 10997,
+          "cost_usd": "0.084996"
+        },
+        "dynamic-controls-page": {
+          "graph_status": "needs-review",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 3,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 26.737670292000985,
+          "actor_tokens": 11276,
+          "critic_tokens": 11593,
+          "cost_usd": "0.0737935"
+        },
+        "dynamic-controls-test": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 4.680416375005734,
+          "actor_tokens": 2890,
+          "critic_tokens": 3381,
+          "cost_usd": "0.0197525"
+        },
+        "hovers-page": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 4.224435707990779,
+          "actor_tokens": 2171,
+          "critic_tokens": 2662,
+          "cost_usd": "0.015595"
+        },
+        "hovers-test": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 4.149082582996925,
+          "actor_tokens": 2385,
+          "critic_tokens": 2874,
+          "cost_usd": "0.012528"
+        },
+        "nested-frames-page": {
+          "graph_status": "needs-review",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 3,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 27.80354583299777,
+          "actor_tokens": 9745,
+          "critic_tokens": 10155,
+          "cost_usd": "0.0744735"
+        },
+        "nested-frames-test": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 5.111211791008827,
+          "actor_tokens": 2368,
+          "critic_tokens": 2859,
+          "cost_usd": "0.0159175"
+        },
+        "shared-session-page": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 4.818048000000999,
+          "actor_tokens": 2532,
+          "critic_tokens": 3023,
+          "cost_usd": "0.0185625"
+        },
+        "shared-session-test": {
+          "graph_status": "needs-review",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 2,
+          "all_static": true,
+          "todos": 1,
+          "target_seconds": 12.181507083994802,
+          "actor_tokens": 6539,
+          "critic_tokens": 7062,
+          "cost_usd": "0.0380885"
+        }
+      }
+    },
+    "after": {
+      "experiment": {
+        "name": "s2p-11.1b-gpt-5.4-attempts3-cc5468a0",
+        "id": "f285f3b8-189d-4e20-939c-b1154365fb1f",
+        "url": "https://smith.langchain.com/o/32ac11b4-3e72-4765-a59b-5dc1bcd32cbe/datasets/897199c5-f591-42d4-938e-9e6ec64fc8ed/compare?selectedSessions=f285f3b8-189d-4e20-939c-b1154365fb1f",
+        "mode": "live_converter",
+        "elapsed_seconds": 115.80245441599982
+      },
+      "max_attempts": 3,
+      "model": "openai:gpt-5.4",
+      "critic_model": "openai:gpt-5.4",
+      "phase": "11.1b",
+      "configuration_sha256": "48b6e36db31780d093767b9cadf1da485c4c76ee5f1cbb1ab0c70fb496031ee8",
+      "git_revision": "a2e398d15520ed1ce6e4a5021c436478e64c051d",
+      "git_dirty": false,
+      "local_complete": true,
+      "provider_error_rows": [],
+      "cloud_status": "verified",
+      "scheduled": 11,
+      "passes": {
+        "compiles": 10,
+        "residue_free": 11,
+        "typed_lint_pass": 11,
+        "parity_pass": 11,
+        "all_static_passed": 10,
+        "graph_report_passed": 8
+      },
+      "percent": {
+        "compiles": 90.91,
+        "residue_free": 100.0,
+        "typed_lint_pass": 100.0,
+        "parity_pass": 100.0,
+        "all_static_passed": 90.91,
+        "graph_report_passed": 72.73
+      },
+      "attempt_counts": {
+        "1": 7,
+        "2": 2,
+        "3": 2
+      },
+      "with_draft": {
+        "rows": 11,
+        "no_draft_rows": 0,
+        "all_static_passed": 10,
+        "graph_report_passed": 8,
+        "repaired_rows": 4
+      },
+      "actor_calls": {
+        "total": 17,
+        "known_subtotal": 17,
+        "known_rows": 11,
+        "missing_rows": 0
+      },
+      "target_seconds": {
+        "total": "113.8232803740102085",
+        "known_subtotal": "113.8232803740102085",
+        "known_rows": 11,
+        "missing_rows": 0
+      },
+      "actor_total_tokens": {
+        "total": "60568",
+        "known_subtotal": "60568",
+        "known_rows": 11,
+        "missing_rows": 0
+      },
+      "critic_total_tokens": {
+        "total": "66191",
+        "known_subtotal": "66191",
+        "known_rows": 11,
+        "missing_rows": 0
+      },
+      "langsmith_root_cost_usd": {
+        "total": "0.3442940",
+        "known_subtotal": "0.3442940",
+        "known_rows": 11,
+        "missing_rows": 0
+      },
+      "rows": {
+        "add-remove-page": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 7.230074125007377,
+          "actor_tokens": 3052,
+          "critic_tokens": 3545,
+          "cost_usd": "0.0208425"
+        },
+        "add-remove-test": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 5.386254042008659,
+          "actor_tokens": 3128,
+          "critic_tokens": 3617,
+          "cost_usd": "0.0155305"
+        },
+        "base-page": {
+          "graph_status": "needs-review",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 3,
+          "all_static": true,
+          "todos": 4,
+          "target_seconds": 28.36278399999719,
+          "actor_tokens": 11697,
+          "critic_tokens": 12411,
+          "cost_usd": "0.06723"
+        },
+        "dynamic-controls-page": {
+          "graph_status": "needs-review",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 3,
+          "all_static": false,
+          "todos": 0,
+          "target_seconds": 23.899800499988487,
+          "actor_tokens": 12918,
+          "critic_tokens": 13284,
+          "cost_usd": "0.068961"
+        },
+        "dynamic-controls-test": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 5.846941708005033,
+          "actor_tokens": 3595,
+          "critic_tokens": 4086,
+          "cost_usd": "0.0235025"
+        },
+        "hovers-page": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 2,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 11.952584208003827,
+          "actor_tokens": 6517,
+          "critic_tokens": 7063,
+          "cost_usd": "0.0350945"
+        },
+        "hovers-test": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 4.354022332991008,
+          "actor_tokens": 3069,
+          "critic_tokens": 3560,
+          "cost_usd": "0.0199225"
+        },
+        "nested-frames-page": {
+          "graph_status": "needs-review",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 2,
+          "all_static": true,
+          "todos": 1,
+          "target_seconds": 12.335672250002972,
+          "actor_tokens": 6763,
+          "critic_tokens": 7323,
+          "cost_usd": "0.036947"
+        },
+        "nested-frames-test": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 4.9479097919975175,
+          "actor_tokens": 3057,
+          "critic_tokens": 3548,
+          "cost_usd": "0.0153555"
+        },
+        "shared-session-page": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 4.571743250009604,
+          "actor_tokens": 3228,
+          "critic_tokens": 3719,
+          "cost_usd": "0.0221425"
+        },
+        "shared-session-test": {
+          "graph_status": "passed",
+          "draft": true,
+          "errors": [],
+          "provider_error": false,
+          "attempts": 1,
+          "all_static": true,
+          "todos": 0,
+          "target_seconds": 4.935494165998534,
+          "actor_tokens": 3544,
+          "critic_tokens": 4035,
+          "cost_usd": "0.0187655"
+        }
+      }
+    }
+  },
+  "delta": {
+    "passes": {
+      "compiles": -1,
+      "residue_free": 0,
+      "typed_lint_pass": 0,
+      "parity_pass": 0,
+      "all_static_passed": -1,
+      "graph_report_passed": 2
+    },
+    "percent_points": {
+      "compiles": -9.09,
+      "residue_free": 0.0,
+      "typed_lint_pass": 0.0,
+      "parity_pass": 0.0,
+      "all_static_passed": -9.09,
+      "graph_report_passed": 18.18
+    },
+    "target_seconds": {
+      "total": "-24.5240406659868292",
+      "ratio": "0.823"
+    },
+    "actor_total_tokens": {
+      "total": "1978",
+      "ratio": "1.034"
+    },
+    "critic_total_tokens": {
+      "total": "2688",
+      "ratio": "1.042"
+    },
+    "langsmith_root_cost_usd": {
+      "total": "-0.0497700",
+      "ratio": "0.874"
+    }
+  },
+  "per_case": [
+    {
+      "case_id": "add-remove-page",
+      "before": {
+        "graph_status": "needs-review",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 2,
+        "all_static": true,
+        "todos": 1,
+        "target_seconds": 12.601768583001103,
+        "actor_tokens": 5458,
+        "critic_tokens": 5969,
+        "cost_usd": "0.0283215"
+      },
+      "after": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 7.230074125007377,
+        "actor_tokens": 3052,
+        "critic_tokens": 3545,
+        "cost_usd": "0.0208425"
+      },
+      "change": "improved"
+    },
+    {
+      "case_id": "add-remove-test",
+      "before": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 3.8316324580082437,
+        "actor_tokens": 2439,
+        "critic_tokens": 2928,
+        "cost_usd": "0.0120355"
+      },
+      "after": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 5.386254042008659,
+        "actor_tokens": 3128,
+        "critic_tokens": 3617,
+        "cost_usd": "0.0155305"
+      },
+      "change": "same"
+    },
+    {
+      "case_id": "base-page",
+      "before": {
+        "graph_status": "needs-review",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 3,
+        "all_static": true,
+        "todos": 1,
+        "target_seconds": 32.20800233299087,
+        "actor_tokens": 10787,
+        "critic_tokens": 10997,
+        "cost_usd": "0.084996"
+      },
+      "after": {
+        "graph_status": "needs-review",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 3,
+        "all_static": true,
+        "todos": 4,
+        "target_seconds": 28.36278399999719,
+        "actor_tokens": 11697,
+        "critic_tokens": 12411,
+        "cost_usd": "0.06723"
+      },
+      "change": "same"
+    },
+    {
+      "case_id": "dynamic-controls-page",
+      "before": {
+        "graph_status": "needs-review",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 3,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 26.737670292000985,
+        "actor_tokens": 11276,
+        "critic_tokens": 11593,
+        "cost_usd": "0.0737935"
+      },
+      "after": {
+        "graph_status": "needs-review",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 3,
+        "all_static": false,
+        "todos": 0,
+        "target_seconds": 23.899800499988487,
+        "actor_tokens": 12918,
+        "critic_tokens": 13284,
+        "cost_usd": "0.068961"
+      },
+      "change": "regressed"
+    },
+    {
+      "case_id": "dynamic-controls-test",
+      "before": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 4.680416375005734,
+        "actor_tokens": 2890,
+        "critic_tokens": 3381,
+        "cost_usd": "0.0197525"
+      },
+      "after": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 5.846941708005033,
+        "actor_tokens": 3595,
+        "critic_tokens": 4086,
+        "cost_usd": "0.0235025"
+      },
+      "change": "same"
+    },
+    {
+      "case_id": "hovers-page",
+      "before": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 4.224435707990779,
+        "actor_tokens": 2171,
+        "critic_tokens": 2662,
+        "cost_usd": "0.015595"
+      },
+      "after": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 2,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 11.952584208003827,
+        "actor_tokens": 6517,
+        "critic_tokens": 7063,
+        "cost_usd": "0.0350945"
+      },
+      "change": "same"
+    },
+    {
+      "case_id": "hovers-test",
+      "before": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 4.149082582996925,
+        "actor_tokens": 2385,
+        "critic_tokens": 2874,
+        "cost_usd": "0.012528"
+      },
+      "after": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 4.354022332991008,
+        "actor_tokens": 3069,
+        "critic_tokens": 3560,
+        "cost_usd": "0.0199225"
+      },
+      "change": "same"
+    },
+    {
+      "case_id": "nested-frames-page",
+      "before": {
+        "graph_status": "needs-review",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 3,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 27.80354583299777,
+        "actor_tokens": 9745,
+        "critic_tokens": 10155,
+        "cost_usd": "0.0744735"
+      },
+      "after": {
+        "graph_status": "needs-review",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 2,
+        "all_static": true,
+        "todos": 1,
+        "target_seconds": 12.335672250002972,
+        "actor_tokens": 6763,
+        "critic_tokens": 7323,
+        "cost_usd": "0.036947"
+      },
+      "change": "same"
+    },
+    {
+      "case_id": "nested-frames-test",
+      "before": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 5.111211791008827,
+        "actor_tokens": 2368,
+        "critic_tokens": 2859,
+        "cost_usd": "0.0159175"
+      },
+      "after": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 4.9479097919975175,
+        "actor_tokens": 3057,
+        "critic_tokens": 3548,
+        "cost_usd": "0.0153555"
+      },
+      "change": "same"
+    },
+    {
+      "case_id": "shared-session-page",
+      "before": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 4.818048000000999,
+        "actor_tokens": 2532,
+        "critic_tokens": 3023,
+        "cost_usd": "0.0185625"
+      },
+      "after": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 4.571743250009604,
+        "actor_tokens": 3228,
+        "critic_tokens": 3719,
+        "cost_usd": "0.0221425"
+      },
+      "change": "same"
+    },
+    {
+      "case_id": "shared-session-test",
+      "before": {
+        "graph_status": "needs-review",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 2,
+        "all_static": true,
+        "todos": 1,
+        "target_seconds": 12.181507083994802,
+        "actor_tokens": 6539,
+        "critic_tokens": 7062,
+        "cost_usd": "0.0380885"
+      },
+      "after": {
+        "graph_status": "passed",
+        "draft": true,
+        "errors": [],
+        "provider_error": false,
+        "attempts": 1,
+        "all_static": true,
+        "todos": 0,
+        "target_seconds": 4.935494165998534,
+        "actor_tokens": 3544,
+        "critic_tokens": 4035,
+        "cost_usd": "0.0187655"
+      },
+      "change": "improved"
+    }
+  ],
+  "case_changes": {
+    "improved": 2,
+    "same": 8,
+    "regressed": 1
+  },
+  "by_hard_case": {
+    "1": {
+      "comparable": true,
+      "rows": 3,
+      "before": 3,
+      "after": 2,
+      "graph_before": 1,
+      "graph_after": 1
+    },
+    "3": {
+      "comparable": true,
+      "rows": 2,
+      "before": 2,
+      "after": 1,
+      "graph_before": 1,
+      "graph_after": 1
+    },
+    "4": {
+      "comparable": true,
+      "rows": 2,
+      "before": 2,
+      "after": 2,
+      "graph_before": 1,
+      "graph_after": 1
+    },
+    "6": {
+      "comparable": true,
+      "rows": 2,
+      "before": 2,
+      "after": 1,
+      "graph_before": 1,
+      "graph_after": 1
+    },
+    "7": {
+      "comparable": true,
+      "rows": 2,
+      "before": 2,
+      "after": 2,
+      "graph_before": 1,
+      "graph_after": 2
+    },
+    "8": {
+      "comparable": true,
+      "rows": 2,
+      "before": 2,
+      "after": 2,
+      "graph_before": 2,
+      "graph_after": 2
+    },
+    "9": {
+      "comparable": true,
+      "rows": 2,
+      "before": 2,
+      "after": 2,
+      "graph_before": 1,
+      "graph_after": 2
+    },
+    "10": {
+      "comparable": true,
+      "rows": 2,
+      "before": 2,
+      "after": 2,
+      "graph_before": 1,
+      "graph_after": 1
+    },
+    "11": {
+      "comparable": true,
+      "rows": 2,
+      "before": 2,
+      "after": 2,
+      "graph_before": 1,
+      "graph_after": 2
+    },
+    "12": {
+      "comparable": true,
+      "rows": 1,
+      "before": 1,
+      "after": 1,
+      "graph_before": 0,
+      "graph_after": 1
+    }
+  },
+  "tuned_for": [
+    1,
+    3,
+    4,
+    6,
+    7,
+    8,
+    9,
+    12
+  ],
+  "reserved": {
+    "10": {
+      "comparable": true,
+      "rows": 2,
+      "before": 2,
+      "after": 2,
+      "graph_before": 1,
+      "graph_after": 1
+    },
+    "11": {
+      "comparable": true,
+      "rows": 2,
+      "before": 2,
+      "after": 2,
+      "graph_before": 1,
+      "graph_after": 2
+    }
+  },
+  "headline": "all-static pass 11/11 -> 10/11; graph passed 6/11 -> 8/11"
+}
