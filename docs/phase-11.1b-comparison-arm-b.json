@@ -240,18 +240,18 @@
     },
     "after": {
       "experiment": {
-        "name": "s2p-11.1b-gpt-5.4-attempts3-99d5bb5a",
-        "id": "05539860-9fa3-418e-b127-4ff1e178bd5f",
-        "url": "https://smith.langchain.com/o/32ac11b4-3e72-4765-a59b-5dc1bcd32cbe/datasets/897199c5-f591-42d4-938e-9e6ec64fc8ed/compare?selectedSessions=05539860-9fa3-418e-b127-4ff1e178bd5f",
+        "name": "s2p-11.1b-gpt-5.4-attempts3-cc5468a0",
+        "id": "f285f3b8-189d-4e20-939c-b1154365fb1f",
+        "url": "https://smith.langchain.com/o/32ac11b4-3e72-4765-a59b-5dc1bcd32cbe/datasets/897199c5-f591-42d4-938e-9e6ec64fc8ed/compare?selectedSessions=f285f3b8-189d-4e20-939c-b1154365fb1f",
         "mode": "live_converter",
-        "elapsed_seconds": 122.84794991700619
+        "elapsed_seconds": 115.80245441599982
       },
       "max_attempts": 3,
       "model": "openai:gpt-5.4",
       "critic_model": "openai:gpt-5.4",
       "phase": "11.1b",
-      "configuration_sha256": "4abc68ba518480c0d350d5c050ad173515becd9232a76f23eb54b9b658177c73",
-      "git_revision": "6cb779e6d44d024b371757affcc8d04ecaf3ce02",
+      "configuration_sha256": "48b6e36db31780d093767b9cadf1da485c4c76ee5f1cbb1ab0c70fb496031ee8",
+      "git_revision": "a2e398d15520ed1ce6e4a5021c436478e64c051d",
       "git_dirty": false,
       "local_complete": true,
       "provider_error_rows": [],
@@ -263,7 +263,7 @@
         "typed_lint_pass": 11,
         "parity_pass": 11,
         "all_static_passed": 10,
-        "graph_report_passed": 9
+        "graph_report_passed": 8
       },
       "percent": {
         "compiles": 90.91,
@@ -271,7 +271,7 @@
         "typed_lint_pass": 100.0,
         "parity_pass": 100.0,
         "all_static_passed": 90.91,
-        "graph_report_passed": 81.82
+        "graph_report_passed": 72.73
       },
       "attempt_counts": {
         "1": 7,
@@ -282,7 +282,7 @@
         "rows": 11,
         "no_draft_rows": 0,
         "all_static_passed": 10,
-        "graph_report_passed": 9,
+        "graph_report_passed": 8,
         "repaired_rows": 4
       },
       "actor_calls": {
@@ -292,26 +292,26 @@
         "missing_rows": 0
       },
       "target_seconds": {
-        "total": "120.6196703339956045",
-        "known_subtotal": "120.6196703339956045",
+        "total": "113.8232803740102085",
+        "known_subtotal": "113.8232803740102085",
         "known_rows": 11,
         "missing_rows": 0
       },
       "actor_total_tokens": {
-        "total": "65289",
-        "known_subtotal": "65289",
+        "total": "60568",
+        "known_subtotal": "60568",
         "known_rows": 11,
         "missing_rows": 0
       },
       "critic_total_tokens": {
-        "total": "70298",
-        "known_subtotal": "70298",
+        "total": "66191",
+        "known_subtotal": "66191",
         "known_rows": 11,
         "missing_rows": 0
       },
       "langsmith_root_cost_usd": {
-        "total": "0.3678730",
-        "known_subtotal": "0.3678730",
+        "total": "0.3442940",
+        "known_subtotal": "0.3442940",
         "known_rows": 11,
         "missing_rows": 0
       },
@@ -324,10 +324,10 @@
           "attempts": 1,
           "all_static": true,
           "todos": 0,
-          "target_seconds": 6.169958582991967,
-          "actor_tokens": 3204,
-          "critic_tokens": 3697,
-          "cost_usd": "0.021665"
+          "target_seconds": 7.230074125007377,
+          "actor_tokens": 3052,
+          "critic_tokens": 3545,
+          "cost_usd": "0.0208425"
         },
         "add-remove-test": {
           "graph_status": "passed",
@@ -337,10 +337,10 @@
           "attempts": 1,
           "all_static": true,
           "todos": 0,
-          "target_seconds": 4.15094095900713,
-          "actor_tokens": 3284,
-          "critic_tokens": 3773,
-          "cost_usd": "0.016448"
+          "target_seconds": 5.386254042008659,
+          "actor_tokens": 3128,
+          "critic_tokens": 3617,
+          "cost_usd": "0.0155305"
         },
         "base-page": {
           "graph_status": "needs-review",
@@ -349,11 +349,11 @@
           "provider_error": false,
           "attempts": 3,
           "all_static": true,
-          "todos": 3,
-          "target_seconds": 33.33159783399606,
-          "actor_tokens": 12794,
-          "critic_tokens": 13179,
-          "cost_usd": "0.0740885"
+          "todos": 4,
+          "target_seconds": 28.36278399999719,
+          "actor_tokens": 11697,
+          "critic_tokens": 12411,
+          "cost_usd": "0.06723"
         },
         "dynamic-controls-page": {
           "graph_status": "needs-review",
@@ -362,11 +362,11 @@
           "provider_error": false,
           "attempts": 3,
           "all_static": false,
-          "todos": 2,
-          "target_seconds": 29.55003579199547,
-          "actor_tokens": 14149,
-          "critic_tokens": 14335,
-          "cost_usd": "0.080312"
+          "todos": 0,
+          "target_seconds": 23.899800499988487,
+          "actor_tokens": 12918,
+          "critic_tokens": 13284,
+          "cost_usd": "0.068961"
         },
         "dynamic-controls-test": {
           "graph_status": "passed",
@@ -376,23 +376,23 @@
           "attempts": 1,
           "all_static": true,
           "todos": 0,
-          "target_seconds": 4.819198540993966,
-          "actor_tokens": 3716,
-          "critic_tokens": 4207,
-          "cost_usd": "0.023745"
+          "target_seconds": 5.846941708005033,
+          "actor_tokens": 3595,
+          "critic_tokens": 4086,
+          "cost_usd": "0.0235025"
         },
         "hovers-page": {
           "graph_status": "passed",
           "draft": true,
           "errors": [],
           "provider_error": false,
-          "attempts": 1,
+          "attempts": 2,
           "all_static": true,
           "todos": 0,
-          "target_seconds": 5.3260222079989035,
-          "actor_tokens": 3038,
-          "critic_tokens": 3533,
-          "cost_usd": "0.0203275"
+          "target_seconds": 11.952584208003827,
+          "actor_tokens": 6517,
+          "critic_tokens": 7063,
+          "cost_usd": "0.0350945"
         },
         "hovers-test": {
           "graph_status": "passed",
@@ -402,23 +402,23 @@
           "attempts": 1,
           "all_static": true,
           "todos": 0,
-          "target_seconds": 4.64264054200612,
-          "actor_tokens": 3231,
-          "critic_tokens": 3720,
-          "cost_usd": "0.016858"
+          "target_seconds": 4.354022332991008,
+          "actor_tokens": 3069,
+          "critic_tokens": 3560,
+          "cost_usd": "0.0199225"
         },
         "nested-frames-page": {
-          "graph_status": "passed",
+          "graph_status": "needs-review",
           "draft": true,
           "errors": [],
           "provider_error": false,
-          "attempts": 1,
+          "attempts": 2,
           "all_static": true,
-          "todos": 0,
-          "target_seconds": 5.05332362500485,
-          "actor_tokens": 3105,
-          "critic_tokens": 3596,
-          "cost_usd": "0.0202275"
+          "todos": 1,
+          "target_seconds": 12.335672250002972,
+          "actor_tokens": 6763,
+          "critic_tokens": 7323,
+          "cost_usd": "0.036947"
         },
         "nested-frames-test": {
           "graph_status": "passed",
@@ -428,36 +428,36 @@
           "attempts": 1,
           "all_static": true,
           "todos": 0,
-          "target_seconds": 4.119405541991,
-          "actor_tokens": 3194,
-          "critic_tokens": 3685,
-          "cost_usd": "0.0159155"
+          "target_seconds": 4.9479097919975175,
+          "actor_tokens": 3057,
+          "critic_tokens": 3548,
+          "cost_usd": "0.0153555"
         },
         "shared-session-page": {
           "graph_status": "passed",
           "draft": true,
           "errors": [],
           "provider_error": false,
-          "attempts": 2,
+          "attempts": 1,
           "all_static": true,
           "todos": 0,
-          "target_seconds": 10.707840667004348,
-          "actor_tokens": 7520,
-          "critic_tokens": 7963,
-          "cost_usd": "0.038473"
+          "target_seconds": 4.571743250009604,
+          "actor_tokens": 3228,
+          "critic_tokens": 3719,
+          "cost_usd": "0.0221425"
         },
         "shared-session-test": {
           "graph_status": "passed",
           "draft": true,
           "errors": [],
           "provider_error": false,
-          "attempts": 2,
+          "attempts": 1,
           "all_static": true,
           "todos": 0,
-          "target_seconds": 12.74870604100579,
-          "actor_tokens": 8054,
-          "critic_tokens": 8610,
-          "cost_usd": "0.039813"
+          "target_seconds": 4.935494165998534,
+          "actor_tokens": 3544,
+          "critic_tokens": 4035,
+          "cost_usd": "0.0187655"
         }
       }
     }
@@ -469,7 +469,7 @@
       "typed_lint_pass": 0,
       "parity_pass": 0,
       "all_static_passed": -1,
-      "graph_report_passed": 3
+      "graph_report_passed": 2
     },
     "percent_points": {
       "compiles": -9.09,
@@ -477,23 +477,23 @@
       "typed_lint_pass": 0.0,
       "parity_pass": 0.0,
       "all_static_passed": -9.09,
-      "graph_report_passed": 27.27
+      "graph_report_passed": 18.18
     },
     "target_seconds": {
-      "total": "-17.7276507060014332",
-      "ratio": "0.872"
+      "total": "-24.5240406659868292",
+      "ratio": "0.823"
     },
     "actor_total_tokens": {
-      "total": "6699",
-      "ratio": "1.114"
+      "total": "1978",
+      "ratio": "1.034"
     },
     "critic_total_tokens": {
-      "total": "6795",
-      "ratio": "1.107"
+      "total": "2688",
+      "ratio": "1.042"
     },
     "langsmith_root_cost_usd": {
-      "total": "-0.0261910",
-      "ratio": "0.934"
+      "total": "-0.0497700",
+      "ratio": "0.874"
     }
   },
   "per_case": [
@@ -520,10 +520,10 @@
         "attempts": 1,
         "all_static": true,
         "todos": 0,
-        "target_seconds": 6.169958582991967,
-        "actor_tokens": 3204,
-        "critic_tokens": 3697,
-        "cost_usd": "0.021665"
+        "target_seconds": 7.230074125007377,
+        "actor_tokens": 3052,
+        "critic_tokens": 3545,
+        "cost_usd": "0.0208425"
       },
       "change": "improved"
     },
@@ -550,10 +550,10 @@
         "attempts": 1,
         "all_static": true,
         "todos": 0,
-        "target_seconds": 4.15094095900713,
-        "actor_tokens": 3284,
-        "critic_tokens": 3773,
-        "cost_usd": "0.016448"
+        "target_seconds": 5.386254042008659,
+        "actor_tokens": 3128,
+        "critic_tokens": 3617,
+        "cost_usd": "0.0155305"
       },
       "change": "same"
     },
@@ -579,11 +579,11 @@
         "provider_error": false,
         "attempts": 3,
         "all_static": true,
-        "todos": 3,
-        "target_seconds": 33.33159783399606,
-        "actor_tokens": 12794,
-        "critic_tokens": 13179,
-        "cost_usd": "0.0740885"
+        "todos": 4,
+        "target_seconds": 28.36278399999719,
+        "actor_tokens": 11697,
+        "critic_tokens": 12411,
+        "cost_usd": "0.06723"
       },
       "change": "same"
     },
@@ -609,11 +609,11 @@
         "provider_error": false,
         "attempts": 3,
         "all_static": false,
-        "todos": 2,
-        "target_seconds": 29.55003579199547,
-        "actor_tokens": 14149,
-        "critic_tokens": 14335,
-        "cost_usd": "0.080312"
+        "todos": 0,
+        "target_seconds": 23.899800499988487,
+        "actor_tokens": 12918,
+        "critic_tokens": 13284,
+        "cost_usd": "0.068961"
       },
       "change": "regressed"
     },
@@ -640,10 +640,10 @@
         "attempts": 1,
         "all_static": true,
         "todos": 0,
-        "target_seconds": 4.819198540993966,
-        "actor_tokens": 3716,
-        "critic_tokens": 4207,
-        "cost_usd": "0.023745"
+        "target_seconds": 5.846941708005033,
+        "actor_tokens": 3595,
+        "critic_tokens": 4086,
+        "cost_usd": "0.0235025"
       },
       "change": "same"
     },
@@ -667,13 +667,13 @@
         "draft": true,
         "errors": [],
         "provider_error": false,
-        "attempts": 1,
+        "attempts": 2,
         "all_static": true,
         "todos": 0,
-        "target_seconds": 5.3260222079989035,
-        "actor_tokens": 3038,
-        "critic_tokens": 3533,
-        "cost_usd": "0.0203275"
+        "target_seconds": 11.952584208003827,
+        "actor_tokens": 6517,
+        "critic_tokens": 7063,
+        "cost_usd": "0.0350945"
       },
       "change": "same"
     },
@@ -700,10 +700,10 @@
         "attempts": 1,
         "all_static": true,
         "todos": 0,
-        "target_seconds": 4.64264054200612,
-        "actor_tokens": 3231,
-        "critic_tokens": 3720,
-        "cost_usd": "0.016858"
+        "target_seconds": 4.354022332991008,
+        "actor_tokens": 3069,
+        "critic_tokens": 3560,
+        "cost_usd": "0.0199225"
       },
       "change": "same"
     },
@@ -723,19 +723,19 @@
         "cost_usd": "0.0744735"
       },
       "after": {
-        "graph_status": "passed",
+        "graph_status": "needs-review",
         "draft": true,
         "errors": [],
         "provider_error": false,
-        "attempts": 1,
+        "attempts": 2,
         "all_static": true,
-        "todos": 0,
-        "target_seconds": 5.05332362500485,
-        "actor_tokens": 3105,
-        "critic_tokens": 3596,
-        "cost_usd": "0.0202275"
+        "todos": 1,
+        "target_seconds": 12.335672250002972,
+        "actor_tokens": 6763,
+        "critic_tokens": 7323,
+        "cost_usd": "0.036947"
       },
-      "change": "improved"
+      "change": "same"
     },
     {
       "case_id": "nested-frames-test",
@@ -760,10 +760,10 @@
         "attempts": 1,
         "all_static": true,
         "todos": 0,
-        "target_seconds": 4.119405541991,
-        "actor_tokens": 3194,
-        "critic_tokens": 3685,
-        "cost_usd": "0.0159155"
+        "target_seconds": 4.9479097919975175,
+        "actor_tokens": 3057,
+        "critic_tokens": 3548,
+        "cost_usd": "0.0153555"
       },
       "change": "same"
     },
@@ -787,13 +787,13 @@
         "draft": true,
         "errors": [],
         "provider_error": false,
-        "attempts": 2,
+        "attempts": 1,
         "all_static": true,
         "todos": 0,
-        "target_seconds": 10.707840667004348,
-        "actor_tokens": 7520,
-        "critic_tokens": 7963,
-        "cost_usd": "0.038473"
+        "target_seconds": 4.571743250009604,
+        "actor_tokens": 3228,
+        "critic_tokens": 3719,
+        "cost_usd": "0.0221425"
       },
       "change": "same"
     },
@@ -817,20 +817,20 @@
         "draft": true,
         "errors": [],
         "provider_error": false,
-        "attempts": 2,
+        "attempts": 1,
         "all_static": true,
         "todos": 0,
-        "target_seconds": 12.74870604100579,
-        "actor_tokens": 8054,
-        "critic_tokens": 8610,
-        "cost_usd": "0.039813"
+        "target_seconds": 4.935494165998534,
+        "actor_tokens": 3544,
+        "critic_tokens": 4035,
+        "cost_usd": "0.0187655"
       },
       "change": "improved"
     }
   ],
   "case_changes": {
-    "improved": 3,
-    "same": 7,
+    "improved": 2,
+    "same": 8,
     "regressed": 1
   },
   "by_hard_case": {
@@ -856,7 +856,7 @@
       "before": 2,
       "after": 2,
       "graph_before": 1,
-      "graph_after": 2
+      "graph_after": 1
     },
     "6": {
       "comparable": true,
@@ -943,5 +943,5 @@
       "graph_after": 2
     }
   },
-  "headline": "all-static pass 11/11 -> 10/11; graph passed 6/11 -> 9/11"
+  "headline": "all-static pass 11/11 -> 10/11; graph passed 6/11 -> 8/11"
 }

@@ -2,7 +2,7 @@
 
 Comparable: **True**
 
-**all-static pass 11/11 -> 10/11; graph passed 6/11 -> 9/11**
+**all-static pass 11/11 -> 10/11; graph passed 6/11 -> 8/11**
 
 Edited between arms: `docs/playbook.md`.
 
@@ -19,7 +19,7 @@ Edited between arms: `docs/playbook.md`.
 | Arm | Experiment | Git | Local complete | Cloud |
 | --- | --- | --- | --- | --- |
 | A: before | [s2p-11.1b-gpt-5.4-attempts3-a7d0e95c](https://smith.langchain.com/o/32ac11b4-3e72-4765-a59b-5dc1bcd32cbe/datasets/897199c5-f591-42d4-938e-9e6ec64fc8ed/compare?selectedSessions=65031644-01a2-4fd7-b7af-413db0b7d552) | `56db849f8` | True | verified |
-| B: after | [s2p-11.1b-gpt-5.4-attempts3-99d5bb5a](https://smith.langchain.com/o/32ac11b4-3e72-4765-a59b-5dc1bcd32cbe/datasets/897199c5-f591-42d4-938e-9e6ec64fc8ed/compare?selectedSessions=05539860-9fa3-418e-b127-4ff1e178bd5f) | `6cb779e6d` | True | verified |
+| B: after | [s2p-11.1b-gpt-5.4-attempts3-cc5468a0](https://smith.langchain.com/o/32ac11b4-3e72-4765-a59b-5dc1bcd32cbe/datasets/897199c5-f591-42d4-938e-9e6ec64fc8ed/compare?selectedSessions=f285f3b8-189d-4e20-939c-b1154365fb1f) | `a2e398d15` | True | verified |
 
 ## Quality
 
@@ -30,16 +30,16 @@ Edited between arms: `docs/playbook.md`.
 | typed_lint_pass | 11/11 (100.0%) | 11/11 (100.0%) | +0 (+0.0 pts) |
 | parity_pass | 11/11 (100.0%) | 11/11 (100.0%) | +0 (+0.0 pts) |
 | all_static_passed | 11/11 (100.0%) | 10/11 (90.91%) | -1 (-9.09 pts) |
-| graph_report_passed | 6/11 (54.55%) | 9/11 (81.82%) | +3 (+27.27 pts) |
+| graph_report_passed | 6/11 (54.55%) | 8/11 (72.73%) | +2 (+18.18 pts) |
 
 ## Cost
 
 | Measure | A: before | B: after | Delta (B − A) |
 | --- | --- | --- | --- |
-| target_seconds | 138.3473210399970377 | 120.6196703339956045 | -17.7276507060014332 (×0.872) |
-| actor_total_tokens | 58590 | 65289 | 6699 (×1.114) |
-| critic_total_tokens | 63503 | 70298 | 6795 (×1.107) |
-| langsmith_root_cost_usd | 0.3940640 | 0.3678730 | -0.0261910 (×0.934) |
+| target_seconds | 138.3473210399970377 | 113.8232803740102085 | -24.5240406659868292 (×0.823) |
+| actor_total_tokens | 58590 | 60568 | 1978 (×1.034) |
+| critic_total_tokens | 63503 | 66191 | 2688 (×1.042) |
+| langsmith_root_cost_usd | 0.3940640 | 0.3442940 | -0.0497700 (×0.874) |
 
 ## Per hard case
 
@@ -67,13 +67,13 @@ Groups overlap: one row exercises several patterns, so these counts do not sum t
 | base-page | needs-review (3) | True | needs-review (3) | True | same |
 | dynamic-controls-page | needs-review (3) | True | needs-review (3) | False | regressed |
 | dynamic-controls-test | passed (1) | True | passed (1) | True | same |
-| hovers-page | passed (1) | True | passed (1) | True | same |
+| hovers-page | passed (1) | True | passed (2) | True | same |
 | hovers-test | passed (1) | True | passed (1) | True | same |
-| nested-frames-page | needs-review (3) | True | passed (1) | True | improved |
+| nested-frames-page | needs-review (3) | True | needs-review (2) | True | same |
 | nested-frames-test | passed (1) | True | passed (1) | True | same |
-| shared-session-page | passed (1) | True | passed (2) | True | same |
-| shared-session-test | needs-review (2) | True | passed (2) | True | improved |
+| shared-session-page | passed (1) | True | passed (1) | True | same |
+| shared-session-test | needs-review (2) | True | passed (1) | True | improved |
 
-Changes: {'improved': 3, 'same': 7, 'regressed': 1}.
+Changes: {'improved': 2, 'same': 8, 'regressed': 1}.
 
 One run per arm. These models are not deterministic and temperature is not set, so a small delta can be run-to-run variance rather than the edit. Static gates do not establish browser correctness.

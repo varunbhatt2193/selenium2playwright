@@ -154,6 +154,116 @@ hard case 12 uses returned promise chains (no `await` keyword in the file, same
 conversion task). Implicit v3 ordering is not covered. Under hard case 8 only
 hover is exercised — drag-and-drop and modifier clicks are still open.
 
+### ⛔ Still true: the Anthropic account is limit-blocked until 2026-10-01
+
+Every Anthropic model returns `400 invalid_request_error: You have reached your
+specified API usage limits. You will regain access on 2026-10-01 at 00:00 UTC.`
+Account-wide, not model-specific — a one-token `claude-sonnet-5` probe gives the
+same error. **<https://s2p.fly.dev> and the playground convert nothing for
+anybody**, and Fly is still billing for the machines. Fix it at Console →
+Settings (very likely the spend cap advised after 10.4), or wait for 2026-10-01.
+
+The failed Opus baseline spent zero tokens. Its uploaded experiment
+`s2p-11.1b-claude-opus-5-attempts3-f6b74c60` is an **outage record, never a
+score** — do not compare anything against it.
+
+### 11.1b is done — on OpenAI, because Varun chose not to wait
+
+Read [phase-11.1b-report.md](phase-11.1b-report.md). Ran on `openai:gpt-5.4`
+(actor + critic), so **its numbers are not comparable to the Opus/Sonnet figures
+in phase-6.4 or reflection-shootout**. Four runs, **$1.57**, all cloud-verified.
+**Graph-passed 6/11 → 9/11** across two eval-gated playbook edits.
+
+**The finding that matters more than the scores:** two *identical* baseline runs
+gave 9/11 vs 11/11 gates and 7/11 vs 6/11 graph-passed, with four of eleven rows
+changing outcome. Temperature is unset; these models are not deterministic. So
+an 11-row, one-run-per-arm A/B **cannot** attribute a one- or two-row delta to a
+prompt edit — the argument has to rest on reading the generated code. Any future
+session tempted to publish "the playbook improved X%" from a single pair of runs
+should read that section first.
+
+What was stable was the *diagnosis*: three page objects never reached `passed`
+in either baseline, and failed the same way both times.
+
+**New playbook rules, both measured:** 26 (`executeScript` is a workaround until
+proven otherwise — delete the JS click and the scroll) and 27 (frames are scoped,
+not entered — `enterFrame`/`returnToTop` get deleted with a ledger entry, and
+never rebuild the cursor with a flag or `childFrames()`). New rules take the next
+free number rather than renumbering: `assemble.py`, the tests and several
+published reports cite rules by number.
+
+**New tooling:** `eval_prompt_ab.py` + `scripts/compare_prompt_ab.py`, the mirror
+image of the 6.3 reflection A/B. Every configuration key must match except the
+file hashes, and among those only `docs/playbook.md` may have moved — so working
+agreement rule 6 ("no prompt change without a green eval run") is checkable
+rather than aspirational. Nine tests exercise the refusals.
+
+```bash
+uv run python scripts/run_eval_experiment.py --benchmark hard --model openai:gpt-5.4 --run
+uv run python scripts/compare_prompt_ab.py <arm-a-dir> <arm-c-dir> --reserved 10 --reserved 11
+```
+
+**Two things left open on purpose:**
+
+1. **Hard case 10 (the BasePage) failed all four runs** at the full three
+   attempts. The model will not delete the wait helpers, and every TODO it wrote
+   says why: *"call sites were not provided"*. Deleting `waitAndClick` is only
+   correct if you can also fix its callers, which a single-file conversion
+   cannot. That is a limit of the task shape, not a missing rule — forcing it
+   with a rule would be fitting the prompt to a fixture. It belongs to suite
+   mode (Phase 9).
+2. **Hard cases 10 and 11 were reserved** from the tuning loop and must stay
+   reserved. 10 did not move; 11 improved and is reported as probable variance.
+
+**For the next session:** re-run on Opus when account access returns, and
+re-measure rules 26/27 on a fresh set — with eleven rows, overfitting is a live
+risk that only new fixtures can settle.
+
+### 11.1a is done: the twelve hard cases are a second benchmark
+
+Read [hard-cases.md](hard-cases.md) first. In one paragraph: the Phase 6.1 set
+measures ordinary page objects and tests and the converter passes it, which is
+not the same as being good at this job. `plan-review.md` listed twelve patterns
+where a mechanical translation compiles, passes lint, passes residue, and
+silently tests something else. Those are now fixtures.
+
+```
+samples/selenium-hard-suite/       11 Selenium files (the inputs)
+samples/playwright-hard-golden/    11 Playwright goldens (the answers)
+cd samples && npm run test:hard && npm run test:hard-golden
+uv run python scripts/measure_hard_fixtures.py     # re-measure; rewrites the evidence file
+uv run python scripts/upload_hard_dataset.py       # local preview, no network
+```
+
+**Uploaded and verified: `selenium2playwright-hard-v1-b233d4c101fd`, 11
+examples** (receipt: `docs/phase-11.1-receipt.json`). Measured 2026-09-08:
+Selenium 7/7 in headless Chrome (21.1s), Playwright goldens 7/7, 0 flaky
+(14.7s), all four gates green over the whole golden tree.
+
+Three things a future session must not undo:
+
+1. **Hard cases 2 (dialogs) and 5 (windows) are covered by the Phase 6.1 set**
+   and cross-referenced in `COVERED_BY_BASE_DATASET`, not duplicated.
+   `check_manifest` fails the build if a case is claimed by both benchmarks or
+   by neither, so "twelve" is enforced. Do not "fix" the coverage gap by
+   writing a second alerts page.
+2. **`tests/shared-session.spec.ts`'s golden carries a `TODO(review)` on
+   purpose** (`storageState` is a suite-level fix a single-file conversion
+   cannot make). `plan-review.md` finding 6: a dataset whose references never
+   admit a limitation teaches the agent to guess confidently. That TODO is the
+   feature.
+3. **`snapshot_example` gained `source_dir`/`golden_dir` and
+   `upload_collection` gained `description`** — both additive, both defaulting
+   to the Phase 6.1 values. `BaseDatasetUnchangedTests` asserts the published
+   set still fingerprints to `selenium2playwright-v1-4920b5f319d8`. If that
+   test ever fails, the 6.1 dataset has silently moved.
+
+**Honest gap, written down so nobody claims otherwise:** real Selenium v3
+promise-manager code cannot be browser-verified under selenium-webdriver v4, so
+hard case 12 uses returned promise chains (no `await` keyword in the file, same
+conversion task). Implicit v3 ordering is not covered. Under hard case 8 only
+hover is exercised — drag-and-drop and modifier clicks are still open.
+
 ### ⛔ 11.1b is blocked: the Anthropic account has hit its usage limit
 
 Varun chose **Opus for both** the iteration and the published number on
