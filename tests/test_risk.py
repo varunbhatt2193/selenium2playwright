@@ -17,6 +17,7 @@ from langchain_core.messages import AIMessage
 from langchain_core.runnables import RunnableLambda
 from langgraph.types import Command
 
+from console_env import pin_console
 from selenium2playwright import cli, graph, memory, risk
 from selenium2playwright.prompts import build_prompt, format_decisions
 from selenium2playwright.schemas import ConversionResult, Critique
@@ -96,6 +97,7 @@ class ScriptedGraph(unittest.TestCase):
     """Queue drafts and reviews; capture the prompts each call was given."""
 
     def setUp(self):
+        pin_console(self)  # rich renders differently on CI; see tests/console_env.py
         env = patch.dict(os.environ, {"LANGSMITH_TRACING": "false", "LANGCHAIN_TRACING_V2": "false",
                                       # Shaped like a key, worth nothing: the CLI now builds the configured
                                       # model before running, and no test may need a real credential.

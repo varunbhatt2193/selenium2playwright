@@ -28,6 +28,7 @@ from langchain_core.runnables import RunnableLambda
 from langgraph.errors import InvalidUpdateError
 from langgraph.graph import END, START, StateGraph
 
+from console_env import pin_console
 from selenium2playwright import assemble, cli, graph, suite, suite_graph
 from selenium2playwright.schemas import ConversionReport, ConversionResult, Critique, ValidationReport
 
@@ -135,9 +136,7 @@ class FanOutTests(unittest.TestCase):
                                     'import { LoginPage } from "../pages/LoginPage";\n'
                                     'describe("Login", () => { it("works", () => new Builder()); });\n'),
         })
-        started = time.time()
         final = self.run_suite(delay=0.4)
-        elapsed = time.time() - started
 
         self.assertEqual([o.wave for o in suite_graph.ordered(final)], [1, 1, 1, 2])
         first = [c for c in self.log if "spec" not in c["inputs"]["source_path"]]
@@ -149,8 +148,13 @@ class FanOutTests(unittest.TestCase):
         # The spec imports a page object, so its wave cannot start early.
         spec = next(c for c in self.log if "spec" in c["inputs"]["source_path"])
         self.assertGreaterEqual(spec["started"], max(c["finished"] for c in first) - 0.01)
-        # Serial would be four sleeps; two waves is two.
-        self.assertLess(elapsed, 4 * 0.4)
+        # Serial would be four sleeps back to back; two waves is two. Compare the
+        # span the children actually occupied against what they actually spent,
+        # both measured inside this run — a wall-clock constant is a coin flip on
+        # a slow shared runner, and it lost the first time CI ran this file.
+        span = max(c["finished"] for c in self.log) - min(c["started"] for c in self.log)
+        spent = sum(c["finished"] - c["started"] for c in self.log)
+        self.assertLess(span, spent)
 
     def test_a_later_wave_is_given_the_converted_companions_from_the_output_tree(self):
         self.run_suite()
@@ -320,6 +324,7 @@ class CommandTests(unittest.TestCase):
     """`s2p suite` — the surface, with the per-file graph scripted."""
 
     def setUp(self):
+        pin_console(self)  # rich renders differently on CI; see tests/console_env.py
         keys = patch.dict(os.environ, {"LANGSMITH_TRACING": "false", "LANGCHAIN_TRACING_V2": "false",
                                        "ANTHROPIC_API_KEY": "sk-ant-offline-test",
                                        "S2P_EMBEDDINGS": "off"})

@@ -135,6 +135,19 @@ calls, no LangSmith — a pull request cannot spend money here.
   went stale; exit 2 means the app never answered, which is infrastructure
   failure and must never be reported as a passing suite.
 
+**What the first CI run taught, in six minutes:** both browser gates passed on
+Linux immediately — service container, browser install, declared divergence and
+all. The *offline* job went red, twice over, and neither failure was a defect.
+rich deliberately treats GitHub Actions as a colour-capable terminal, and
+Typer's usage-error panel is a different console from the one step 9.1 pinned,
+so four assertions saw the right sentence wrapped at a different column and
+interrupted by escape codes (`tests/console_env.py` now pins colour and width
+for the harnesses that read it). And one test asserted `elapsed < 1.6s` on a
+shared runner that took 1.86s; it now compares the span the parallel children
+occupied against what they actually spent, both measured inside the same run, so
+machine speed cannot decide it. A gate that only ever runs on the machine that
+wrote it is not a gate.
+
 The second job is the one this step exists for. Every converter score in this
 repository is measured against those fixtures. If a dependency bump, a sandbox
 change or an edited fixture quietly breaks them, every published percentage

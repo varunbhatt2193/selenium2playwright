@@ -18,6 +18,7 @@ import typer
 from langchain_core.messages import AIMessage
 from langchain_core.runnables import RunnableLambda
 
+from console_env import pin_console
 from selenium2playwright import cli, graph
 from selenium2playwright.schemas import ConversionResult, Critique
 
@@ -33,6 +34,7 @@ class CliHarness(unittest.TestCase):
     """A scripted model plus the real gates, driven through cli.run()."""
 
     def setUp(self):
+        pin_console(self)  # rich renders differently on CI; see tests/console_env.py
         tracing = patch.dict(os.environ, {"LANGSMITH_TRACING": "false", "LANGCHAIN_TRACING_V2": "false",
                                           # Shaped like a key, worth nothing: the CLI now builds the configured
                                           # model before running, and no test may need a real credential.
