@@ -141,6 +141,56 @@ rules by number.*
     - the order dependence between frame reads disappears. Keep every assertion
       and their order; drop the *requirement* that they run in that order.
 
+## Waits fused to an extractor
+
+*Added 2026-09-08 from the first public 12-file suite run, where 11 of 12 files
+followed rule 20 and the twelfth did not. Same numbering convention as above:
+next free number, never renumber.*
+
+28. **A wait inside a getter is not behaviour to preserve.** Rule 20 turns a
+    POM method that *only* extracts a value into an exposed `Locator`. The word
+    "only" is where this goes wrong: Selenium getters routinely wait first, and
+    a wait attached to a `getText()` looks like extra behaviour that would be
+    lost by exposing a locator. It is not. Web-first assertions **retry until
+    they pass or time out**, so the wait is already inside them.
+
+    ```ts
+    // Selenium: wait for non-empty text, then return it
+    async getResultText(): Promise<string> {
+      const result = await this.driver.findElement(this.resultMessage);
+      await this.driver.wait(until.elementTextMatches(result, /\S/), 5000);
+      return result.getText();
+    }
+    ```
+
+    ```ts
+    // Playwright, in the page object: expose the locator, wait for nothing
+    readonly resultMessage: Locator;
+    // ...and in the test, one line that waits AND judges:
+    await expect(alerts.resultMessage).toHaveText(/\S/);
+    ```
+
+    The rule, stated so it cannot be read around:
+
+    - `wait(until.elementTextMatches(el, re))` + `getText()` → expose the
+      `Locator`; the test asserts `toHaveText(re)` / `toContainText(…)`.
+    - `wait(until.elementIsVisible(el))` + any read → expose the `Locator`;
+      the read itself already auto-waits, and the test's assertion retries.
+    - the same for `getAttribute`, `isDisplayed`, `isEnabled` and `getCssValue`
+      preceded by a wait: `toHaveAttribute`, `toBeVisible`, `toBeEnabled`,
+      `toHaveCSS`.
+    - **never** reach for `page.waitForFunction` to keep a wait a page object no
+      longer needs. It is a browser-side callback, so it fails the compile gate
+      the moment it mentions `document` (rule 26), and it is the wrong answer
+      even when it compiles: it polls the DOM to reproduce what an assertion
+      does natively.
+
+    Record the removed getter in the parity ledger as removed-with-reason, or as
+    renamed when you expose the locator under a name the tests can read
+    (`getResultText` → `resultMessage`). If the wait guards something no
+    assertion can express, keep the closest faithful code and say why in a
+    `TODO(review)` — the honesty rule outranks this one.
+
 ## Honesty (restated — overrides everything above)
 
 23. Never invent an API. If no rule covers a pattern and the mapping cannot be
