@@ -28,6 +28,15 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "langgraph-cli[inmem]>=0.4.31",
+    { include-group = "eval" },
+]
+# Step 11.4. DeepEval is a test-time dependency: the runtime package converts
+# files without it, the deployment image (`--no-dev`) never installs it, and it
+# drags in pytest, gRPC and OpenTelemetry that nothing in the agent needs. It is
+# folded into `dev` so a plain `uv sync` — and the offline CI job — get it
+# without a second flag; the manual judge workflow installs this group alone.
+eval = [
+    "deepeval>=4.2,<5",
 ]
 # Step 10.3. The playground is a front end for a deployment, not part of the
 # agent: `s2p convert` and the graph itself must never need Streamlit installed,
