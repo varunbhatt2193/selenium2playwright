@@ -1,9 +1,85 @@
-# Restart here — 2026-09-08 (Phase 11: 11.1a/11.1b/11.2 done; ⛔ Anthropic API is limit-blocked until 2026-10-01)
+# Restart here — 2026-09-08 (Phase 11: 11.1a/11.1b/11.2/11.3a done; ⛔ Anthropic API is limit-blocked until 2026-10-01)
 
 ## Current position
 
-**Phases 0–9 complete, 10.1 done, 10.2 DONE — the converter is live at
-<https://s2p.fly.dev>, self-hosted on Fly. 🏁 M4 shipped at 9.3.**
+**Phases 0–10 complete; 11.1a, 11.1b, 11.2 and 11.3a done. 🏁 M4 shipped at 9.3.**
+
+**Two things are live, and it matters which is which:**
+
+| | | |
+|---|---|---|
+| **<https://varun-s2p.fly.dev>** | Fly app `varun-s2p` | **the page a person opens.** Upload one file or a zip of a folder; get the converted tree back as a zip with the report inside. This is the link to put on a CV. |
+| `https://s2p.fly.dev` | Fly app `s2p` | the graph API. JSON only — a browser gets `{"detail":"Not Found"}`. Needs a bearer key. |
+
+`./deploy/fly/deploy.sh` ships the graph; `./deploy/fly/deploy-ui.sh` ships the
+page. **Four apps now** (`s2p`, `s2p-postgres`, `s2p-redis`, `varun-s2p`) ≈
+**$23/month**, flat and traffic-independent — a public link does not move it.
+Model spend is the only cost that responds to traffic, capped at ~$5/day.
+
+### What 11.3a added (2026-09-08)
+
+**A suite can be uploaded.** `source_tree` (relative path → contents) carries a
+folder as text, so nothing in the request names a path on the server — which is
+the only property `guard.py` was ever protecting. `plan` materializes it into a
+temp directory *it* chooses; `finish` reads the tree back out as text and
+deletes the workspace; every node between is 9.2/9.3 unchanged. `root` and
+`out_root` stay refused for anyone but the owner, so naming a folder **by path**
+is still local-only (`folder_blocker()` hides that input).
+
+Three things that had to hold, and would be expensive to rediscover:
+
+- `suite.safe_path` is a whitelist of shapes, not a blacklist of tricks, and a
+  tree with one bad key is refused **whole** — a suite that silently dropped a
+  file would convert, compile, and be wrong in a way nobody looks for.
+- `sweep_workspaces()` runs at the start of each suite and deletes workspaces
+  older than an hour, because `finish` cannot clean up after a run that never
+  reached it.
+- `limits.spend(runs=n)` charges **per file** (INCRBY, atomic). The meter counted
+  runs, and one twelve-file suite is twelve conversions.
+
+**Playbook rule 28.** A wait fused to a getter is not behaviour to preserve —
+web-first assertions retry, so `expect(locator).toHaveText(/\S/)` is the wait
+and the judgement in one line. The sample suite went **8/12 with a tree that
+would not compile → 12/12 with the tree compiling, 51.3s → 20.4s, every file on
+its first attempt.** Deliberately not a `tsconfig` change: adding `DOM` to `lib`
+would cost the compile gate its ability to catch browser APIs hallucinated into
+Node context. Gated on three hard-suite files (the 11.1b `document` failure is
+gone, nothing regressed) — **not** a full eval run, which is worth finishing if
+the rule ever becomes load-bearing in a published number.
+
+**Transitive compile context.** `dispatch` handed each file its *direct* imports
+only, so on a suite three or more deep a spec's page object could not resolve
+its own BasePage. Measured with the real gate and no model: three phantom
+findings before, zero after — and the repair loop was spending its three
+attempts on them. Latent since 9.2, invisible because `samples/selenium-suite`
+is exactly two deep **and** because the 9.2 test asserted the buggy answer.
+
+**Sharp edges found by running it:**
+
+- `suite_result` named both the converted files and the whole-tree compile
+  report `tree`, so the download button silently offered a zip containing
+  `{"gate": "compile", "passed": true}`.
+- `suite_key()` returned the **owner** key on every call. That would have worked
+  perfectly against `s2p.fly.dev` and bypassed the meter completely, because
+  `guard_run` returns `True` for an owner *before* `limits.spend` is reached. It
+  is now scoped to local backends and pinned by a test named after exactly that.
+- `LANGGRAPH_DEPLOYMENT_URL = "http://s2p.internal:8000"` is the obvious thing to
+  write and does not work. Fly's private network is IPv6-only and the LangGraph
+  image binds `0.0.0.0`. Measured from inside the UI machine; the finding is in
+  `deploy/fly/ui.toml` beside the line it explains.
+- `fly apps create` **creates** — there is no dry-run. Using it to check name
+  availability made three apps; two were destroyed.
+
+`S2P_DAILY_LIMIT` is now **15** (was 10) so one 12-file suite fits per visitor
+per day; the global budget is unchanged at 41 runs/day ≈ $5.
+
+**Next in 11.3:** the codemod comparison table (`plan-review.md` item 5 — one
+README table, *with an honest row where a codemod wins*), ADRs (item 15, first
+one "why StateGraph, not `create_agent`"; there is no `docs/adr/` yet and the
+reasoning is scattered through `plan.md` and the walkthroughs), public trace
+links, the suite demo video, LinkedIn assets.
+
+### Before 11.3a
 
 A file sent as text comes back `compile=PASS residue=PASS lint=PASS
 parity=PASS`, critic pass, with the reflection loop taking real laps. Three
