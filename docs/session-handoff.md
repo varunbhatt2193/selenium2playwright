@@ -150,7 +150,15 @@ Three things to carry forward:
 
 `.github/workflows/ci.yml` runs the offline suite and both browser gates on
 every push, with **no secrets**, so a pull request cannot spend money. The
-offline suite now passes on a machine with no credentials at all.
+offline suite now passes on a machine with no credentials at all, and CI is
+**green** (run 34179741487).
+
+The first CI run was red, and its two causes are worth remembering because they
+will come back: rich treats GitHub Actions as a colour-capable terminal, and
+Typer's usage-error panel is a *different* console from the `cli.console` that
+step 9.1 pinned — so assert on that panel through `tests/console_env.py`'s pin
+(and `unwrapped()`), never on raw stderr. And never assert a wall-clock constant
+on a shared runner: compare something measured inside the same run.
 
 ### 11.1a is done: the twelve hard cases are a second benchmark
 
