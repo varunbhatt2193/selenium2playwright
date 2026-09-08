@@ -84,6 +84,54 @@ the core of the converter's system prompt — changes to it are gated by evals.
 21. POMs contain no assertions; tests judge, page objects expose.
 22. Absolute URLs in POMs → relative paths + `baseURL` in the config.
 
+## Frames and JavaScript escapes
+
+*Added 2026-09-08 from measured hard-case failures; gated by an eval run
+(`docs/phase-11.1b-report.md`). New rules take the next free number rather than
+renumbering: `assemble.py`, the tests and several published reports refer to
+rules by number.*
+
+26. **`executeScript` is a workaround until proven otherwise.** Selenium code
+    reaches for JavaScript when the driver could not do something. Playwright
+    usually can, so the correct conversion is normally to **delete the escape,
+    not translate it**:
+    - `executeScript("arguments[0].click()", el)` → plain `locator.click()`.
+      Playwright waits for the element to be visible, stable, enabled and
+      actually hit-testable before it fires — which is exactly what the JS click
+      was faking.
+    - `scrollIntoView` / `scrollIntoViewIfNeeded` → **delete**. Every Playwright
+      action scrolls its target into view first. Emitting
+      `scrollIntoViewIfNeeded()` before a `click()` is not a conversion, it is
+      the Selenium habit kept alive.
+    - setting a field's value through JS → `fill()`.
+    Keep `locator.evaluate()` only when the script **is** the thing under test:
+    reading a computed style, calling a page API with no UI, asserting on
+    something the DOM only exposes to JavaScript. Never emit `evaluate()` merely
+    to reproduce a click or a scroll, and never reference DOM types
+    (`HTMLButtonElement`, `document`, `window`) — the validation project has no
+    `DOM` lib, so that does not compile. If it is genuinely unclear whether the
+    script was a workaround or the subject, emit the closest faithful code plus
+    a `TODO(review)` saying which of the two you could not decide.
+
+27. **Frames are scoped, not entered.** `switchTo().frame(x)` and
+    `switchTo().defaultContent()` move one global cursor, so Selenium page
+    objects grow methods whose only job is moving it, and callers that must run
+    in the right order. `frameLocator()` scopes a single lookup and changes no
+    state:
+    - a frame's contents → a `readonly Locator` built through
+      `page.frameLocator("<selector>")`; nested frames chain
+      `frameLocator(…).frameLocator(…)`.
+    - methods that only entered or left a frame (`enterFrame`, `returnToTop`,
+      `switchToDefault`) have no work left → **delete them** and record each in
+      the parity ledger as removed-with-reason.
+    - **never** rebuild the cursor: no `currentFrame` field, no `inTopFrame`
+      flag, no guard that throws when the caller "is in the wrong frame", and
+      no `page.frame()` / `childFrames()` walking. That reimplements Selenium
+      inside Playwright; it is also how `childFrames()` ends up called on a
+      `Page`, which does not type-check.
+    - the order dependence between frame reads disappears. Keep every assertion
+      and their order; drop the *requirement* that they run in that order.
+
 ## Honesty (restated — overrides everything above)
 
 23. Never invent an API. If no rule covers a pattern and the mapping cannot be
