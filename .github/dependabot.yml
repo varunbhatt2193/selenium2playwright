@@ -39,6 +39,12 @@ updates:
       interval: weekly
     open-pull-requests-limit: 5
     groups:
+      # First, so it wins regardless of update type. vite and its React plugin
+      # each declare a peer range on the other, so a major of one on its own
+      # cannot install at all — npm fails at ERESOLVE before anything is built.
+      # Proposed apart they are two pull requests that can never go green.
+      vite:
+        patterns: ["vite", "@vitejs/*"]
       playground-minor-patch:
         update-types: [minor, patch]
 
