@@ -1,4 +1,4 @@
-# Restart here — 2026-09-07 (Phase 10 complete: live at https://s2p.fly.dev, guarded, with a playground in front of it)
+# Restart here — 2026-09-08 (Phase 10 complete; Phase 11 started: the twelve hard cases are a benchmark)
 
 ## Current position
 
@@ -100,11 +100,67 @@ one file?" for someone who cannot run the CLI. Pair it with
 [phase-9.3-report.md](phase-9.3-report.md), the real artifact it produces.
 Tracked in roadmap 11.3; written here too because roadmap.md is gitignored.
 
-**Phase 10 is complete. Next is Phase 11** — 11.1 hard-case sprint, 11.2
-execution evals in CI, 11.3 launch kit (drop the 🚧 banner, comparison table,
-cost numbers, **the suite demo video above**, LinkedIn assets). 11.3 is also where *hosting the
-playground itself* belongs: today the page runs on your laptop against the live
-backend, which is enough to demo and not enough to put in a CV link.
+**Phase 10 is complete. Phase 11 has started.** 11.1 was split into a and b on
+2026-09-08, because building the ruler and using it are different kinds of work:
+**11.1a is DONE** (no model spend, browser verification), **11.1b is next** (an
+eval-gated tuning loop with a real bill). Then 11.2 execution evals in CI, 11.3
+launch kit (drop the 🚧 banner, comparison table, cost numbers, **the suite demo
+video above**, LinkedIn assets). 11.3 is also where *hosting the playground
+itself* belongs: today the page runs on your laptop against the live backend,
+which is enough to demo and not enough to put in a CV link.
+
+### 11.1a is done: the twelve hard cases are a second benchmark
+
+Read [hard-cases.md](hard-cases.md) first. In one paragraph: the Phase 6.1 set
+measures ordinary page objects and tests and the converter passes it, which is
+not the same as being good at this job. `plan-review.md` listed twelve patterns
+where a mechanical translation compiles, passes lint, passes residue, and
+silently tests something else. Those are now fixtures.
+
+```
+samples/selenium-hard-suite/       11 Selenium files (the inputs)
+samples/playwright-hard-golden/    11 Playwright goldens (the answers)
+cd samples && npm run test:hard && npm run test:hard-golden
+uv run python scripts/measure_hard_fixtures.py     # re-measure; rewrites the evidence file
+uv run python scripts/upload_hard_dataset.py       # local preview, no network
+```
+
+**Uploaded and verified: `selenium2playwright-hard-v1-b233d4c101fd`, 11
+examples** (receipt: `docs/phase-11.1-receipt.json`). Measured 2026-09-08:
+Selenium 7/7 in headless Chrome (21.1s), Playwright goldens 7/7, 0 flaky
+(14.7s), all four gates green over the whole golden tree.
+
+Three things a future session must not undo:
+
+1. **Hard cases 2 (dialogs) and 5 (windows) are covered by the Phase 6.1 set**
+   and cross-referenced in `COVERED_BY_BASE_DATASET`, not duplicated.
+   `check_manifest` fails the build if a case is claimed by both benchmarks or
+   by neither, so "twelve" is enforced. Do not "fix" the coverage gap by
+   writing a second alerts page.
+2. **`tests/shared-session.spec.ts`'s golden carries a `TODO(review)` on
+   purpose** (`storageState` is a suite-level fix a single-file conversion
+   cannot make). `plan-review.md` finding 6: a dataset whose references never
+   admit a limitation teaches the agent to guess confidently. That TODO is the
+   feature.
+3. **`snapshot_example` gained `source_dir`/`golden_dir` and
+   `upload_collection` gained `description`** — both additive, both defaulting
+   to the Phase 6.1 values. `BaseDatasetUnchangedTests` asserts the published
+   set still fingerprints to `selenium2playwright-v1-4920b5f319d8`. If that
+   test ever fails, the 6.1 dataset has silently moved.
+
+**Honest gap, written down so nobody claims otherwise:** real Selenium v3
+promise-manager code cannot be browser-verified under selenium-webdriver v4, so
+hard case 12 uses returned promise chains (no `await` keyword in the file, same
+conversion task). Implicit v3 ordering is not covered. Under hard case 8 only
+hover is exercised — drag-and-drop and modifier clicks are still open.
+
+**11.1b is the next step:** run the converter against that dataset (the 6.2
+experiment runner and 6.4 judge already exist), publish the per-hard-case
+scorecard *including failures*, then iterate the playbook — every change gated
+by a green eval run. Reserve at least two hard cases from the tuning loop so the
+benchmark does not become the thing the prompt is fitted to. This one costs real
+model spend, so it needs a model decision first (sonnet to iterate, opus for the
+published number).
 
 The managed platform is the part that failed, and it is history now: 10.1 put
 the graphs behind `langgraph dev`; 10.2 made them *deployable*: the file travels
@@ -160,7 +216,7 @@ plain-English walkthrough with check-yourself questions, then wait for his
 review. **Always end a turn that hands control back with an explicit "waiting on
 you" line** (asked 2026-09-06 — a pause must never be implied).
 
-**415 offline tests pass** (`uv run python -m unittest discover -s tests`, ~171 s
+**442 offline tests pass** (`uv run python -m unittest discover -s tests`, ~163 s
 — not `-t .`, and pytest is not installed). The suite is terminal-width
 independent from 40 to 200 columns as of 9.3.
 

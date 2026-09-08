@@ -54,12 +54,18 @@ def _read_typescript(root: Path, relative: str) -> str:
     return code
 
 
-def snapshot_example(case: DatasetCase, samples_root: Path) -> dict:
+def snapshot_example(case: DatasetCase, samples_root: Path, *,
+                     source_dir: str = "selenium-suite",
+                     golden_dir: str = "playwright-golden") -> dict:
     """Return inputs/reference outputs/metadata in LangSmith's example format.
 
     Snapshot text now so later edits to the checkout cannot silently change an
     already-uploaded task. Reference code and acceptance criteria stay outside
     inputs; the future target must receive only inputs, never this entire dict.
+
+    The suite directory names are arguments so that Step 11.1's hard-case pair
+    can reuse this builder unchanged. Their defaults are the Phase 6.1 suites,
+    whose already-uploaded rows must keep producing byte-identical output.
     """
     if not case.case_id.strip() or not case.scenario.strip():
         raise ValueError("case_id and scenario must be non-blank")
@@ -74,8 +80,8 @@ def snapshot_example(case: DatasetCase, samples_root: Path) -> dict:
     if case.path in case.companions or len(set(case.companions)) != len(case.companions):
         raise ValueError("Companions must be unique and exclude the target's own reference")
 
-    source_root = samples_root / "selenium-suite"
-    golden_root = samples_root / "playwright-golden"
+    source_root = samples_root / source_dir
+    golden_root = samples_root / golden_dir
     source = _read_typescript(source_root, case.path)
     reference = _read_typescript(golden_root, case.path)
     companions = {}

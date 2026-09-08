@@ -1,0 +1,326 @@
+{
+  "schema_version": 1,
+  "scope": "Hard-case source fixtures and their independently authored goldens; not converter outputs and not a scored experiment.",
+  "measured_at_utc": "2026-09-08T00:08:54.769219Z",
+  "tools": {
+    "@playwright/test": "1.63.0",
+    "mocha": "12.0.0",
+    "selenium-webdriver": "4.48.0",
+    "typescript": "5.9.3",
+    "node": "v26.0.0"
+  },
+  "browser_settings": {
+    "source": "headless Chrome",
+    "reference": "headless Chromium",
+    "playwright_workers": 1,
+    "playwright_retries": 0
+  },
+  "browser_totals": {
+    "source": {
+      "suites": 5,
+      "tests": 7,
+      "passes": 7,
+      "pending": 0,
+      "failures": 0,
+      "start": "2026-09-08T00:08:17.994Z",
+      "end": "2026-09-08T00:08:39.059Z",
+      "duration": 21065
+    },
+    "reference": {
+      "startTime": "2026-09-08T00:08:39.672Z",
+      "duration": 14713.113000000001,
+      "expected": 7,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    }
+  },
+  "static_gates": {
+    "compile": {
+      "passed": true,
+      "findings": [],
+      "scope": "all 11 hard-case golden files together"
+    },
+    "residue": {
+      "passed": true,
+      "findings": [],
+      "scope": "all 11 hard-case golden files together"
+    },
+    "lint": {
+      "passed": true,
+      "findings": [],
+      "scope": "all 11 hard-case golden files together"
+    },
+    "parity": {
+      "passed": true,
+      "findings": [],
+      "scope": "all 11 hard-case golden files together"
+    }
+  },
+  "artifacts": {
+    "source": "out/11.1/selenium.json",
+    "reference": "out/11.1/playwright.json",
+    "static": "out/11.1/static-gates.json"
+  },
+  "cases": {
+    "base-page": {
+      "source_sha256": "17331b3b46050f435d09bdcbda03dc59bb771c7d5ff6137ba9c8a6a81b1d4485",
+      "reference_sha256": "8af23fb8771886033432a2934cab97db389967acac13dd767498ce993e02c7fe",
+      "browser_test_case_id": "dynamic-controls-test",
+      "source_browser": [
+        {
+          "name": "removes the checkbox and reports it gone",
+          "status": "passed",
+          "duration_ms": 8158
+        },
+        {
+          "name": "enables the text field and accepts input",
+          "status": "passed",
+          "duration_ms": 3159
+        }
+      ],
+      "reference_browser": [
+        {
+          "name": "removes the checkbox and reports it gone",
+          "status": "passed",
+          "duration_ms": 4505
+        },
+        {
+          "name": "enables the text field and accepts input",
+          "status": "passed",
+          "duration_ms": 4470
+        }
+      ]
+    },
+    "dynamic-controls-page": {
+      "source_sha256": "7fd51c3861cacebc45ceeeeea932865157a700c7d1f81e919f2aec7d36e960b0",
+      "reference_sha256": "7e4e0770f2acaf00228b68b9b99bc5226d5f13d9ea9513179c3700ac9949e7d4",
+      "browser_test_case_id": "dynamic-controls-test",
+      "source_browser": [
+        {
+          "name": "removes the checkbox and reports it gone",
+          "status": "passed",
+          "duration_ms": 8158
+        },
+        {
+          "name": "enables the text field and accepts input",
+          "status": "passed",
+          "duration_ms": 3159
+        }
+      ],
+      "reference_browser": [
+        {
+          "name": "removes the checkbox and reports it gone",
+          "status": "passed",
+          "duration_ms": 4505
+        },
+        {
+          "name": "enables the text field and accepts input",
+          "status": "passed",
+          "duration_ms": 4470
+        }
+      ]
+    },
+    "dynamic-controls-test": {
+      "source_sha256": "06b540d6d147298bf4bcb87e6719213a500b8346c426f11e3fb575e4766c371e",
+      "reference_sha256": "bac64442771232a3bd9bdafe1e0d431a4f0cdab6d4c45a09193883d12c6b0b08",
+      "browser_test_case_id": "dynamic-controls-test",
+      "source_browser": [
+        {
+          "name": "removes the checkbox and reports it gone",
+          "status": "passed",
+          "duration_ms": 8158
+        },
+        {
+          "name": "enables the text field and accepts input",
+          "status": "passed",
+          "duration_ms": 3159
+        }
+      ],
+      "reference_browser": [
+        {
+          "name": "removes the checkbox and reports it gone",
+          "status": "passed",
+          "duration_ms": 4505
+        },
+        {
+          "name": "enables the text field and accepts input",
+          "status": "passed",
+          "duration_ms": 4470
+        }
+      ]
+    },
+    "add-remove-page": {
+      "source_sha256": "f0dd22da08dfb13e95723f2093ce9b46b58b99159b14343e37073f43bc5eb4fe",
+      "reference_sha256": "4529ad6dc0e73c3acfa60968f2eefc1f405cca8c2779b8a90d4f275e063e64dc",
+      "browser_test_case_id": "add-remove-test",
+      "source_browser": [
+        {
+          "name": "adds five rows and then deletes every one of them",
+          "status": "passed",
+          "duration_ms": 1098
+        }
+      ],
+      "reference_browser": [
+        {
+          "name": "adds five rows and then deletes every one of them",
+          "status": "passed",
+          "duration_ms": 1596
+        }
+      ]
+    },
+    "add-remove-test": {
+      "source_sha256": "10ba79e44855557e0e00eba19ca2124878c073221115e8448477f8b99e761c35",
+      "reference_sha256": "a1064d53671f5f3bbc540aa772aca47be420dd7c6db131712c2b50c01bb415a3",
+      "browser_test_case_id": "add-remove-test",
+      "source_browser": [
+        {
+          "name": "adds five rows and then deletes every one of them",
+          "status": "passed",
+          "duration_ms": 1098
+        }
+      ],
+      "reference_browser": [
+        {
+          "name": "adds five rows and then deletes every one of them",
+          "status": "passed",
+          "duration_ms": 1596
+        }
+      ]
+    },
+    "nested-frames-page": {
+      "source_sha256": "4d64c1b26a88371a45039a1b1231f535b66e40967b9d467b544989f9eb22aa61",
+      "reference_sha256": "ba463634e010bc5782a2631f7133d533a90379c31100abb99b6291be0ff51556",
+      "browser_test_case_id": "nested-frames-test",
+      "source_browser": [
+        {
+          "name": "reads the middle frame and then the bottom frame",
+          "status": "passed",
+          "duration_ms": 770
+        }
+      ],
+      "reference_browser": [
+        {
+          "name": "reads the middle frame and then the bottom frame",
+          "status": "passed",
+          "duration_ms": 830
+        }
+      ]
+    },
+    "nested-frames-test": {
+      "source_sha256": "6c516df96ca428dd42af8906711ff00e4b18e8d7947eb1ed3f5bbf87b0382f3a",
+      "reference_sha256": "66941722efd2e00ec64fab4404d8e6055404ea6c2128835b33debf2aa61d68ef",
+      "browser_test_case_id": "nested-frames-test",
+      "source_browser": [
+        {
+          "name": "reads the middle frame and then the bottom frame",
+          "status": "passed",
+          "duration_ms": 770
+        }
+      ],
+      "reference_browser": [
+        {
+          "name": "reads the middle frame and then the bottom frame",
+          "status": "passed",
+          "duration_ms": 830
+        }
+      ]
+    },
+    "hovers-page": {
+      "source_sha256": "f385ea1fba3d828701b0bae3bb420ef9c7ca60ef88e172cb05cad95881934549",
+      "reference_sha256": "57b9d420f23b42b22a821bcd79ddc5b0fb9bc409366ba4ad5e804c451fac16b8",
+      "browser_test_case_id": "hovers-test",
+      "source_browser": [
+        {
+          "name": "reveals only the hovered avatar's caption",
+          "status": "passed",
+          "duration_ms": 1237
+        }
+      ],
+      "reference_browser": [
+        {
+          "name": "reveals only the hovered avatar's caption",
+          "status": "passed",
+          "duration_ms": 1148
+        }
+      ]
+    },
+    "hovers-test": {
+      "source_sha256": "969a42d2a7e787f1b112cc7a83c11fc1f23a824a1dd6594ab2b230b9ab2eade6",
+      "reference_sha256": "76bdb206a65f854958317013bf7f7e74c232d090f5a40444ce3014eea118cd70",
+      "browser_test_case_id": "hovers-test",
+      "source_browser": [
+        {
+          "name": "reveals only the hovered avatar's caption",
+          "status": "passed",
+          "duration_ms": 1237
+        }
+      ],
+      "reference_browser": [
+        {
+          "name": "reveals only the hovered avatar's caption",
+          "status": "passed",
+          "duration_ms": 1148
+        }
+      ]
+    },
+    "shared-session-page": {
+      "source_sha256": "6f7ac7369da3da5a14bc2c69271e827d2412112b948f80f254da4026e1a294e1",
+      "reference_sha256": "144fd848fee2c9bacf7aeff21fdb76bfb93baee458d2054e70e5f6e9bf71abcb",
+      "browser_test_case_id": "shared-session-test",
+      "source_browser": [
+        {
+          "name": "lands on the secure area after the shared login",
+          "status": "passed",
+          "duration_ms": 215
+        },
+        {
+          "name": "still shows the secure area after a reload",
+          "status": "passed",
+          "duration_ms": 103
+        }
+      ],
+      "reference_browser": [
+        {
+          "name": "lands on the secure area after the shared login",
+          "status": "passed",
+          "duration_ms": 25
+        },
+        {
+          "name": "still shows the secure area after a reload",
+          "status": "passed",
+          "duration_ms": 115
+        }
+      ]
+    },
+    "shared-session-test": {
+      "source_sha256": "31f31fc3e74f3f73770f2a30df80f2fc54732b5d58108cf6668699baa16959fe",
+      "reference_sha256": "244db1d99d13b17193f16f88525e3f17ab13edfdd24ba34fe356e5d622ffa525",
+      "browser_test_case_id": "shared-session-test",
+      "source_browser": [
+        {
+          "name": "lands on the secure area after the shared login",
+          "status": "passed",
+          "duration_ms": 215
+        },
+        {
+          "name": "still shows the secure area after a reload",
+          "status": "passed",
+          "duration_ms": 103
+        }
+      ],
+      "reference_browser": [
+        {
+          "name": "lands on the secure area after the shared login",
+          "status": "passed",
+          "duration_ms": 25
+        },
+        {
+          "name": "still shows the secure area after a reload",
+          "status": "passed",
+          "duration_ms": 115
+        }
+      ]
+    }
+  }
+}

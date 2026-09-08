@@ -38,8 +38,22 @@ def missing_examples(client: Client, dataset_id: UUID, expected: dict[str, dict]
             for identity, row in expected.items() if identity not in found]
 
 
-def upload_collection(client: Client, collection: dict) -> dict:
-    """Create/resume an immutable-by-convention collection and return a verified receipt."""
+BASE_DESCRIPTION = (
+    "Phase 6.1 curated development benchmark: 12 file conversions, six scenarios, "
+    "eight browser tests per framework. Test rows receive golden POM companions. "
+    "Inputs are source snapshots; outputs are independent references. "
+    "Fixture-validation metadata is measured baseline evidence, not converter scores. "
+    "Iframe typing remains uncovered. See repository docs/evaluation-dataset.md."
+)
+
+
+def upload_collection(client: Client, collection: dict, description: str = BASE_DESCRIPTION) -> dict:
+    """Create/resume an immutable-by-convention collection and return a verified receipt.
+
+    The description is written once, when the dataset is created. A second
+    benchmark (Step 11.1's hard cases) passes its own; the default keeps the
+    Phase 6.1 text byte-identical to what is already published.
+    """
     name = collection["dataset_name"]
     created = False
     try:
@@ -48,13 +62,7 @@ def upload_collection(client: Client, collection: dict) -> dict:
         try:
             dataset = client.create_dataset(
                 dataset_name=name,
-                description=(
-                    "Phase 6.1 curated development benchmark: 12 file conversions, six scenarios, "
-                    "eight browser tests per framework. Test rows receive golden POM companions. "
-                    "Inputs are source snapshots; outputs are independent references. "
-                    "Fixture-validation metadata is measured baseline evidence, not converter scores. "
-                    "Iframe typing remains uncovered. See repository docs/evaluation-dataset.md."
-                ),
+                description=description,
                 metadata={"collection_sha256": collection["collection_sha256"],
                           "schema_version": 1, "coverage": collection["coverage"]},
             )

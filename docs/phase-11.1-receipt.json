@@ -1,0 +1,65 @@
+{
+  "status": "verified",
+  "dataset_name": "selenium2playwright-hard-v1-b233d4c101fd",
+  "dataset_id": "897199c5-f591-42d4-938e-9e6ec64fc8ed",
+  "dataset_url": "https://smith.langchain.com/o/32ac11b4-3e72-4765-a59b-5dc1bcd32cbe/datasets/897199c5-f591-42d4-938e-9e6ec64fc8ed",
+  "dataset_version": "2026-09-08T00:13:23.005331+00:00",
+  "collection_sha256": "b233d4c101fde8464611264aa8732f1fff2ef98700fd920da264cc2262b385ba",
+  "dataset_created": true,
+  "examples_created": 11,
+  "examples_verified": 11,
+  "coverage": {
+    "conversion_examples": 11,
+    "scenarios": {
+      "add-remove": 2,
+      "base": 1,
+      "dynamic-controls": 2,
+      "hovers": 2,
+      "nested-frames": 2,
+      "shared-session": 2
+    },
+    "kinds": {
+      "page-object": 6,
+      "test": 5
+    },
+    "browser_tests_per_framework": 7,
+    "hard_cases_total": 12,
+    "hard_cases_here": [
+      1,
+      3,
+      4,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12
+    ],
+    "hard_cases_in_base_dataset": {
+      "2": "alerts-page / alerts-test in the Phase 6.1 set (samples/selenium-suite/pages/AlertsPage.ts)",
+      "5": "windows-page / windows-test in the Phase 6.1 set (samples/selenium-suite/pages/WindowsPage.ts)"
+    }
+  },
+  "example_ids": {
+    "add-remove-page": "ba566d4e-c46c-55ca-8252-68b2f402c0f4",
+    "add-remove-test": "112ab1fb-afec-53a7-bbc2-a82bf8f12d1c",
+    "base-page": "53ff52e5-2aac-5ff5-81e2-0b93cc988825",
+    "dynamic-controls-page": "e8c8e009-e0a2-5136-a3cf-edbdf02ee01f",
+    "dynamic-controls-test": "112b4ba3-c7e1-5651-a9c8-c41c41004646",
+    "hovers-page": "c65db428-5340-5b45-8466-8457a7c7475e",
+    "hovers-test": "7fce1722-e3a6-5a22-8df9-5fddee3facee",
+    "nested-frames-page": "b78c0c86-4a7b-5dc1-9998-654727228184",
+    "nested-frames-test": "7fca3979-dd26-5d48-bf2f-03c62f69be2f",
+    "shared-session-page": "b361f018-d0ea-5351-a980-3633c1dfe4b6",
+    "shared-session-test": "9d6e0450-7b38-5c5b-915f-4f1c63d0c7ff"
+  },
+  "verification": "Exact inputs, reference outputs and metadata at the recorded dataset version",
+  "recorded_at_utc": "2026-09-08T00:13:23.508608+00:00",
+  "elapsed_seconds": 1.688,
+  "langsmith_sdk_version": "0.12.1",
+  "git_revision": "91fcebb9d8998940e1e708ad48db9036feb50aa0",
+  "git_dirty": true,
+  "model_calls": 0,
+  "converter_experiment": "not_run; Step 11.2"
+}
