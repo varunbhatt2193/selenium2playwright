@@ -457,8 +457,9 @@ have it. There is a test named after exactly that.
 
 **A plan, before the button.** A suite run is the one thing on this page that
 costs twelve conversions instead of one, so `pg.plan_suite()` runs `suite.scan`
-locally — no model, no server — and puts "12 files to convert in 2 waves · 0
-copied across · 0 skipped" and the wave contents on screen *first*. It is only
+locally — no model, no server — and puts "Found 6 page objects and 6 Selenium
+test files (8 tests)", the arithmetic under it ("12 file(s) to convert in 2
+wave(s) · 0 copied across · 0 skipped") and the wave contents on screen *first*. It is only
 correct because suite mode is local: the folder this process can see is the
 folder the graph will open.
 
@@ -476,6 +477,45 @@ outcome that branch appended. `Update` gained an `update` field so `stream()`
 stops throwing that payload away: for one conversion it is noise, for a suite it
 is the difference between eighty seconds of visible work and eighty seconds of
 spinner.
+
+**A commentary in the suite's own words.** The four node names a suite run goes
+through are the graph's vocabulary. Translating them one-for-one, the way the
+single-file path does, produced a line that said "Starting the next wave" —
+which fired between every wave *and once more after the last one*, so the same
+six words appeared three times on a twelve-file run and told a watcher nothing
+about what the agent was doing. Two things fixed it:
+
+* **`suite.count_cases` and `suite.census`.** The manifest already knew each
+  file's `kind` (`page-object` | `test` | `support`); `SuiteFile` now also
+  carries `cases`, the `it(`/`test(` count inside a spec. A census of any group
+  of files is then `{page_objects, tests, cases, support}` — the four numbers a
+  sentence needs. Counted per file, so the *same* function answers "what is in
+  this suite" and "what is in wave 2".
+* **`pg.wave_label(plan, n)`, which can return `""`.** `next_wave` is a loop
+  counter, so it runs once per wave and once more to discover there is none
+  left; that last lap is the one that used to announce a wave that never
+  started. An empty label is not sent, and the wave number comes from the node's
+  own update (`{"wave": n}`), so the line on screen and the wave the graph is
+  about to dispatch are the same `n`.
+
+The run now reads as a sequence, in a trail rather than a single line that keeps
+being overwritten:
+
+```
+✓ Found 6 page objects and 6 Selenium test files (8 tests)
+✓ Reading the folder and working out what converts before what
+✓ Wave 1 of 2 · converting 6 page objects to Playwright
+✓ Wave 2 of 2 · converting 6 test files (8 tests) to Playwright
+⟳ Compiling the converted tree as one project and writing the report
+```
+
+with the per-file line (`7/12 · tests/login.spec.ts — passed`) underneath it
+rather than on top of it. The counts are of what will be *converted*, after
+`--only`, so a filtered plan that charges for four files does not claim to have
+found twelve — the same rule the meter follows. Every one of those sentences is
+built in Python (`found`, `wave_lines`, `wave_label`) and sent as text, so the
+plan drawn before the button and the progress shown after it cannot describe the
+same wave in two different ways.
 
 ### What the result tabs are for
 

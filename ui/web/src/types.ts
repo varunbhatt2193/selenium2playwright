@@ -58,6 +58,13 @@ export type ConvertEvent =
   | ({ kind: 'done' } & ConvertDone)
   | { kind: 'error'; message: string }
 
+export type Census = {
+  page_objects: number
+  tests: number
+  cases: number
+  support: number
+}
+
 export type SuitePlan = {
   root: string
   waves: string[][]
@@ -66,8 +73,14 @@ export type SuitePlan = {
   skipped: [string, string][]
   notes: string[]
   billable: number
+  counts: Census
+  // One per entry in `waves`, in the same order: what that wave is made of.
+  wave_counts: Census[]
   files: number
   line: string
+  found: string
+  // One per wave, in `waves` order: "6 page objects", "6 test files (8 tests)".
+  wave_lines: string[]
 }
 
 export type PlanResponse = {
@@ -115,8 +128,8 @@ export type SuiteResult = {
 }
 
 export type SuiteEvent =
-  | { kind: 'start'; files: number; waves: number }
-  | { kind: 'node'; node: string; label: string }
+  | { kind: 'start'; files: number; waves: number; found: string }
+  | { kind: 'node'; node: string; label: string; wave?: number }
   | { kind: 'file'; landed: number; of: number; row: FileRow }
   | { kind: 'done'; result: SuiteResult }
   | { kind: 'error'; message: string }

@@ -320,6 +320,14 @@ class WebTests(unittest.TestCase):
         self.assertEqual(got["plan"]["waves"], [["pages/P.ts"], ["tests/p.spec.ts"]])
         self.assertEqual(got["plan"]["billable"], 2)
         self.assertEqual(got["unaffordable"], "")
+        # The page draws these two before the button: what was found, and what
+        # each wave is made of. Both are computed in Python so the plan and the
+        # progress line cannot describe the same wave differently.
+        # Both files here drive Selenium with no runner in them, so both are page
+        # objects — `p.spec.ts` is named like a spec but has no `it` in it, and
+        # the scan believes the file, not the filename.
+        self.assertEqual(got["plan"]["found"], "Found 2 page objects")
+        self.assertEqual(got["plan"]["wave_lines"], ["1 page object", "1 page object"])
 
     def test_plan_says_when_the_budget_cannot_pay(self):
         with patch.object(pg, "fetch_limits", lambda **_: {**SNAPSHOT, "budget": {"remaining": 1, "limit": 41}}):
@@ -351,7 +359,11 @@ class WebTests(unittest.TestCase):
         self.fake.runs.chunks = [
             chunk("metadata", {"run_id": RUN}),
             chunk("updates", {"plan": {}}),
+            chunk("updates", {"next_wave": {"wave": 1}}),
             chunk("updates", {"convert_file": {"outcomes": [outcome]}}),
+            # The loop's last lap: `next_wave` runs once more, finds no wave 2
+            # and routes to `finish`. It must not announce a wave.
+            chunk("updates", {"next_wave": {"wave": 2}}),
             chunk("updates", {"finish": {}}),
             chunk("values", {"outcomes": [outcome], "elapsed": 4.0,
                              "converted_tree": {"pages/P.ts": PLAYWRIGHT},
@@ -364,10 +376,14 @@ class WebTests(unittest.TestCase):
         })
         got = events(response)
         kinds = [e["kind"] for e in got]
-        self.assertEqual(kinds, ["start", "node", "file", "node", "done"])
-        self.assertEqual(got[0], {"kind": "start", "files": 1, "waves": 1})
-        self.assertEqual(got[2]["row"]["path"], "pages/P.ts")
-        self.assertEqual(got[2]["row"]["gates_line"], "1/1")
+        self.assertEqual(kinds, ["start", "node", "node", "file", "node", "done"])
+        self.assertEqual(got[0], {"kind": "start", "files": 1, "waves": 1,
+                                  "found": "Found 1 page object"})
+        # The wave that runs is named by what is in it; the extra lap is silent.
+        self.assertEqual(got[2], {"kind": "node", "node": "next_wave", "wave": 1,
+                                  "label": "converting 1 page object to Playwright"})
+        self.assertEqual(got[3]["row"]["path"], "pages/P.ts")
+        self.assertEqual(got[3]["row"]["gates_line"], "1/1")
         result = got[-1]["result"]
         self.assertTrue(result["passed"])
         self.assertTrue(result["compiles"])

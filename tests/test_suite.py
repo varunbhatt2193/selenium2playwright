@@ -248,6 +248,59 @@ class Cycles(unittest.TestCase):
         self.assertIn("import cycle between pages/A.ts, pages/B.ts", manifest.notes[0])
 
 
+class CountingTests(unittest.TestCase):
+    """`count_cases` and `census` — the vocabulary the progress line is written in.
+
+    A suite run is minutes long and the page used to describe it as "starting
+    the next wave", three times, which is the graph's word for a loop counter
+    and nobody else's word for anything. These two functions are what let it say
+    "converting 6 page objects" and then "converting 6 test files (8 tests)"
+    instead.
+    """
+
+    def test_counts_it_and_test_including_modifiers(self):
+        source = (
+            'describe("Login", () => {\n'
+            '  it("logs in", async () => {});\n'
+            '  it.only("focuses", async () => {});\n'
+            '  it.skip("is pending", async () => {});\n'
+            '  test("also a case", async () => {});\n'
+            "});\n")
+        # Three `it`s (plain, .only, .skip) and one `test`. The `describe` around
+        # them is a grouping, not a case, so it is not one of them.
+        self.assertEqual(suite.count_cases(source), 4)
+
+    def test_a_method_call_ending_in_it_is_not_a_test(self):
+        # `driver.quit()` and `awaitIt(` both contain the letters, and neither is
+        # a case. This is the whole job of the lookbehind.
+        self.assertEqual(suite.count_cases("await driver.quit();\nawaitIt(x);\n"), 0)
+        self.assertEqual(suite.count_cases("suite.it('nope', () => {});\n"), 0)
+
+    def test_a_tagged_template_case_counts(self):
+        self.assertEqual(suite.count_cases("test.each`a\\n${1}`('x', () => {});\n"), 1)
+
+    def test_the_sample_suite_is_six_page_objects_and_six_specs(self):
+        if not SAMPLE.is_dir():
+            self.skipTest("samples are not on this machine")
+        manifest = suite.scan(SAMPLE)
+        counted = suite.census(manifest.files)
+        self.assertEqual(counted["page_objects"], 6)
+        self.assertEqual(counted["tests"], 6)
+        self.assertEqual(counted["cases"], 8)
+        # A page object holds no cases, and is not charged for any.
+        self.assertTrue(all(f.cases == 0 for f in manifest.files if f.kind == "page-object"))
+
+    def test_a_census_of_one_wave_is_a_census_of_those_files_only(self):
+        with TemporaryDirectory() as folder:
+            root = suite.materialize(TOY, Path(folder) / "toy")
+            manifest = suite.scan(root)
+        by_path = {f.path: f for f in manifest.files}
+        first, last = manifest.waves[0], manifest.waves[-1]
+        self.assertEqual(suite.census(by_path[p] for p in first)["tests"], 0)
+        self.assertEqual(suite.census(by_path[p] for p in last)["tests"], 1)
+        self.assertEqual(suite.census(by_path[p] for p in last)["cases"], 1)
+
+
 class ManifestJson(unittest.TestCase):
     def test_the_payload_is_named_versioned_and_serialisable(self):
         payload = suite.manifest_json(suite.scan(SAMPLE))

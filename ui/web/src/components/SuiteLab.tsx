@@ -19,6 +19,11 @@ export default function SuiteLab({ limits, onSpent }: Props) {
   const [dragging, setDragging] = useState(false)
   const [error, setError] = useState('')
   const [rows, setRows] = useState<FileRow[]>([])
+  // Two different things, shown in two different places. `stages` is the story
+  // — what was found, which wave is converting what — and it only grows.
+  // `progress` is the last file to land, which changes twelve times and used
+  // to overwrite the stage line the moment it appeared.
+  const [stages, setStages] = useState<string[]>([])
   const [progress, setProgress] = useState('')
   const [expected, setExpected] = useState(0)
   const [result, setResult] = useState<SuiteResult | null>(null)
@@ -67,6 +72,7 @@ export default function SuiteLab({ limits, onSpent }: Props) {
     setError('')
     setRows([])
     setResult(null)
+    setStages([planned.plan.found])
     setProgress('Sending the suite to the agent…')
     setExpected(planned.plan.files)
     try {
@@ -77,11 +83,15 @@ export default function SuiteLab({ limits, onSpent }: Props) {
         attempts: ATTEMPTS,
         model: '',
       })) {
-        if (event.kind === 'start') setExpected(event.files)
-        else if (event.kind === 'node') setProgress(event.label)
+        if (event.kind === 'start') {
+          setExpected(event.files)
+          setStages([event.found])
+        } else if (event.kind === 'node') setStages((s) => [...s, event.label])
         else if (event.kind === 'file') {
           setRows((r) => [...r, event.row])
-          setProgress(`${event.landed}/${event.of} · ${event.row.path} — ${event.row.status}`)
+          // No `landed/of` prefix: `.progress-count` at the end of the same line
+          // already carries it, and the line read "2/12 · … 2/12".
+          setProgress(`${event.row.path} — ${event.row.status}`)
         } else if (event.kind === 'done') {
           setResult(event.result)
           setTab('files')
@@ -190,11 +200,13 @@ export default function SuiteLab({ limits, onSpent }: Props) {
             )}
             {p && (
               <>
+                <p className="plan-found">{p.found}</p>
                 <p className="plan-line">{p.line}</p>
                 <ol className="waves">
                   {p.waves.map((wave, i) => (
                     <li key={i}>
                       <strong>Wave {i + 1}</strong>
+                      {p.wave_lines[i] && <span className="wave-what">{p.wave_lines[i]}</span>}
                       <ul>
                         {wave.map((path) => (
                           <li key={path}>
@@ -241,6 +253,7 @@ export default function SuiteLab({ limits, onSpent }: Props) {
 
         {(running || rows.length > 0 || error || result) && (
           <div className="suite-progress">
+            {running && stages.length > 0 && <Stages stages={stages} />}
             {running && (
               <div className="progress-line">
                 <Loader2 size={14} className="spin" /> {progress}
@@ -414,6 +427,28 @@ export default function SuiteLab({ limits, onSpent }: Props) {
         )}
       </div>
     </section>
+  )
+}
+
+// What the run has done so far, one line per stage, oldest first. The same
+// shape as the single-file lab's trail and the same CSS, because it is the
+// same idea: a minutes-long run should read as a sequence somebody can follow,
+// not as one line of text that keeps being replaced by a different one.
+function Stages({ stages }: { stages: string[] }) {
+  return (
+    <ol className="trail live" aria-live="polite">
+      {stages.map((label, index) => {
+        const last = index === stages.length - 1
+        return (
+          <li key={index} className={last ? 'current' : 'past'}>
+            <span className="trail-dot">
+              {last ? <Loader2 size={11} className="spin" /> : <Check size={11} />}
+            </span>
+            <span>{label}</span>
+          </li>
+        )
+      })}
+    </ol>
   )
 }
 

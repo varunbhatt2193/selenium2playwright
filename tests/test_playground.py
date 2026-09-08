@@ -567,6 +567,50 @@ class SuitePlanTests(unittest.TestCase):
         self.assertEqual(pg.plan_suite(self.SAMPLE, ["LoginPage.ts"]).convert,
                          ["pages/LoginPage.ts"])
 
+    def test_the_plan_says_what_it_found_not_just_how_many(self):
+        plan = pg.plan_suite(self.SAMPLE)
+        self.assertEqual(plan.found,
+                         "Found 6 page objects and 6 Selenium test files (8 tests)")
+        self.assertEqual(plan.counts["page_objects"], 6)
+        self.assertEqual(plan.counts["tests"], 6)
+        self.assertEqual(plan.counts["cases"], 8)
+
+    def test_one_of_each_is_said_in_the_singular(self):
+        plan = pg.plan_suite(self.SAMPLE, ["LoginPage.ts", "login.spec.ts"])
+        self.assertEqual(plan.found,
+                         "Found 1 page object and 1 Selenium test file (2 tests)")
+
+    def test_a_filter_that_leaves_only_page_objects_says_only_that(self):
+        # The counts are of what will be converted, not of what was scanned:
+        # a plan that charges for six files must not claim to have found twelve.
+        plan = pg.plan_suite(self.SAMPLE, ["pages/*.ts"])
+        self.assertEqual(plan.found, "Found 6 page objects")
+        self.assertEqual(plan.counts["tests"], 0)
+
+    def test_each_wave_is_named_by_what_is_in_it(self):
+        plan = pg.plan_suite(self.SAMPLE)
+        self.assertEqual(plan.wave_lines, ["6 page objects", "6 test files (8 tests)"])
+        self.assertEqual(pg.wave_label(plan, 1),
+                         "Wave 1 of 2 · converting 6 page objects to Playwright")
+        self.assertEqual(pg.wave_label(plan, 2),
+                         "Wave 2 of 2 · converting 6 test files (8 tests) to Playwright")
+
+    def test_the_lap_past_the_last_wave_says_nothing(self):
+        # `next_wave` is a loop counter: the graph runs it once per wave and once
+        # more, to find there is none left. The old fixed label announced that
+        # non-existent wave right before the report appeared.
+        plan = pg.plan_suite(self.SAMPLE)
+        self.assertEqual(pg.wave_label(plan, 3), "")
+        self.assertEqual(pg.wave_label(plan, 0), "")
+
+    def test_a_single_wave_is_not_numbered(self):
+        plan = pg.plan_suite(self.SAMPLE, ["pages/*.ts"])
+        self.assertEqual(len(plan.waves), 1)
+        self.assertEqual(pg.wave_label(plan, 1), "converting 6 page objects to Playwright")
+
+    def test_the_labels_no_longer_carry_a_fixed_next_wave(self):
+        self.assertNotIn("next_wave", pg.SUITE_NODE_LABELS)
+
     def test_the_output_folder_may_not_be_the_suite_or_inside_it(self):
         self.assertIn("different", pg.check_suite(self.SAMPLE, self.SAMPLE))
         self.assertIn("inside", pg.check_suite(self.SAMPLE, self.SAMPLE + "/out"))

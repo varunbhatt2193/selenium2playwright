@@ -37,10 +37,9 @@ Three things that had to hold, and would be expensive to rediscover:
 - `limits.spend(runs=n)` charges **per conversion** (INCRBY, atomic). The meter
   counted runs, and one twelve-file suite is twelve conversions. Copied helpers
   are free: the guard prices a tree with `suite.conversions`, the same call the
-  page uses for the number on screen. **That is commit `084af3e` (2026-09-08)
-  and it is NOT deployed yet** — until `./deploy/fly/deploy.sh` and
-  `./deploy/fly/deploy-ui.sh` both run, the live demo still charges every file
-  sent and refuses a 16-file repo with 4 Selenium files in it.
+  page uses for the number on screen. Commit `084af3e` (2026-09-08), **deployed
+  to both Fly apps the same day**, so the live demo charges for conversions and
+  a 16-file repo with 4 Selenium files in it goes through.
 
 **Playbook rule 28.** A wait fused to a getter is not behaviour to preserve —
 web-first assertions retry, so `expect(locator).toHaveText(/\S/)` is the wait

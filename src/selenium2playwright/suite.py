@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import os
 import re
+from collections.abc import Iterable
 from fnmatch import fnmatch
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -56,6 +57,26 @@ IMPORT_PATTERN = re.compile(
 # "../pages/LoginPage" on disk is LoginPage.ts; a folder import is its index.
 RESOLUTION_ORDER = (".ts", ".tsx", ".js", ".mjs", ".cjs", "/index.ts", "/index.js")
 
+# One test case, in Mocha and in Jest alike: `it("…")` or `test("…")`, with any
+# modifier chain in between — `it.only`, `it.skip`, `test.each`, which is why
+# the call can open with a backtick as well as a bracket.
+#
+# `describe` is deliberately not counted: it groups cases, it is not one, and a
+# file with three describes and thirty its should say thirty. The lookbehind
+# keeps `suite.it(` and `foo_it(` out — a bare `it` is the only one that is the
+# runner's.
+#
+# This is a count for a progress line, not an assertion: an `it(` inside a
+# comment is counted, and no regex short of parsing the file would know better.
+# The number is honest about scale, which is all it is asked to be.
+CASE_PATTERN = re.compile(r"""(?<![\w$.])(?:it|test)(?:\.\w+)*\s*[(`]""")
+
+
+def count_cases(source: str) -> int:
+    """How many test cases are in this file. Heuristic, like everything here."""
+    return len(CASE_PATTERN.findall(source))
+
+
 # What we do with each kind of file, and why. The reason is written for the
 # person reading the report, not for the code.
 CONVERT, COPY, SKIP = "convert", "copy", "skip"
@@ -79,6 +100,7 @@ class SuiteFile:
     imported_by: tuple[str, ...] = ()  # the reverse edge; who needs this converted first
     external_imports: tuple[str, ...] = ()  # packages: selenium-webdriver, chai, node:os …
     lines: int = 0
+    cases: int = 0  # test cases inside it; 0 for a page object, which has none
     wave: int = 0  # 1-based; 0 means "not converted, so not in any wave"
 
 
@@ -249,6 +271,7 @@ def scan_sources(sources: dict[str, str], root: str = "uploaded files") -> Manif
             imports=tuple(dict.fromkeys(inside)),
             external_imports=tuple(s for s in specifiers if not s.startswith(".")),
             lines=source.count("\n") + (0 if source.endswith("\n") or not source else 1),
+            cases=count_cases(source) if kind == "test" else 0,
         )
 
     # The reverse edge, filled in once every file is known: who is waiting on this one.
@@ -287,6 +310,27 @@ def conversions(tree: dict[str, str], only: list[str] | None = None) -> int:
     patterns = [p for p in (only or []) if isinstance(p, str) and p.strip()]
     manifest = scan_sources(tree)
     return sum(1 for f in manifest.convertible if selected(f.path, patterns))
+
+
+def census(files: Iterable[SuiteFile]) -> dict[str, int]:
+    """How many page objects, test files and test cases are in this group.
+
+    The vocabulary a progress line needs. "6 files in 2 waves" says nothing a
+    person watching can picture; "6 page objects, then 6 Mocha test files with
+    41 tests between them" is the same run described in the words they used
+    when they wrote it.
+
+    Takes any iterable of files, not a manifest, because the two callers want
+    different groups out of the same scan: the whole suite for the "found"
+    line, and one wave's worth for the line that names what is converting now.
+    """
+    files = list(files)
+    return {
+        "page_objects": sum(1 for f in files if f.kind == "page-object"),
+        "tests": sum(1 for f in files if f.kind == "test"),
+        "cases": sum(f.cases for f in files),
+        "support": sum(1 for f in files if f.kind == "support"),
+    }
 
 
 def _with_dependent(item: SuiteFile, dependent: str) -> SuiteFile:

@@ -1193,9 +1193,20 @@ pre.code:not(.numbered) .line {
   align-items: flex-start;
 }
 
-.plan-line {
+/* What the scan found, in the suite's own vocabulary. Above `.plan-line`,
+   which is the arithmetic — files, waves, what today's budget pays for. */
+.plan-found {
   font-size: 14px;
   font-weight: 600;
+  color: var(--text);
+  margin: 0;
+}
+
+.plan-line {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-3);
+  margin: 2px 0 0;
 }
 
 .waves {
@@ -1220,6 +1231,13 @@ pre.code:not(.numbered) .line {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--accent);
+}
+
+/* "6 page objects" beside "WAVE 1": what the wave is, not just its number. */
+.wave-what {
+  font-size: 12px;
+  color: var(--text-3);
+  margin-left: 8px;
 }
 
 .waves ul {

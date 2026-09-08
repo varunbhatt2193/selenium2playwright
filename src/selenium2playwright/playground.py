@@ -641,11 +641,76 @@ def suite_client(url: str = "", key: str = "", visitor: str = ""):
                            timeout=TIMEOUT)
 
 
+# --- saying what a suite run is doing ----------------------------------------
+#
+# A suite run is minutes long and mostly silent, and the four node names it goes
+# through are the graph's vocabulary, not a person's. These four helpers turn a
+# `suite.census` into the sentence somebody watching would have written: what
+# was found, and what is being converted right now.
+
+
+def _plural(count: int, noun: str, many: str = "") -> str:
+    """`1 page object`, `6 page objects`. The `many` form is for irregulars."""
+    return f"{count} {noun if count == 1 else (many or noun + 's')}"
+
+
+def _join(parts: list[str]) -> str:
+    """`a`, `a and b`, `a, b and c` — the way a person lists things."""
+    if len(parts) < 2:
+        return parts[0] if parts else ""
+    return ", ".join(parts[:-1]) + " and " + parts[-1]
+
+
+def _found_parts(counts: dict[str, int], test_noun: str = "Selenium test file") -> list[str]:
+    """The two things worth naming in a census, in the order they convert.
+
+    Page objects first because that is wave 1, and the test count in brackets
+    because it is the number that says how big this suite really is — six test
+    files is a shrug, six test files holding forty tests is an afternoon of work
+    somebody is about to not do by hand.
+
+    A count of zero is left out rather than printed as "0 page objects": the
+    sentence is about what is there.
+    """
+    parts = []
+    if counts.get("page_objects"):
+        parts.append(_plural(counts["page_objects"], "page object"))
+    if counts.get("tests"):
+        part = _plural(counts["tests"], test_noun)
+        if counts.get("cases"):
+            part += f" ({_plural(counts['cases'], 'test')})"
+        parts.append(part)
+    return parts
+
+
+def wave_label(plan: "SuitePlan", number: int) -> str:
+    """What wave `number` is converting, or "" when there is no such wave.
+
+    The empty string is the important half. `next_wave` is a loop counter, so
+    the graph runs it once per wave *and once more* — the run that finds nothing
+    left and routes to `finish`. The old fixed label announced a wave that was
+    never going to start, right before the report appeared. Returning "" here
+    means the page simply does not show a line for it.
+    """
+    total = len(plan.waves)
+    if not 1 <= number <= total:
+        return ""
+    counts = plan.wave_counts[number - 1] if number <= len(plan.wave_counts) else {}
+    what = _join(_found_parts(counts, "test file")) or _plural(len(plan.waves[number - 1]), "file")
+    where = f"Wave {number} of {total} · " if total > 1 else ""
+    return f"{where}converting {what} to Playwright"
+
+
+# The suite graph's nodes, in the same voice. `next_wave` is missing on purpose:
+# it is the only node whose honest label depends on what is in the wave, so it
+# is built by `wave_label` from the plan rather than looked up here. A fixed
+# "Starting the next wave" said nothing — it fired between every wave and again
+# after the last one, so a person watching saw the same six words three times
+# and learned nothing about what the agent was doing.
 SUITE_NODE_LABELS = {
-    "plan": "Scanning the folder and settling the wave order",
-    "next_wave": "Starting the next wave",
+    "plan": "Reading the folder and working out what converts before what",
     "convert_file": "Converting",
-    "finish": "Compiling the whole tree and writing the report",
+    "finish": "Compiling the converted tree as one project and writing the report",
 }
 
 
@@ -670,6 +735,13 @@ class SuitePlan:
     # nothing. The guard counts with `suite.conversions`, and so does this, so
     # the number on screen is the number the meter takes.
     billable: int = 0
+    # What the files ARE, not just how many. `census` for the whole selection,
+    # and one `census` per wave in the same order as `waves` — which is what
+    # lets the progress line say "converting 6 page objects" instead of
+    # "starting the next wave". Both are counted from the same manifest the
+    # waves come from, so they cannot disagree with each other.
+    counts: dict[str, int] = field(default_factory=dict)
+    wave_counts: list[dict[str, int]] = field(default_factory=list)
 
     @property
     def files(self) -> int:
@@ -679,6 +751,29 @@ class SuitePlan:
     def line(self) -> str:
         return (f"{self.files} file(s) to convert in {len(self.waves)} wave(s) · "
                 f"{len(self.copied)} copied across · {len(self.skipped)} skipped")
+
+    @property
+    def found(self) -> str:
+        """What the scan found, in the words the suite was written in.
+
+        The sentence a person reads before they press the button, and the first
+        thing the run says when they do. `line` is the arithmetic — files,
+        waves, cost — and it stays, because that is what the budget is about.
+        This is the shape: page objects, test files, and how many tests are
+        actually inside them.
+        """
+        return "Found " + _join(_found_parts(self.counts) or ["nothing to convert"])
+
+    @property
+    def wave_lines(self) -> list[str]:
+        """One short description per wave, for the list beside the button.
+
+        The same words `wave_label` uses while the run is going, so the plan a
+        person read before pressing and the line they watch afterwards are
+        recognisably about the same wave.
+        """
+        return [_join(_found_parts(counts, "test file")) or _plural(len(wave), "file")
+                for counts, wave in zip(self.wave_counts, self.waves)]
 
 
 def plan_suite(root: str, only: list[str] | None = None) -> SuitePlan:
@@ -710,15 +805,22 @@ def _plan_from(manifest, root: str, only: list[str] | None) -> SuitePlan:
     patterns = list(only or [])
     chosen = [f.path for f in manifest.convertible if suite.selected(f.path, patterns)]
     keep = set(chosen)
+    by_path = {f.path: f for f in manifest.files}
+    waves = [[p for p in wave if p in keep] for wave in manifest.waves
+             if any(p in keep for p in wave)]
     return SuitePlan(
         root=str(root),
         billable=len(chosen),
-        waves=[[p for p in wave if p in keep] for wave in manifest.waves
-               if any(p in keep for p in wave)],
+        waves=waves,
         convert=chosen,
         copied=[f.path for f in manifest.files if f.action == suite.COPY],
         skipped=[(f.path, f.reason) for f in manifest.files if f.action == suite.SKIP],
         notes=list(manifest.notes),
+        # Counted over `chosen`, not over the manifest: `--only` is a filter on
+        # what will be converted, so a plan that charges for four files must not
+        # claim to have found twelve.
+        counts=suite.census(by_path[p] for p in chosen),
+        wave_counts=[suite.census(by_path[p] for p in wave) for wave in waves],
     )
 
 

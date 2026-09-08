@@ -107,7 +107,8 @@ def card_view(card: pg.Scorecard) -> dict[str, Any]:
 
 
 def plan_view(plan: pg.SuitePlan) -> dict[str, Any]:
-    return {**asdict(plan), "files": plan.files, "line": plan.line}
+    return {**asdict(plan), "files": plan.files, "line": plan.line,
+            "found": plan.found, "wave_lines": plan.wave_lines}
 
 
 def result_view(result: pg.SuiteResult) -> dict[str, Any]:
@@ -360,7 +361,8 @@ def suite_events(body: SuiteRequest, visitor: str) -> Iterator[dict[str, Any]]:
         request = pg.suite_payload(only=only, tree=body.tree)
         context = pg.suite_context(model=body.model, max_attempts=body.attempts, user_id="")
         config = pg.suite_config(waves=len(plan.waves), parallel=body.parallel)
-        yield {"kind": "start", "files": plan.files, "waves": len(plan.waves)}
+        yield {"kind": "start", "files": plan.files, "waves": len(plan.waves),
+               "found": plan.found}
         for update in pg.stream(client, thread_id, request, assistant="suite",
                                 config=config, context=context):
             if update.kind == "node":
@@ -368,7 +370,19 @@ def suite_events(body: SuiteRequest, visitor: str) -> Iterator[dict[str, Any]]:
                     landed += 1
                     yield {"kind": "file", "landed": landed, "of": plan.files,
                            "row": {**asdict(row), "gates_line": row.gates_line}}
-                if update.node in pg.SUITE_NODE_LABELS and update.node != "convert_file":
+                # `next_wave` is the one node whose label is not a constant: it
+                # says which wave, and what is in it. The number comes from the
+                # node's own update — it returns `{"wave": n}` and nothing else
+                # — so the line the page shows and the wave the graph is about
+                # to dispatch are the same n. `wave_label` returns "" for the
+                # extra run at the end, and an empty label is not sent.
+                if update.node == "next_wave":
+                    number = (update.update or {}).get("wave", 0)
+                    label = pg.wave_label(plan, number)
+                    if label:
+                        yield {"kind": "node", "node": "next_wave",
+                               "label": label, "wave": number}
+                elif update.node in pg.SUITE_NODE_LABELS and update.node != "convert_file":
                     yield {"kind": "node", "node": update.node,
                            "label": pg.SUITE_NODE_LABELS[update.node]}
             elif update.kind == "state":

@@ -221,6 +221,7 @@ def convert_suite(plan: pg.SuitePlan, only: list[str], *,
                                  parallel=st.session_state.suite_parallel)
         final: dict = {}
         with area, st.status(f"Converting {plan.files} file(s)…", expanded=True) as status:
+            st.write(plan.found)
             for update in pg.stream(client, thread_id, request, assistant="suite",
                                     config=config, context=context):
                 if update.kind == "node":
@@ -228,7 +229,11 @@ def convert_suite(plan: pg.SuitePlan, only: list[str], *,
                         landed.append(row)
                         st.write(f"{len(landed)}/{plan.files} · `{row.path}` — "
                                  f"{row.status} ({row.gates_line} gates, {row.seconds:.0f}s)")
-                    if update.node in {"plan", "finish"}:
+                    if update.node == "next_wave":
+                        wave = pg.wave_label(plan, (update.update or {}).get("wave", 0))
+                        if wave:
+                            st.write(wave)
+                    elif update.node in {"plan", "finish"}:
                         st.write(pg.SUITE_NODE_LABELS.get(update.node, update.node))
                 elif update.kind == "state":
                     final = update.state
