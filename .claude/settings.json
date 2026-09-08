@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv run python -m unittest discover -s tests)",
+      "mcp__claude-in-chrome__get_page_text",
+      "mcp__claude-in-chrome__find",
+      "mcp__claude-in-chrome__tabs_context_mcp",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_find",
+      "mcp__playwright-test__test_list"
+    ]
+  }
+}

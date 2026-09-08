@@ -7,6 +7,10 @@
 #                    ESLint, the AST scripts) against scripted model replies
 #   execution-gate   the golden fixtures, run in a real browser against a pinned
 #                    local copy of the demo app
+#   playground-build the React page compiles and bundles, which nothing else
+#                    here checks — `ui/web` is built by the Dockerfile at
+#                    deploy time, so without this job a bad dependency bump is
+#                    found by `fly deploy`, in front of whoever is watching
 #
 # The second job is the one this step exists for. Every converter score in this
 # repository is measured against those fixtures; if a fixture, the sandbox or a
@@ -31,7 +35,10 @@ concurrency:
 
 jobs:
   offline-checks:
-    name: Offline checks (590 tests)
+    # No count in the name on purpose: it is a required status check now,
+    # and a rule that names "(590 tests)" stops matching the day the 591st
+    # is written — which blocks every pull request until someone notices.
+    name: Offline checks
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -125,3 +132,25 @@ jobs:
           path: out/11.2/
           if-no-files-found: warn
           retention-days: 14
+
+  playground-build:
+    name: Playground page builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/web/package-lock.json
+
+      # `npm run build` is `tsc --noEmit && vite build`: the types have to hold
+      # and the bundle has to come out. Same command the Dockerfile runs, just
+      # early enough to be a red check instead of a failed deploy.
+      - name: Build the page
+        run: npm ci && npm run build
+        working-directory: ui/web

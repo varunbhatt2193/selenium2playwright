@@ -1242,6 +1242,24 @@ def explain(exc: Exception) -> str:
     return f"{type(exc).__name__}: {exc}"
 
 
+def recognized(exc: Exception) -> bool:
+    """Whether `explain` has a sentence of its own for this, or falls back.
+
+    Its last line is the exception's own text, which is written for whoever
+    raised it and is free to carry a URL, a path, or a header. On this machine
+    that is the most useful thing on the screen. On the public page it is a
+    stranger's browser, so `ui/server.py` asks this first and logs the rest.
+
+    Lives next to `explain` because it mirrors its branches — move one and the
+    other has to move.
+    """
+    response = getattr(exc, "response", None)
+    if response is not None and getattr(response, "status_code", None):
+        return True
+    # TimeoutException is an HTTPError, so this covers both of explain's cases.
+    return isinstance(exc, httpx.HTTPError)
+
+
 def retry_after(exc: Exception) -> int:
     """Seconds to wait, when the refusal was a rate limit that said so."""
     response = getattr(exc, "response", None)

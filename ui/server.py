@@ -43,6 +43,8 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
+import traceback
 from collections.abc import Iterator
 from dataclasses import asdict
 from pathlib import Path
@@ -132,7 +134,20 @@ def sse(events: Iterator[dict[str, Any]]) -> StreamingResponse:
 
 
 def failure(exc: Exception) -> dict[str, Any]:
-    """Every failure here is somebody else's server, said in a sentence."""
+    """Every failure here is somebody else's server, said in a sentence.
+
+    When `playground.explain` recognizes the failure, the sentence was written
+    for the person watching and says what they can do about it. When it does
+    not, its fallback is the exception's own text — a URL, a path, a header,
+    whatever the SDK put there. That is worth having, and worth having *here*:
+    it goes to this server's log, which `fly logs` reads, and the page is told
+    that something broke rather than being handed the details.
+    """
+    if not pg.recognized(exc):
+        traceback.print_exception(exc, file=sys.stderr)
+        return {"kind": "error", "message": (
+            "Something went wrong on this server, and it has been logged. Try "
+            "again — if it keeps happening, the deployment needs a look.")}
     wait = pg.retry_after(exc)
     message = pg.explain(exc) + (f" You can try again in about {wait}s." if wait else "")
     return {"kind": "error", "message": message}

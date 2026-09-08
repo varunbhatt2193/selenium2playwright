@@ -260,6 +260,27 @@ class WebTests(unittest.TestCase):
         self.assertIn("Slow down.", got[-1]["message"])
         self.assertIn("17s", got[-1]["message"])
 
+    def test_an_unrecognized_failure_is_logged_here_and_not_streamed_there(self):
+        """The visitor gets a sentence; the exception's own words go to the log.
+
+        `explain`'s fallback is `f"{type(exc).__name__}: {exc}"`, and what an
+        SDK puts in an exception is written for whoever raised it — a URL, a
+        path, a header. Useful, and useful *here*: `fly logs` reads stderr.
+        """
+        secret = "/app/.env line 3: S2P_DEMO_KEY=sk-not-real"
+        self.fake.runs.raise_with = RuntimeError(secret)
+
+        stderr = io.StringIO()
+        with patch("sys.stderr", stderr):
+            got = events(self.client.post("/api/convert",
+                                          json={"source": SELENIUM, "filename": "P.ts"}))
+
+        self.assertEqual(got[-1]["kind"], "error")
+        self.assertNotIn(secret, got[-1]["message"])
+        self.assertNotIn("RuntimeError", got[-1]["message"])
+        self.assertIn("has been logged", got[-1]["message"])
+        self.assertIn(secret, stderr.getvalue())      # kept, where the owner can read it
+
     def test_feedback_passes_through_with_a_sentence(self):
         seen = {}
 

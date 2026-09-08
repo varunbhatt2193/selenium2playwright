@@ -47,3 +47,6 @@ out/
 # is the local copy needed to reassemble the URI, and is a secret like any other.
 deploy/fly/Dockerfile.generated
 deploy/fly/.pgpassword
+
+# Machine-specific Claude Code settings. The shared allowlist is settings.json.
+.claude/settings.local.json
