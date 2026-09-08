@@ -294,3 +294,68 @@ class BudgetTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SuiteUploadTests(unittest.TestCase):
+    """A folder sent as text: allowed, validated, and charged by the file.
+
+    This is the step that made whole-suite conversion possible on a public host.
+    The three things it had to get right are one test each: the request names no
+    server path, a path that escapes is refused at the door, and twelve files
+    cost twelve — not one.
+    """
+
+    def setUp(self):
+        limits._counter.reset()
+
+    def test_a_tree_is_allowed_where_a_root_is_not(self):
+        tree = {"pages/LoginPage.ts": "export class LoginPage {}"}
+        with patch.dict(os.environ, {"S2P_DAILY_LIMIT": "50"}, clear=False):
+            self.assertTrue(run(guard.guard_run(
+                VISITOR, {"kwargs": {"input": {"source_tree": tree}}})))
+        with self.assertRaises(Exception) as caught:
+            run(guard.guard_run(VISITOR, {"kwargs": {"input": {"root": "/etc"}}}))
+        self.assertIn("root", str(caught.exception))
+
+    def test_a_key_that_could_escape_the_workspace_is_refused(self):
+        for bad in ("../../etc/cron.d/x", "/etc/passwd", "a/../../b.ts", "C:/x.ts"):
+            with self.assertRaises(Exception, msg=bad) as caught:
+                run(guard.guard_run(
+                    VISITOR, {"kwargs": {"input": {"source_tree": {bad: "boom"}}}}))
+            self.assertIn("relative path", str(caught.exception), bad)
+
+    def test_a_tree_that_is_not_an_object_is_refused_rather_than_iterated(self):
+        with self.assertRaises(Exception) as caught:
+            run(guard.guard_run(
+                VISITOR, {"kwargs": {"input": {"source_tree": ["pages/A.ts"]}}}))
+        self.assertIn("object", str(caught.exception))
+
+    def test_twelve_files_cost_twelve_not_one(self):
+        """The reason `limits.spend` grew a `runs` argument.
+
+        The meter counts runs, and a twelve-file suite is one run and twelve
+        conversions. Charging it once would let a single request spend twelve
+        times its share of a budget everybody is sharing.
+        """
+        tree = {f"pages/P{i}.ts": "export class P {}" for i in range(5)}
+        before = run(limits.snapshot())
+        run(guard.guard_run(VISITOR, {"kwargs": {"input": {"source_tree": tree}}}))
+        after = run(limits.snapshot())
+        self.assertEqual(after["budget"]["used"] - before["budget"]["used"], 5)
+
+    def test_a_suite_too_big_for_what_is_left_is_refused_whole(self):
+        # Half a suite converted and half refused is a worse answer than
+        # "this needs 12 and 5 are left".
+        with patch.object(limits, "BUDGET_RUNS", 4), patch.object(limits, "DAILY_LIMIT", 99):
+            tree = {f"p{i}.ts": "x" for i in range(6)}
+            with self.assertRaises(Exception) as caught:
+                run(guard.guard_run(VISITOR, {"kwargs": {"input": {"source_tree": tree}}}))
+            self.assertIn("6 conversions", str(caught.exception))
+            # And the refusal gave the counts back, so the next caller is not
+            # paying for a run that never started.
+            self.assertEqual(run(limits.snapshot())["budget"]["used"], 0)
+
+    def test_the_owner_still_skips_all_of_it(self):
+        owner = FakeCtx("owner", ["owner"])
+        self.assertTrue(run(guard.guard_run(
+            owner, {"kwargs": {"input": {"root": "/anywhere", "out_root": "/tmp/out"}}})))

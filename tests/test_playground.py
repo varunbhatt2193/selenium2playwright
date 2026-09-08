@@ -22,15 +22,19 @@ Three of them are worth more than the rest:
 from __future__ import annotations
 
 import asyncio
+import io
 import os
 import unittest
+import zipfile
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 import httpx
 
-from selenium2playwright import guard, limits
+from types import SimpleNamespace
+
+from selenium2playwright import env, guard, limits, suite, suite_graph
 from selenium2playwright import playground as pg
 
 
@@ -106,9 +110,9 @@ class FakeRuns:
     def __init__(self, chunks, calls):
         self.chunks, self.calls = chunks, calls
 
-    def stream(self, thread_id, assistant, input=None, stream_mode=None):  # noqa: A002
+    def stream(self, thread_id, assistant, input=None, stream_mode=None, **extra):  # noqa: A002
         self.calls.append({"thread_id": thread_id, "assistant": assistant,
-                           "input": input, "stream_mode": stream_mode})
+                           "input": input, "stream_mode": stream_mode, **extra})
         yield from self.chunks
 
 
@@ -485,6 +489,312 @@ class ExplanationTests(unittest.TestCase):
         self.assertEqual(pg.retry_after(ValueError("plain")), 0)
 
 
+class SuiteAvailabilityTests(unittest.TestCase):
+    """Whose filesystem is this? The one question suite mode turns on."""
+
+    def test_a_backend_on_this_machine_is_the_only_one_that_qualifies(self):
+        for url in ("http://127.0.0.1:2024", "http://localhost:8123",
+                    "http://[::1]:2024", "http://0.0.0.0:2024/"):
+            self.assertTrue(pg.is_local(url), url)
+        for url in ("https://s2p.fly.dev", "http://10.0.0.69:8501",
+                    "https://localhost.example.com"):
+            self.assertFalse(pg.is_local(url), url)
+
+    def test_a_remote_backend_can_still_run_suites_just_not_by_path(self):
+        # The distinction the whole design turns on: what is local-only is
+        # naming a folder, not converting one.
+        blocked = pg.folder_blocker("https://s2p.fly.dev")
+        self.assertIn("s2p.fly.dev", blocked)
+        self.assertIn("Upload", blocked)
+        self.assertEqual(pg.folder_blocker("http://127.0.0.1:2024"), "")
+
+    def test_the_guard_really_would_refuse_a_folder_by_path(self):
+        """The reason the folder input is local-only, asserted rather than described.
+
+        `folder_blocker` says the deployment refuses `root` and `out_root`. This
+        runs step 10.4's actual authorization handler over the actual payload
+        this module builds and shows the refusal, so the sentence on screen
+        cannot quietly become false while the guard changes underneath it.
+        """
+        body = {"assistant_id": "suite",
+                "kwargs": {"input": pg.suite_payload("samples/selenium-suite", "out/demo")}}
+        with self.assertRaises(Exception) as caught:
+            run(guard.guard_run(VISITOR, body))
+        self.assertIn("root", str(caught.exception))
+
+    def test_an_uploaded_suite_is_something_the_guard_accepts(self):
+        """The other half of the same contract, and the one that makes uploads work.
+
+        `source_tree` carries the folder as text, so nothing in the request
+        names a path on the server — which is the only property the guard was
+        ever protecting.
+        """
+        body = {"assistant_id": "suite", "kwargs": {"input": pg.suite_payload(
+            tree={"pages/LoginPage.ts": SELENIUM, "tests/login.spec.ts": SELENIUM})}}
+        self.assertTrue(run(guard.guard_run(VISITOR, body)))
+
+    def test_a_tree_with_a_path_that_escapes_is_refused_at_the_door(self):
+        body = {"assistant_id": "suite",
+                "kwargs": {"input": {"source_tree": {"../../etc/cron.d/x": "boom"}}}}
+        with self.assertRaises(Exception) as caught:
+            run(guard.guard_run(VISITOR, body))
+        self.assertIn("relative path", str(caught.exception))
+
+
+class SuitePlanTests(unittest.TestCase):
+    """The wave plan on screen, and the four refusals that come before a model."""
+
+    SAMPLE = str(env.REPO_ROOT / "samples" / "selenium-suite")
+
+    def test_the_plan_is_the_scan_it_claims_to_be(self):
+        # The page draws this before spending anything, so it has to be the
+        # same plan the graph will follow, not an approximation of it.
+        manifest = suite.scan(Path(self.SAMPLE))
+        plan = pg.plan_suite(self.SAMPLE)
+        self.assertEqual(plan.convert, [f.path for f in manifest.convertible])
+        self.assertEqual(len(plan.waves), len(manifest.waves))
+        self.assertEqual(plan.waves[0], list(manifest.waves[0]))
+        self.assertIn(f"{len(manifest.convertible)} file(s)", plan.line)
+
+    def test_only_narrows_the_plan_and_empties_the_waves_it_empties(self):
+        plan = pg.plan_suite(self.SAMPLE, ["pages/*.ts"])
+        self.assertTrue(plan.convert)
+        self.assertTrue(all(p.startswith("pages/") for p in plan.convert))
+        # A wave with nothing left in it is not shown as an empty wave.
+        self.assertTrue(all(wave for wave in plan.waves))
+
+    def test_a_bare_filename_is_a_pattern_too(self):
+        self.assertEqual(pg.plan_suite(self.SAMPLE, ["LoginPage.ts"]).convert,
+                         ["pages/LoginPage.ts"])
+
+    def test_the_output_folder_may_not_be_the_suite_or_inside_it(self):
+        self.assertIn("different", pg.check_suite(self.SAMPLE, self.SAMPLE))
+        self.assertIn("inside", pg.check_suite(self.SAMPLE, self.SAMPLE + "/out"))
+
+    def test_a_folder_that_is_not_there_is_said_so_before_anything_is_sent(self):
+        with TemporaryDirectory() as tmp:
+            missing = str(Path(tmp) / "nope")
+            self.assertIn("not a folder", pg.check_suite(missing, tmp + "/out"))
+
+    def test_an_only_that_matches_nothing_is_a_complaint_not_an_empty_run(self):
+        self.assertIn("Nothing", pg.check_suite(self.SAMPLE, "out/x", ["*.java"]))
+
+    def test_an_empty_folder_says_what_it_found(self):
+        with TemporaryDirectory() as tmp:
+            (Path(tmp) / "suite").mkdir()
+            complaint = pg.check_suite(str(Path(tmp) / "suite"), str(Path(tmp) / "out"))
+            self.assertIn("no TypeScript Selenium files", complaint)
+
+    def test_a_good_run_has_nothing_to_complain_about(self):
+        self.assertEqual(pg.check_suite(self.SAMPLE, "out/playground-suite"), "")
+
+
+class SuiteRequestTests(unittest.TestCase):
+    """What goes on the wire: paths, a context and the two limits."""
+
+    def test_paths_go_as_paths_because_this_backend_is_this_machine(self):
+        request = pg.suite_payload("samples/selenium-suite", "out/demo", ["pages/*.ts"])
+        self.assertTrue(request["root"].endswith("samples/selenium-suite"))
+        self.assertEqual(request["only"], ["pages/*.ts"])
+        self.assertEqual(request["report_path"], "")
+        self.assertNotIn("source_tree", request)
+        # The manifest stays here. Sending it would mean serialising a tree of
+        # frozen dataclasses to save one directory walk.
+        self.assertNotIn("manifest", request)
+
+    def test_an_uploaded_tree_goes_as_text_and_names_no_path_at_all(self):
+        # The property the guard checks: not "the paths are safe" but "there
+        # are no server paths in this request".
+        request = pg.suite_payload(tree={"pages/A.ts": "x"}, only=["*.ts"])
+        self.assertEqual(request["source_tree"], {"pages/A.ts": "x"})
+        self.assertNotIn("root", request)
+        self.assertNotIn("out_root", request)
+        self.assertEqual(set(request) & set(guard.FORBIDDEN_INPUTS), set())
+
+    def test_blank_patterns_are_dropped_rather_than_sent(self):
+        self.assertEqual(pg.suite_payload("a", "b", ["", "   ", "x.ts"])["only"], ["x.ts"])
+
+    def test_an_unset_model_is_left_to_the_server(self):
+        # "leave it alone" has to be expressible, or the form's defaults quietly
+        # overrule .env on every run.
+        self.assertEqual(pg.suite_context(), {"user_id": ""})
+        context = pg.suite_context(model="openai:gpt-5.4", max_attempts=2, user_id="varun")
+        self.assertEqual(context, {"model": "openai:gpt-5.4", "max_attempts": 2,
+                                   "user_id": "varun"})
+
+    def test_the_context_is_something_suite_settings_accepts(self):
+        # It travels as JSON and is rebuilt on the far side; a key the dataclass
+        # does not have is a TypeError in the graph, not here.
+        settings = suite_graph.settings(SimpleNamespace(
+            context=pg.suite_context(model="openai:gpt-5.4", max_attempts=2)))
+        self.assertEqual(settings.model, "openai:gpt-5.4")
+        self.assertEqual(settings.max_attempts, 2)
+
+    def test_the_limits_are_the_same_two_the_cli_sends(self):
+        """Pinned against `cli.suite_run_config`, which is where they were decided.
+
+        Two copies of the recursion arithmetic is exactly the kind of thing that
+        drifts silently and then fails a forty-file suite at wave nine.
+        """
+        from selenium2playwright import cli
+
+        theirs = cli.suite_run_config({"actor": "m", "critic": "m"}, 3, waves=5, parallel=4)
+        ours = pg.suite_config(waves=5, parallel=4)
+        self.assertEqual(ours["max_concurrency"], theirs["max_concurrency"])
+        self.assertEqual(ours["recursion_limit"], theirs["recursion_limit"])
+
+
+def outcome_dict(path: str, wave: int = 1, status: str = "passed", **overrides) -> dict:
+    """A `FileOutcome` as it actually arrives: JSON, with the tuples as lists."""
+    row = {"path": path, "wave": wave, "status": status, "attempts": 1,
+           "reason": "all gates passed", "gates": [["compile", True], ["residue", True]],
+           "critic": "pass", "todos": [], "notes": [], "written": f"out/{path}",
+           "seconds": 12.5, "errors": []}
+    row.update(overrides)
+    return row
+
+
+class SuiteRowTests(unittest.TestCase):
+    """Reading outcomes that are dataclasses locally and dicts over HTTP."""
+
+    def test_a_dict_and_a_dataclass_read_the_same(self):
+        posted = pg.file_row(outcome_dict("pages/LoginPage.ts"))
+        direct = pg.file_row(suite_graph.FileOutcome(
+            path="pages/LoginPage.ts", wave=1, status="passed", attempts=1,
+            reason="all gates passed", gates=(("compile", True), ("residue", True)),
+            critic="pass", written="out/pages/LoginPage.ts", seconds=12.5))
+        self.assertEqual(posted, direct)
+        self.assertTrue(posted.ok)
+        self.assertEqual(posted.gates_line, "2/2")
+
+    def test_files_tick_off_as_the_fan_out_finishes_them(self):
+        """The live half: one `convert_file` update per file, in finish order."""
+        client = FakeClient([
+            Chunk("updates", {"plan": {"waves": [["a.ts"]]}}),
+            Chunk("updates", {"convert_file": {"outcomes": [outcome_dict("pages/B.ts")]}}),
+            Chunk("updates", {"convert_file": {"outcomes": [
+                outcome_dict("pages/A.ts", status="needs-review")]}}),
+        ])
+        landed = [row
+                  for update in pg.stream(client, "t", {}, assistant="suite")
+                  if update.kind == "node"
+                  for row in pg.rows_in(update.update)]
+        self.assertEqual([r.path for r in landed], ["pages/B.ts", "pages/A.ts"])
+        self.assertEqual([r.status for r in landed], ["passed", "needs-review"])
+
+    def test_a_node_that_wrote_no_outcomes_produces_no_rows(self):
+        self.assertEqual(pg.rows_in({"wave": 2}), [])
+
+    def test_the_suite_assistant_is_the_one_asked_for(self):
+        client = FakeClient([])
+        list(pg.stream(client, "t", {}, assistant="suite"))
+        self.assertEqual(client.calls[0]["assistant"], "suite")
+
+
+def assembly_dict(**overrides) -> dict:
+    """An `assemble.Assembly` as JSON, the way `values` streaming delivers it."""
+    built = {
+        "tree": {"gate": "compile", "passed": True, "findings": [], "tool_output": ""},
+        "tree_error": "",
+        "files": 12,
+        "ledgers": [{"path": "pages/LoginPage.ts", "added": [], "note": "", "changes": [
+            {"kind": "member", "name": "LoginPage.login", "verdict": "kept",
+             "counterpart": "", "reason": ""},
+            {"kind": "member", "name": "LoginPage.getFlashText", "verdict": "renamed",
+             "counterpart": "flashMessage", "reason": ""},
+        ]}],
+        "todos": [{"text": "confirm the baseURL", "places": ["pages/LoginPage.ts:14",
+                                                             "tests/login.spec.ts"]}],
+        "scorecard": {}, "notes": [], "markdown": "# Conversion report\n",
+        "report_path": "out/demo/conversion-report.md",
+    }
+    built.update(overrides)
+    return built
+
+
+class SuiteResultTests(unittest.TestCase):
+    """The 9.3 assembly, which is the half the per-file rows cannot report."""
+
+    def test_rows_come_back_in_plan_order_not_finish_order(self):
+        state = {"outcomes": [outcome_dict("tests/z.spec.ts", wave=2),
+                              outcome_dict("pages/B.ts"), outcome_dict("pages/A.ts")]}
+        result = pg.suite_result(state)
+        self.assertEqual([r.path for r in result.rows],
+                         ["pages/A.ts", "pages/B.ts", "tests/z.spec.ts"])
+
+    def test_a_run_that_never_assembled_still_shows_what_it_converted(self):
+        # A suite that fell over in wave 2 has outcomes and no assembly. The
+        # rows it did produce are the most useful thing on the screen.
+        result = pg.suite_result({"outcomes": [outcome_dict("pages/A.ts")], "elapsed": 9.0})
+        self.assertFalse(result.assembled)
+        self.assertFalse(result.compiles)
+        self.assertEqual(len(result.rows), 1)
+        self.assertIn("tree not compiled", result.headline)
+
+    def test_the_assembly_is_read_out_of_the_final_state(self):
+        result = pg.suite_result({"outcomes": [outcome_dict("pages/LoginPage.ts")],
+                                  "elapsed": 83.1, "assembly": assembly_dict()})
+        self.assertTrue(result.assembled)
+        self.assertTrue(result.compiles)
+        self.assertEqual((result.kept, result.renamed, result.removed), (1, 1, 0))
+        self.assertEqual(result.tree_files, 12)
+        self.assertEqual(result.todos[0][0], "confirm the baseURL")
+        self.assertEqual(len(result.todos[0][1]), 2)
+        self.assertTrue(result.report_path.endswith("conversion-report.md"))
+        self.assertIn("83.1s", result.headline)
+
+    def test_twelve_green_rows_are_not_a_pass_if_the_tree_does_not_build(self):
+        """The whole argument for step 9.3, as one assertion.
+
+        Every per-file gate verdict is a local claim: this file compiled against
+        the companions it happened to import. A page object whose method two
+        specs call differently passes every row and still leaves a folder that
+        does not build.
+        """
+        broken = assembly_dict(tree={
+            "gate": "compile", "passed": False, "tool_output": "",
+            "findings": [{"gate": "compile", "file": "tests/login.spec.ts", "line": 8,
+                          "code": "TS2554", "message": "Expected 2 arguments, but got 1."}]})
+        state = {"outcomes": [outcome_dict("pages/LoginPage.ts"),
+                              outcome_dict("tests/login.spec.ts", wave=2)],
+                 "assembly": broken}
+        result = pg.suite_result(state)
+        self.assertEqual(result.totals["passed"], 2)
+        self.assertFalse(result.passed)
+        self.assertIn("tests/login.spec.ts:8 TS2554", result.tree_findings[0])
+        self.assertIn("tree does not compile", result.headline)
+
+    def test_a_compile_that_could_not_run_is_not_green_either(self):
+        # Unknown is never a pass — `assemble.Assembly.compiles` makes the same
+        # call for the same reason.
+        result = pg.suite_result({"outcomes": [outcome_dict("pages/A.ts")],
+                                  "assembly": assembly_dict(tree=None,
+                                                            tree_error="tsc not found")})
+        self.assertFalse(result.passed)
+        self.assertEqual(result.tree_error, "tsc not found")
+
+    def test_a_removal_with_no_reason_is_counted_as_unexplained(self):
+        # The report's loudest line: a public method disappeared and the model
+        # never said why.
+        ledgers = [{"path": "pages/LoginPage.ts", "added": [], "note": "", "changes": [
+            {"kind": "member", "name": "LoginPage.dismiss", "verdict": "removed",
+             "counterpart": "", "reason": ""},
+            {"kind": "member", "name": "LoginPage.waitFor", "verdict": "removed",
+             "counterpart": "", "reason": "Playwright auto-waits."}]}]
+        result = pg.suite_result({"outcomes": [], "assembly": assembly_dict(ledgers=ledgers)})
+        self.assertEqual((result.removed, result.unexplained), (2, 1))
+        self.assertIn("no reason given", [loss[3] for loss in result.losses])
+
+    def test_a_needs_review_file_keeps_the_suite_out_of_green(self):
+        result = pg.suite_result({"outcomes": [
+            outcome_dict("pages/A.ts"),
+            outcome_dict("pages/B.ts", status="needs-review")], "assembly": assembly_dict()})
+        self.assertTrue(result.compiles)
+        self.assertFalse(result.passed)
+        self.assertEqual(result.totals, {"passed": 1, "needs-review": 1,
+                                         "refused": 0, "failed": 0})
+
+
 class SplitTests(unittest.TestCase):
     def test_playground_never_imports_streamlit(self):
         """The reason every test above can exist.
@@ -511,3 +821,216 @@ class SplitTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SuiteKeyTests(unittest.TestCase):
+    """The one place the owner's key is used, and why it has to be."""
+
+    def test_a_local_folder_run_calls_as_the_owner(self):
+        # `guard.guard_run` refuses `root` for anyone without the owner
+        # permission, so a folder run that authenticated as a demo visitor would
+        # be offered on screen and then 403 — the worst of both.
+        with patch.dict(os.environ, {"S2P_API_KEY": "owner-key",
+                                     "S2P_DEMO_KEY": "demo-key"}, clear=False):
+            self.assertEqual(pg.suite_key("http://127.0.0.1:2024"), "owner-key")
+            self.assertEqual(pg.demo_key(), "demo-key")
+
+    def test_a_remote_upload_never_calls_as_the_owner(self):
+        """The one that would quietly cost money if it were wrong.
+
+        An uploaded suite is metered per file, and the meter is only reached on
+        the demo path — `guard_run` returns True immediately for an owner. A
+        page that sent the owner key to a public deployment would spend the
+        whole day's budget past every guardrail step 10.4 built.
+        """
+        with patch.dict(os.environ, {"S2P_API_KEY": "owner-key",
+                                     "S2P_DEMO_KEY": "demo-key"}, clear=False):
+            self.assertEqual(pg.suite_key("https://s2p.fly.dev"), "demo-key")
+
+    def test_the_owner_is_the_one_the_guard_lets_through(self):
+        owner = FakeCtx("owner", ["owner"])
+        body = {"assistant_id": "suite",
+                "kwargs": {"input": pg.suite_payload("samples/selenium-suite", "out/demo")}}
+        self.assertTrue(run(guard.guard_run(owner, body)))
+
+    def test_with_no_owner_key_it_falls_back_rather_than_sending_nothing(self):
+        # A server run with S2P_AUTH=off ignores the token entirely; sending the
+        # demo key there is harmless and means one fewer thing to configure.
+        with patch.dict(os.environ, {"S2P_DEMO_KEY": "demo-key"}, clear=False):
+            os.environ.pop("S2P_API_KEY", None)
+            self.assertEqual(pg.suite_key("http://127.0.0.1:2024"), "demo-key")
+
+
+class SuiteStreamTests(unittest.TestCase):
+    """The two things a fan-out cannot run without, and the default that is left alone."""
+
+    def test_a_single_conversion_still_sends_neither(self):
+        # The server's own defaults are the right answer for one file, and
+        # sending `config=None` is not the same as not sending it.
+        client = FakeClient([])
+        list(pg.stream(client, "t", {}))
+        self.assertNotIn("config", client.calls[0])
+        self.assertNotIn("context", client.calls[0])
+
+    def test_a_suite_run_carries_its_limits_and_its_models(self):
+        client = FakeClient([])
+        list(pg.stream(client, "t", {}, assistant="suite",
+                       config=pg.suite_config(waves=2, parallel=4),
+                       context=pg.suite_context(model="openai:gpt-5.4")))
+        call = client.calls[0]
+        self.assertEqual(call["assistant"], "suite")
+        self.assertEqual(call["config"]["max_concurrency"], 4)
+        self.assertEqual(call["config"]["recursion_limit"], 10)
+        self.assertEqual(call["context"]["model"], "openai:gpt-5.4")
+
+    def test_the_committed_report_is_where_the_tab_looks_for_it(self):
+        # The blocked tab renders this file. A rename would turn the one honest
+        # answer to "does it scale past one file" into a missing expander.
+        self.assertTrue(pg.SUITE_REPORT.exists(), pg.SUITE_REPORT)
+
+
+def zipped(files: dict[str, str]) -> bytes:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        for name, text in files.items():
+            archive.writestr(name, text)
+    return buffer.getvalue()
+
+
+def upload(name: str, data) -> SimpleNamespace:
+    """Anything with .name and .getvalue() — Streamlit's UploadedFile, or this."""
+    raw = data if isinstance(data, bytes) else data.encode("utf-8")
+    return SimpleNamespace(name=name, getvalue=lambda: raw)
+
+
+class UploadTests(unittest.TestCase):
+    """Bytes a browser hands over, turned into the two shapes the graph takes."""
+
+    def test_one_file_comes_in_as_name_and_text(self):
+        name, text = pg.read_upload(upload("LoginPage.ts", SELENIUM))
+        self.assertEqual(name, "LoginPage.ts")
+        self.assertEqual(text, SELENIUM)
+
+    def test_a_byte_order_mark_is_stripped_rather_than_sent(self):
+        # Invisible in an editor and a syntax error to tsc — it would come back
+        # as a compile-gate finding about the visitor's own file.
+        _, text = pg.read_upload(upload("A.ts", "﻿export class A {}"))
+        self.assertEqual(text, "export class A {}")
+
+    def test_something_that_is_not_text_is_refused_with_a_sentence(self):
+        with self.assertRaises(ValueError) as caught:
+            pg.read_upload(upload("logo.png", b"\x89PNG\r\n\x1a\n\xff\xfe"))
+        self.assertIn("not UTF-8", str(caught.exception))
+
+    def test_a_zip_of_a_folder_loses_the_wrapper_directory(self):
+        # Zipping a folder gives you `selenium-suite/pages/LoginPage.ts`, and
+        # that leading directory is not part of anybody's import paths.
+        tree = pg.tree_from_zip(zipped({
+            "selenium-suite/pages/LoginPage.ts": SELENIUM,
+            "selenium-suite/tests/login.spec.ts": SELENIUM,
+        }))
+        self.assertEqual(sorted(tree), ["pages/LoginPage.ts", "tests/login.spec.ts"])
+
+    def test_a_zip_with_no_common_wrapper_is_left_alone(self):
+        tree = pg.tree_from_zip(zipped({"pages/A.ts": "a", "B.ts": "b"}))
+        self.assertEqual(sorted(tree), ["B.ts", "pages/A.ts"])
+
+    def test_a_single_file_zip_keeps_its_folder(self):
+        # With one file there is no evidence of a wrapper, and stripping the
+        # only directory would rewrite a real path.
+        self.assertEqual(list(pg.tree_from_zip(zipped({"pages/A.ts": "a"}))),
+                         ["pages/A.ts"])
+
+    def test_junk_and_dependencies_are_dropped_not_refused(self):
+        # node_modules is the one that matters: a suite zipped with its
+        # dependencies is tens of thousands of files, every one of them charged.
+        tree = pg.tree_from_zip(zipped({
+            "s/pages/A.ts": "a", "s/pages/B.ts": "b",
+            "s/node_modules/x/index.ts": "junk",
+            "s/.git/config": "junk", "__MACOSX/._A.ts": "junk", "s/dist/A.ts": "junk",
+        }))
+        self.assertEqual(sorted(tree), ["pages/A.ts", "pages/B.ts"])
+
+    def test_non_source_files_in_a_zip_are_ignored(self):
+        tree = pg.tree_from_zip(zipped(
+            {"a/A.ts": "a", "a/B.ts": "b", "a/README.md": "#", "a/x.png": "c"}))
+        self.assertEqual(sorted(tree), ["A.ts", "B.ts"])
+
+    def test_loose_files_and_a_zip_are_the_same_gesture(self):
+        loose, complaint = pg.tree_from_uploads(
+            [upload("LoginPage.ts", SELENIUM), upload("login.spec.ts", SELENIUM)])
+        self.assertEqual(complaint, "")
+        self.assertEqual(sorted(loose), ["LoginPage.ts", "login.spec.ts"])
+
+    def test_a_loose_file_keeps_only_its_base_name(self):
+        # A browser does not send the directory a file came from, which is why
+        # the zip route exists and is the one to prefer for folders.
+        tree, _ = pg.tree_from_uploads([upload("/Users/x/pages/A.ts", SELENIUM)])
+        self.assertEqual(list(tree), ["A.ts"])
+
+    def test_an_upload_that_cannot_be_read_answers_with_a_complaint(self):
+        tree, complaint = pg.tree_from_uploads([upload("a.ts", b"\xff\xfe\x00")])
+        self.assertEqual(tree, {})
+        self.assertIn("not UTF-8", complaint)
+
+    def test_nothing_uploaded_is_not_an_error_yet(self):
+        # An empty uploader on first render is not somebody doing it wrong.
+        self.assertEqual(pg.tree_from_uploads([]), ({}, ""))
+
+    def test_a_tree_that_breaks_the_rules_says_which_rule(self):
+        big = {f"f{i}.ts": "x" for i in range(suite.MAX_TREE_FILES + 1)}
+        _, complaint = pg.tree_from_uploads([upload(n, t) for n, t in big.items()])
+        self.assertIn(str(suite.MAX_TREE_FILES), complaint)
+
+    def test_an_uploaded_tree_gets_the_same_plan_preview_as_a_folder(self):
+        tree = {"pages/LoginPage.ts": SELENIUM,
+                "tests/login.spec.ts":
+                    "import { LoginPage } from '../pages/LoginPage';\n" + SELENIUM}
+        plan = pg.plan_tree(tree)
+        self.assertEqual(plan.files, 2)
+        self.assertEqual(plan.billable, 2)
+        self.assertIn("2 file(s)", plan.line)
+
+
+class DownloadTests(unittest.TestCase):
+    """Giving the suite back, which is the half an upload is useless without."""
+
+    def test_the_converted_tree_comes_back_out_of_the_final_state(self):
+        result = pg.suite_result({
+            "outcomes": [outcome_dict("pages/A.ts")],
+            "converted_tree": {"pages/A.ts": "converted"},
+            "assembly": assembly_dict()})
+        self.assertEqual(result.tree, {"pages/A.ts": "converted"})
+
+    def test_a_folder_run_sends_nothing_back_because_it_is_already_there(self):
+        result = pg.suite_result({"outcomes": [outcome_dict("pages/A.ts")],
+                                  "assembly": assembly_dict()})
+        self.assertEqual(result.tree, {})
+
+    def test_the_zip_holds_the_code_and_the_report_together(self):
+        # The report says which of these files still needs eyes. The two parting
+        # company is how it gets ignored.
+        data = pg.converted_zip({"pages/A.ts": "converted"}, "# Conversion report")
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            self.assertEqual(sorted(archive.namelist()),
+                             ["conversion-report.md", "pages/A.ts"])
+            self.assertEqual(archive.read("pages/A.ts").decode(), "converted")
+
+    def test_a_zip_survives_a_round_trip_through_the_uploader(self):
+        original = {"pages/A.ts": SELENIUM, "tests/a.spec.ts": SELENIUM}
+        back = pg.tree_from_zip(pg.converted_zip(original))
+        self.assertEqual(back, original)
+
+
+class OldBackendTests(unittest.TestCase):
+    def test_a_deployment_that_predates_uploads_says_so(self):
+        # The one 403 that is not a rule the visitor broke: an old image has no
+        # idea what source_tree is, falls through to the single-file check, and
+        # asks for source_text.
+        said = pg.explain_status(403, "Send the file as `source_text`. The public demo…")
+        self.assertIn("Redeploy", said)
+
+    def test_a_real_refusal_is_still_passed_through_unchanged(self):
+        said = pg.explain_status(403, "`root` is not available on the public demo.")
+        self.assertNotIn("Redeploy", said)
+        self.assertIn("`root`", said)

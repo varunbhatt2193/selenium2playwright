@@ -143,21 +143,29 @@ class _Counter:
             self._redis = aioredis.from_url(self._uri, decode_responses=True)
         return self._redis
 
-    async def bump(self, key: str, ttl: int) -> int:
-        """Add one to `key`, creating it with a `ttl` if it is new. Returns the total."""
+    async def bump(self, key: str, ttl: int, amount: int = 1) -> int:
+        """Add `amount` to `key`, creating it with a `ttl` if it is new. Returns the total.
+
+        `amount` exists for the suite: twelve files is one request and twelve
+        conversions, and charging it as one would let a single call spend twelve
+        times its share of a budget everybody is sharing. `INCRBY n` is one
+        round trip and one atomic step, which a loop of twelve `INCR`s would
+        not be — two callers interleaving would each read a total that was never
+        true.
+        """
         if not self._uri:
             async with self._lock:
                 now = time.monotonic()
                 count, expires = self._memory.get(key, (0, 0.0))
                 if expires <= now:
                     count, expires = 0, now + ttl
-                count += 1
+                count += amount
                 self._memory[key] = (count, expires)
                 return count
 
         client = await self._client()
         pipe = client.pipeline()
-        pipe.incr(key)
+        pipe.incrby(key, amount)
         pipe.ttl(key)
         count, remaining = await pipe.execute()
         count = int(count)
@@ -172,20 +180,20 @@ class _Counter:
         # Re-arming a key with no TTL (-1) covers the gap where a process died
         # between the INCR and the EXPIRE; without it that key would count
         # forever and the visitor would be locked out until somebody noticed.
-        if count == 1 or int(remaining) < 0:
+        if count == amount or int(remaining) < 0:
             await client.expire(key, ttl)
         return count
 
-    async def undo(self, key: str) -> None:
-        """Give back one count. See `spend()` for when this is and is not right."""
+    async def undo(self, key: str, amount: int = 1) -> None:
+        """Give back `amount` counts. See `spend()` for when this is and is not right."""
         if not self._uri:
             async with self._lock:
                 count, expires = self._memory.get(key, (0, 0.0))
                 if count:
-                    self._memory[key] = (count - 1, expires)
+                    self._memory[key] = (max(0, count - amount), expires)
             return
         client = await self._client()
-        await client.decr(key)
+        await client.decrby(key, amount)
 
     async def read(self, key: str) -> int:
         if not self._uri:
@@ -247,8 +255,13 @@ async def tap(identity: str, *, unlimited: bool = False) -> Decision:
     return Decision(allowed=True, used={"tap": count})
 
 
-async def spend(identity: str, *, unlimited: bool = False) -> Decision:
-    """Charge one run against `identity`, or explain why it cannot be charged.
+async def spend(identity: str, *, runs: int = 1, unlimited: bool = False) -> Decision:
+    """Charge `runs` conversions against `identity`, or explain why it cannot be.
+
+    `runs` is 1 for a single file and the file count for a suite. It is charged
+    as one atomic step rather than a loop, so a suite that does not fit is
+    refused whole: half a suite converted and half refused is a worse answer
+    than "this needs 12 and 5 are left".
 
     The order matters. Burst is checked first because it is the cheapest signal
     and the most likely to be someone hammering; the daily budget is checked
@@ -268,6 +281,7 @@ async def spend(identity: str, *, unlimited: bool = False) -> Decision:
     if unlimited:
         return Decision(allowed=True, reason="owner")
 
+    runs = max(1, int(runs))
     day = _today()
     burst_key = f"{PREFIX}:burst:{identity}"
     daily_key = f"{PREFIX}:day:{identity}:{day}"
@@ -275,6 +289,8 @@ async def spend(identity: str, *, unlimited: bool = False) -> Decision:
     two_days = 60 * 60 * 48
 
     try:
+        # Burst counts requests, not files: it exists to stop somebody holding
+        # the button down, and one suite is one press however wide it is.
         burst = await _counter.bump(burst_key, BURST_WINDOW)
         if burst > BURST_LIMIT:
             return Decision(
@@ -284,25 +300,31 @@ async def spend(identity: str, *, unlimited: bool = False) -> Decision:
                 used={"burst": burst},
             )
 
-        daily = await _counter.bump(daily_key, two_days)
+        daily = await _counter.bump(daily_key, two_days, runs)
         if daily > DAILY_LIMIT:
-            await _counter.undo(daily_key)
+            await _counter.undo(daily_key, runs)
             return Decision(
                 allowed=False,
-                reason=f"Daily limit reached — {DAILY_LIMIT} conversions per visitor per day.",
+                reason=(f"Daily limit reached — {DAILY_LIMIT} conversions per visitor "
+                        f"per day, and this needs {runs}."
+                        if runs > 1 else
+                        f"Daily limit reached — {DAILY_LIMIT} conversions per visitor per day."),
                 retry_after=_seconds_to_midnight(),
-                used={"daily": daily - 1},
+                used={"daily": daily - runs},
             )
 
-        budget = await _counter.bump(budget_key, two_days)
+        budget = await _counter.bump(budget_key, two_days, runs)
         if budget > BUDGET_RUNS:
-            await _counter.undo(budget_key)
-            await _counter.undo(daily_key)
+            await _counter.undo(budget_key, runs)
+            await _counter.undo(daily_key, runs)
             return Decision(
                 allowed=False,
-                reason="The demo's daily budget is spent. It resets at midnight UTC.",
+                reason=(f"This suite needs {runs} conversions and the demo's daily "
+                        "budget cannot cover it. It resets at midnight UTC."
+                        if runs > 1 else
+                        "The demo's daily budget is spent. It resets at midnight UTC."),
                 retry_after=_seconds_to_midnight(),
-                used={"budget": budget - 1},
+                used={"budget": budget - runs},
             )
 
         await _maybe_alert(budget, day)

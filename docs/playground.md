@@ -23,7 +23,7 @@ Two files, and the split between them is the first thing worth understanding.
 | file | what it is | tested by |
 |---|---|---|
 | `ui/app.py` | the layout: what goes where on the page | your eyes |
-| `src/selenium2playwright/playground.py` | every decision the page makes | `tests/test_playground.py`, 57 tests |
+| `src/selenium2playwright/playground.py` | every decision the page makes | `tests/test_playground.py`, 114 tests |
 
 ## Streamlit in five minutes, because the model explains the code
 
@@ -197,6 +197,7 @@ environment, which is exactly why nobody noticed.
 |---|---|
 | `LANGGRAPH_DEPLOYMENT_URL` | which backend to talk to; defaults to `http://127.0.0.1:8123` (a local `langgraph up`) |
 | `S2P_DEMO_KEY` | the key the playground calls with. Falls back to `S2P_API_KEY` only for a local server running `S2P_AUTH=off` |
+| `S2P_API_KEY` | used **only** by the whole-suite tab, and only when the backend is on this machine — `guard.guard_run` refuses `root` for anyone but the owner |
 
 Both are already in `.env`, so `uv run --group ui streamlit run ui/app.py` talks
 to the live deployment with no arguments. Point `LANGGRAPH_DEPLOYMENT_URL` at
@@ -220,6 +221,222 @@ installed to convert a file.
 | refine: "Keep search() returning the number of results, using count()" | second turn on the same thread → `async search(term): Promise<number> { … return this.results.count(); }`, 3 attempts, 4/4 + critic pass |
 | 👎 with a comment | attached to the run **and** queued into `s2p-feedback-queue` with the comment and visitor id |
 | the meter | budget line moved 38 → 31 across the session, one per conversion |
+
+## The second tab: a whole folder
+
+`s2p suite` has converted folders since step 9.3 — 12 files, dependency waves, a
+whole-tree compile and a markdown report — and none of it was visible in the
+browser. The tab is the surface, and the interesting part is *why it is only
+half a surface*.
+
+### Getting a suite in, and getting it back out
+
+A paste box is the right input for "show me what this does to one file" and the
+wrong one for everything else — nobody pastes twelve files. So there are two
+ways in, and the difference between them is not convenience.
+
+**Upload** sends the folder as `source_tree`: relative path to text, the same
+keys the manifest already uses. Drop the `.ts` files, or a zip of the folder —
+a zip is the one to prefer, because a browser does not send the directory a
+loose file came from and a spec's `import '../pages/LoginPage'` needs those
+directories to exist. `tree_from_zip` strips the wrapping folder (`selenium-suite/pages/…`
+becomes `pages/…`) and drops `node_modules`, `__MACOSX` and friends rather than
+refusing the upload over them.
+
+**A folder path** sends `root`/`out_root`, which name directories on the machine
+the graph runs on. That is offered only when the backend *is* this machine.
+
+The way back out is a **zip of the converted tree with `conversion-report.md`
+inside it**. One button, not two: the report is the document that says which of
+those files still needs eyes, and the two parting company is how it gets ignored.
+
+### The graph never learned about text, and did not need to
+
+The suite graph's inputs are `root` and `out_root`; it walks the folder with
+`Path.rglob`, copies support files with `shutil.copyfile`, and compiles a real
+tree with a real `tsc`. Rewriting all of that to work on a dict would have
+touched every part of steps 9.2 and 9.3.
+
+It did not have to. `plan` **materializes** `source_tree` into a temp directory
+it chooses, and `finish` reads the result back out as text and deletes the
+workspace. Everything in between is the same code a folder run uses.
+
+```python
+if state.get("source_tree") and not state.get("root"):
+    workspace = Path(tempfile.mkdtemp(prefix="s2p-suite-"))
+    suite.materialize(state["source_tree"], workspace / "src")
+```
+
+Three things had to be true for that to be safe on a public host:
+
+**No key may escape the workspace.** `suite.safe_path` is a whitelist of shapes,
+not a blacklist of tricks: no absolute paths, no drive letters, no backslashes,
+every segment `[A-Za-z0-9._-]` with no leading dot (which is how `..` is
+excluded), at most 8 deep. A tree with one bad key is refused whole rather than
+partially written — a suite that silently dropped a file would convert and
+compile and be wrong in a way nobody would look for. It is checked in three
+places, by the page, by the guard and by the graph, because each is the last
+line of defence for a different caller.
+
+**The workspace has to go, including when the run does not finish.** `finish`
+deletes its own. A run that raises in between never reaches `finish`, so
+`sweep_workspaces()` runs at the start of the next one and removes anything
+older than an hour. A sweep rather than a background task: it needs no
+scheduler, and the moment a new suite starts is exactly when an old one is
+provably over.
+
+**Twelve files have to cost twelve.** The meter counted *runs*, and a twelve-file
+suite is one run and twelve conversions — so one request would have spent twelve
+times its share of a budget everybody shares. `limits.spend(runs=n)` charges per
+file, atomically (`INCRBY`, not a loop), so a suite that does not fit is refused
+whole and refunded: "this needs 12 and 5 are left" is a better answer than half a
+suite. Support files that are only copied are charged too — the guard cannot
+classify them without doing the scan itself, and over-charging makes the demo
+stop early, which is the direction to be wrong in.
+
+### What is left that only works locally
+
+**Naming a folder by path**, and nothing else. `root` and `out_root` are still
+refused for anyone but the owner, and still should be — on a public host
+`root: "/"` is a request to read the machine:
+
+```python
+# guard.py
+"root": "belongs to the suite graph, which reads server-side directories",
+"out_root": "belongs to the suite graph, which writes server-side directories",
+```
+
+`pg.folder_blocker()` gates that one input, and it deliberately asks about the
+URL rather than reading a feature flag — the honest question is *whose
+filesystem is this*, and the answer is in the address bar. Note what it is no
+longer about: suites work everywhere; typing a path works on your own laptop.
+
+```bash
+uv run langgraph dev --no-browser --port 2024        # terminal 1
+LANGGRAPH_DEPLOYMENT_URL=http://127.0.0.1:2024 \
+  uv run --group ui streamlit run ui/app.py \
+  --server.address 127.0.0.1                          # terminal 2
+```
+
+`--server.address 127.0.0.1` is not decoration. Streamlit binds `0.0.0.0` by
+default and prints a Network URL, and this tab reads and writes folders on your
+disk as you — so on an untrusted network, binding it to the world is handing
+somebody a file browser.
+
+### Two modes, two credentials, and the one that would cost money
+
+`guard.guard_run` opens with `if _is_owner(ctx): return True` and refuses `root`
+for everybody else. A local server started with auth *on* and both keys set
+would hand the playground a **demo** identity — so the folder input would be
+offered and then 403 by the same process that offered it, which is the worst of
+both. Hence `pg.suite_key()` returning `S2P_API_KEY` **locally**.
+
+The other half is the one that matters. Remotely it returns the *demo* key,
+deliberately: an uploaded suite is metered per file, and the meter is only
+reached on the demo path — the owner returns `True` before `limits.spend` is
+called at all. A page that sent `S2P_API_KEY` to a public deployment would spend
+the whole day's budget past every guardrail step 10.4 built. So the owner key is
+scoped to the one case that needs it and cannot leak into the one that must not
+have it. There is a test named after exactly that.
+
+### Three things the single-file path did not need
+
+**A plan, before the button.** A suite run is the one thing on this page that
+costs twelve conversions instead of one, so `pg.plan_suite()` runs `suite.scan`
+locally — no model, no server — and puts "12 files to convert in 2 waves · 0
+copied across · 0 skipped" and the wave contents on screen *first*. It is only
+correct because suite mode is local: the folder this process can see is the
+folder the graph will open.
+
+**A config on the run.** `max_concurrency` is what actually caps the fan-out —
+without it LangGraph starts every `Send` in a wave at once, and a forty-file
+wave opens forty connections to the provider. `recursion_limit` counts
+super-steps and each wave costs two, so it grows with the suite. Both are
+restated from `cli.suite_run_config` and pinned against it by a test, because
+two copies of the recursion arithmetic is exactly the kind of thing that drifts
+silently and then fails a forty-file suite at wave nine.
+
+**Files ticking off as they land.** The fan-out finishes `convert_file` once per
+file, in completion order, and each of those `updates` events carries the one
+outcome that branch appended. `Update` gained an `update` field so `stream()`
+stops throwing that payload away: for one conversion it is noise, for a suite it
+is the difference between eighty seconds of visible work and eighty seconds of
+spinner.
+
+### What the result tabs are for
+
+`Files` is step 9.2 — one row per file, in plan order rather than finish order.
+Everything else is step 9.3's assembly, and `Tree` is the one worth reading
+first:
+
+> Every per-file verdict above is a claim about that file compiling against the
+> companions it happened to import.
+
+A page object whose `login()` two specs call with different argument counts
+passes every row and still leaves a folder that does not build. `Tree` is the
+converted folder compiled as **one project**, and it is why `result.passed`
+requires both `every row green` *and* `the tree compiles` — a compile that could
+not run is `NO`, never "fine".
+
+`Parity` is what the source exposed publicly and what became of it; a removal
+with no reason is the loudest line in the report. `TODOs` is every
+`TODO(review)` in the suite merged into one list, so the same concern reported
+by both a page object and its spec is one line rather than two.
+
+### Gotchas found building it
+
+**Everything arrives as a dict.** `FileOutcome` and `Assembly` are frozen
+dataclasses in the graph and plain JSON by the time they reach the page — tuples
+become lists, nested dataclasses become dicts. `pg._get()` reads either, so the
+same reader works against a direct `invoke` in a test and against the SDK
+stream; the alternative was two readers that drift.
+
+**Both tabs render on every run.** Streamlit draws the tab you are not looking
+at and hides it, so nothing in either may do work on sight. Everything expensive
+stays behind a button, and the folder scan is the one exception — cheap, no
+model, and the thing that makes the plan visible before you spend anything.
+
+**A dict shadowed a dataclass and nobody would have noticed.** `suite_result`
+built the converted files into a local called `tree`, then reassigned `tree` to
+the whole-tree *compile report* forty lines later. The download button silently
+offered a zip containing `{"gate": "compile", "passed": true}`. Caught by a test
+that asserted the round trip, not by reading it.
+
+**The owner key leaking into a remote call was the expensive bug.** It would
+have worked perfectly and bypassed the meter entirely. The test is
+`test_a_remote_upload_never_calls_as_the_owner`, and it is the one to keep.
+
+**Recall is off by default here, where the CLI defaults it on.** A first suite
+run should have the fewest moving parts: recall needs the server's embeddings
+configured, and a page that fails on a store it never mentioned is a bad first
+answer. The checkbox is right there.
+
+### Live evidence, 2026-09-08, against a local `langgraph dev`
+
+`samples/selenium-suite`, `--only LoginPage.ts, login.spec.ts`,
+`openai:gpt-5.4`, 4 at a time, 3 attempts:
+
+| what | result |
+|---|---|
+| the plan, before the button | 2 files in 2 waves — wave 1 `pages/LoginPage.ts`, wave 2 `tests/login.spec.ts` |
+| `pages/LoginPage.ts` | **passed**, wave 1, 4/4 gates + critic pass, 2 attempts, 15.2s |
+| `tests/login.spec.ts` | **passed**, wave 2, 4/4 gates + critic pass, **1 attempt**, 5.3s — it was handed the converted page object |
+| the whole tree | **compiles** as one project |
+| parity | 4 kept, 1 renamed (`LoginPage.getFlashText → LoginPage.flashMessage`, reason quoted from the model's own notes), 0 removed, 0 unexplained |
+| TODOs | none |
+| written | `out/playground-suite/{pages,tests}/*.ts` + `conversion-report.md`, rendered in the Report tab |
+| total | 20.5s |
+
+And the same two files **uploaded as a zip**, against the same local backend,
+with no path in the request at all:
+
+| what | result |
+|---|---|
+| the zip | `selenium-suite.zip`, 15 entries — the wrapper folder stripped, `pages/` and `tests/` kept |
+| the plan, before the button | 12 files in 2 waves; narrowed to 2 by `--only` |
+| the run | **2 passed**, tree compiles, 13.5s |
+| back out | "Download the converted suite — 2 file(s) + the report" |
+| the workspace | gone; `sweep_workspaces()` covers the runs that never reach `finish` |
 
 ## Where to look next
 

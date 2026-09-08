@@ -58,6 +58,7 @@ from __future__ import annotations
 
 import operator
 import shutil
+import tempfile
 import time
 from dataclasses import dataclass, replace
 from fnmatch import fnmatch
@@ -157,6 +158,12 @@ class SuiteState(TypedDict, total=False):
     # inputs
     root: str
     out_root: str
+    # The other shape of the same input, for a caller with no filesystem here:
+    # relative path -> text. `plan` writes it into a disposable directory and
+    # sets root/out_root to point at that, so every node after this one is the
+    # step 9.2 and 9.3 code unchanged — it still walks a folder and still
+    # compiles a real tree. See `suite.materialize`.
+    source_tree: dict[str, str]
     only: list[str]  # glob patterns; empty means the whole manifest
     # filled by plan
     manifest: suite.Manifest
@@ -175,6 +182,53 @@ class SuiteState(TypedDict, total=False):
     # filled by finish (step 9.3)
     elapsed: float
     assembly: assemble.Assembly
+    # The converted tree as text, filled only for a `source_tree` run: a caller
+    # who sent bytes has no way to read the folder we wrote, so the folder has
+    # to come back the same way it went in. Empty for a `root` run, where the
+    # files are already on the caller's own disk and copying them into the
+    # response would be sending somebody their own filesystem.
+    converted_tree: dict[str, str]
+    # The temp directory a `source_tree` run built. Deleted by `finish`; kept in
+    # state only so `finish` knows there is something to delete.
+    workspace: str
+
+
+# How long a workspace may sit before it is considered abandoned. Longer than
+# any real suite run and shorter than a deployment's uptime, which is the whole
+# window this needs to cover.
+WORKSPACE_TTL = 3600
+
+
+def sweep_workspaces(ttl: int = WORKSPACE_TTL) -> int:
+    """Delete workspaces from runs that never reached `finish`. Returns the count.
+
+    `finish` deletes its own, and on the happy path that is the end of it. But a
+    run that raises between `plan` and `finish` — a provider outage, a
+    recursion limit, a cancelled request — never reaches `finish` at all, and on
+    a long-lived public host every one of those leaves a copy of somebody's
+    suite on disk until the machine is recycled.
+
+    A sweep at the start of the next run rather than a background task or an
+    `atexit` hook: it needs no scheduler, it cannot outlive the process that
+    registered it, and the moment a new suite starts is exactly when an old one
+    is provably finished. Failures are ignored on purpose — another worker
+    sweeping the same directory at the same time is the expected case, not an
+    error, and a tidy-up that could fail a conversion would be worse than the
+    mess.
+    """
+    cutoff, swept = time.time() - ttl, 0
+    try:
+        candidates = list(Path(tempfile.gettempdir()).glob("s2p-suite-*"))
+    except OSError:
+        return 0
+    for path in candidates:
+        try:
+            if path.is_dir() and path.stat().st_mtime < cutoff:
+                shutil.rmtree(path, ignore_errors=True)
+                swept += 1
+        except OSError:
+            continue
+    return swept
 
 
 def plan(state: SuiteState) -> SuiteState:
@@ -184,8 +238,21 @@ def plan(state: SuiteState) -> SuiteState:
     because they are *context*: `tests/login.spec.ts` imports `../support/users`,
     and the converted file has to compile against something.
     """
-    root = Path(state["root"])
-    out_root = Path(state["out_root"])
+    made: dict[str, str] = {}
+    if state.get("source_tree") and not state.get("root"):
+        sweep_workspaces()
+        # A text run. The workspace is created here rather than by the caller
+        # because the caller is a browser: it has bytes and no path, and the
+        # one thing it must never get to do is choose where on this machine
+        # they land. `materialize` refuses the whole tree if any key is not a
+        # plain relative path.
+        workspace = Path(tempfile.mkdtemp(prefix="s2p-suite-"))
+        suite.materialize(state["source_tree"], workspace / "src")
+        made = {"root": str(workspace / "src"), "out_root": str(workspace / "out"),
+                "workspace": str(workspace)}
+
+    root = Path(made.get("root") or state["root"])
+    out_root = Path(made.get("out_root") or state["out_root"])
     manifest = state.get("manifest") or suite.scan(root)
     patterns = list(state.get("only", []))
 
@@ -199,7 +266,7 @@ def plan(state: SuiteState) -> SuiteState:
 
     waves = [[p for p in wave if selected(p, patterns)] for wave in manifest.waves]
     return {"manifest": manifest, "waves": [w for w in waves if w], "copied": copied,
-            "wave": 0, "started": time.time()}
+            "wave": 0, "started": time.time(), **made}
 
 
 def selected(path: str, patterns: list[str]) -> bool:
@@ -330,8 +397,26 @@ def finish(state: SuiteState, runtime: Runtime[SuiteSettings] | None = None) -> 
     report = Path(state.get("report_path") or out_root / assemble.REPORT_NAME)
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(markdown, encoding="utf-8")
+
+    # A text run has to be handed its files back, and then the workspace has to
+    # go. Read first, delete second, and delete in a `finally` — a run that
+    # raised while assembling would otherwise leave a copy of somebody's suite
+    # on a public host until the machine was recycled.
+    workspace = state.get("workspace") or ""
+    converted: dict[str, str] = {}
+    if workspace:
+        try:
+            converted = assemble.read_tree(out_root)
+        finally:
+            shutil.rmtree(workspace, ignore_errors=True)
+
     return {"elapsed": elapsed,
-            "assembly": replace(built, markdown=markdown, report_path=str(report))}
+            "converted_tree": converted,
+            # The report path is a real file for a `root` run and a deleted temp
+            # path for a text one; saying nothing is better than pointing at
+            # something that is not there.
+            "assembly": replace(built, markdown=markdown,
+                                report_path="" if workspace else str(report))}
 
 
 def build_suite_graph(store: BaseStore | None = None):

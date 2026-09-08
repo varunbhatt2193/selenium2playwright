@@ -62,7 +62,7 @@ from typing import Any
 
 from langgraph_sdk import Auth
 
-from selenium2playwright import limits
+from selenium2playwright import limits, suite
 
 auth = Auth()
 
@@ -251,6 +251,40 @@ async def guard_run(ctx, value: dict) -> bool:
                 status_code=403,
                 detail=f"`{field}` is not available on the public demo: it {why}.",
             )
+
+    # A suite arrives as text or not at all. `root`/`out_root` stay refused
+    # above — those name the server's directories — and `source_tree` is the
+    # shape that carries the same information with the bytes attached and no
+    # path the server would open. `suite.check_tree` is the same function the
+    # page calls before sending and the graph calls before writing; this is the
+    # only one of the three a stranger cannot skip.
+    tree = payload.get("source_tree")
+    if tree is not None:
+        if not isinstance(tree, dict):
+            raise Auth.exceptions.HTTPException(
+                status_code=403,
+                detail="`source_tree` must be an object of relative path to file text.",
+            )
+        complaint = suite.check_tree({str(k): str(v) for k, v in tree.items()})
+        if complaint:
+            raise Auth.exceptions.HTTPException(status_code=403, detail=complaint)
+
+        # Metered per FILE, because that is what it costs. The meter counts
+        # runs, and a twelve-file suite is one run and twelve conversions — so
+        # charging it once would let one request spend twelve times its share of
+        # a shared daily budget. Support files that are only copied are charged
+        # too: the guard cannot classify them without doing the scan itself, and
+        # over-charging makes the demo stop early, which is the direction to be
+        # wrong in.
+        decision = await limits.spend(ctx.user.identity, runs=len(tree))
+        if not decision.allowed:
+            raise Auth.exceptions.HTTPException(
+                status_code=429, detail=decision.reason,
+                headers={"Retry-After": str(decision.retry_after)},
+            )
+        payload["user_id"] = ctx.user.identity
+        value.setdefault("metadata", {})["owner"] = ctx.user.identity
+        return True
 
     named = str(payload.get("source_path") or "").strip()
     if named and not _BARE_FILENAME.match(named):

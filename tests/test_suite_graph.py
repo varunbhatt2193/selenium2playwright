@@ -428,9 +428,17 @@ class RealGraphTests(unittest.TestCase):
         self.tmp = TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
 
-    def golden_model(self):
-        """Answer with the golden file whose source path the prompt names."""
-        wanted = {str(SAMPLE / rel): (GOLDEN / rel).read_text()
+    def golden_model(self, prefix: str = ""):
+        """Answer with the golden file whose source path the prompt names.
+
+        `prefix` is load-bearing, not decoration. A spec's prompt contains *two*
+        of these paths — its own, and its already-converted companion — so
+        matching on the bare relative path would answer the spec with the page
+        object. The source tree and the output tree have different prefixes
+        (`samples/selenium-suite/…` vs `…/out/…`, or `…/src/…` vs `…/out/…` for
+        a text run), and keying on the source one is what keeps them apart.
+        """
+        wanted = {f"{prefix or SAMPLE}/{rel}": (GOLDEN / rel).read_text()
                   for rel in ("pages/LoginPage.ts", "tests/login.spec.ts")}
 
         def structured(schema, **kwargs):
@@ -469,5 +477,114 @@ class RealGraphTests(unittest.TestCase):
                          (GOLDEN / "tests/login.spec.ts").read_text())
 
 
+    def test_a_suite_sent_as_text_comes_back_as_text(self):
+        """The whole of suite-in-the-browser, as one round trip.
+
+        No `root`, no `out_root` — nothing in the input names a path on this
+        machine. `plan` materializes the tree into a temp directory it chose,
+        every node after it is the same code a folder run uses (two waves, the
+        real four gates, a real whole-tree `tsc`), and `finish` hands the
+        converted files back as text and deletes the workspace.
+
+        The assertion that matters most is the last one: the directory is gone.
+        A public host that kept every visitor's suite on disk would be a slow
+        leak of both storage and other people's code.
+        """
+        tree = {rel: (SAMPLE / rel).read_text()
+                for rel in ("pages/LoginPage.ts", "tests/login.spec.ts")}
+        # The workspace path is chosen by the graph, so the stub keys on the
+        # part of it that is fixed: sources live under `<workspace>/src`.
+        with self.golden_model(prefix="/src"):
+            final = suite_graph.build_suite_graph().invoke(
+                {"source_tree": tree},
+                context=suite_graph.SuiteSettings(max_attempts=1),
+                config={"recursion_limit": 20})
+
+        outcomes = suite_graph.ordered(final)
+        self.assertEqual([(o.wave, o.path) for o in outcomes],
+                         [(1, "pages/LoginPage.ts"), (2, "tests/login.spec.ts")])
+        self.assertTrue(final["assembly"].compiles, final["assembly"].tree_error)
+
+        back = final["converted_tree"]
+        self.assertEqual(sorted(back), ["pages/LoginPage.ts", "tests/login.spec.ts"])
+        self.assertEqual(back["tests/login.spec.ts"],
+                         (GOLDEN / "tests/login.spec.ts").read_text())
+
+        # The report is in the state, not on a disk the caller cannot reach.
+        self.assertIn("Conversion report", final["assembly"].markdown)
+        self.assertEqual(final["assembly"].report_path, "")
+        self.assertFalse(Path(final["workspace"]).exists(), "the workspace outlived the run")
+
+    def test_a_folder_run_is_not_handed_its_own_files_back(self):
+        # They are already on the caller's disk. Sending them would be posting
+        # somebody their own filesystem.
+        out = Path(self.tmp.name) / "converted2"
+        with self.golden_model():  # noqa: SIM117
+            final = suite_graph.build_suite_graph().invoke(
+                {"root": str(SAMPLE), "out_root": str(out), "only": ["pages/LoginPage.ts"]},
+                context=suite_graph.SuiteSettings(max_attempts=1),
+                config={"recursion_limit": 20})
+        self.assertEqual(final.get("converted_tree", {}), {})
+        self.assertTrue(final["assembly"].report_path.endswith(assemble.REPORT_NAME))
+
+    def test_a_tree_that_could_escape_never_reaches_the_filesystem(self):
+        # The guard refuses this first, but the graph is the last line of
+        # defence and must not depend on having been called through the guard.
+        with self.assertRaises(ValueError) as caught:
+            suite_graph.plan({"source_tree": {"../escaped.ts": "boom"}})
+        self.assertIn("relative path", str(caught.exception))
+
+
 if __name__ == "__main__":
     unittest.main()
+
+
+class WorkspaceSweepTests(unittest.TestCase):
+    """What happens to a text run's temp folder when the run does not finish.
+
+    `finish` deletes its own workspace, and on the happy path that is the end of
+    it. A run that raises in between never reaches `finish`, and on a long-lived
+    public host every one of those leaves a copy of somebody's suite on disk.
+    """
+
+    def setUp(self):
+        self.tmp = TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        patcher = patch("tempfile.gettempdir", return_value=self.tmp.name)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def make(self, name: str, age_seconds: float) -> Path:
+        path = Path(self.tmp.name) / name
+        (path / "src").mkdir(parents=True)
+        (path / "src" / "A.ts").write_text("somebody's code")
+        old = time.time() - age_seconds
+        os.utime(path, (old, old))
+        return path
+
+    def test_an_abandoned_workspace_is_swept_on_the_next_run(self):
+        stale = self.make("s2p-suite-old", suite_graph.WORKSPACE_TTL + 60)
+        self.assertEqual(suite_graph.sweep_workspaces(), 1)
+        self.assertFalse(stale.exists())
+
+    def test_a_run_still_going_is_left_alone(self):
+        # The sweep runs at the start of a new suite, and another one may be
+        # halfway through its second wave.
+        live = self.make("s2p-suite-live", 30)
+        self.assertEqual(suite_graph.sweep_workspaces(), 0)
+        self.assertTrue((live / "src" / "A.ts").exists())
+
+    def test_it_only_touches_its_own_directories(self):
+        someone_else = Path(self.tmp.name) / "important-thing"
+        someone_else.mkdir()
+        old = time.time() - 99999
+        os.utime(someone_else, (old, old))
+        suite_graph.sweep_workspaces()
+        self.assertTrue(someone_else.exists())
+
+    def test_a_sweep_that_cannot_run_is_not_an_error(self):
+        # Another worker sweeping the same directory is the expected case, not
+        # a failure, and a tidy-up that could fail a conversion would be worse
+        # than the mess.
+        with patch.object(Path, "glob", side_effect=OSError("gone")):
+            self.assertEqual(suite_graph.sweep_workspaces(), 0)

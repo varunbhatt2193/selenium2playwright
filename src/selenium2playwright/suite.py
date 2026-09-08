@@ -268,3 +268,102 @@ def manifest_json(manifest: Manifest) -> dict:
             "external_imports": list(f.external_imports),
         } for f in manifest.files],
     }
+
+
+# --- a suite as text, for callers with no filesystem here ----------------------
+#
+# Everything above this line takes a directory, because that is what `s2p suite`
+# has and it is the honest shape for a folder. A browser has neither: what it
+# has is a handful of uploaded files, or a zip, and the bytes inside them.
+#
+# `source_tree` is that second shape — relative path to text, the same keys the
+# manifest and the ledger already use — and `materialize` turns it back into the
+# first one inside a temporary directory the caller never names. That is the
+# whole trick, and it is what lets the suite graph stay exactly as step 9.2 and
+# 9.3 wrote it: it still walks a folder, still copies support files across, still
+# compiles a real tree with a real `tsc`. It just does it somewhere disposable.
+#
+# The safety property lives in `safe_path`, and it has to be absolute: these keys
+# come from a stranger's zip on a public host, and a key of `../../etc/cron.d/x`
+# would be a file write outside the workspace. So the rule is a whitelist of
+# shapes rather than a blacklist of tricks.
+
+# A demo tree is capped on both axes because they fail differently: too many
+# files is a bill, too many bytes is memory. Both are generous for a real page
+# object suite and hopeless for anyone trying to use this as free compute.
+MAX_TREE_FILES = int(os.environ.get("S2P_MAX_TREE_FILES") or 40)
+MAX_TREE_BYTES = int(os.environ.get("S2P_MAX_TREE_BYTES") or 2 * 1024 * 1024)
+
+# One path segment: no separators (so it cannot descend on its own), no leading
+# dot (so no dotfiles and, more to the point, no ".."), and nothing exotic.
+_SEGMENT = re.compile(r"^(?!\.)[A-Za-z0-9._-]{1,128}$")
+
+
+def safe_path(name: str) -> str:
+    """A relative posix path this is willing to create, or "" if it is not.
+
+    Returns rather than raises because every caller wants to say *which* key was
+    bad in a sentence, and none of them want a traceback. The checks are on the
+    shape:
+
+    * not absolute, and no drive letter or UNC prefix — `/etc/passwd` and
+      `C:\\Windows\\x` are both out;
+    * no backslashes at all, because a Windows-shaped key would arrive as one
+      segment here and become a path later;
+    * every segment matches `_SEGMENT`, which excludes `..` by excluding a
+      leading dot;
+    * at most 8 levels deep, because nothing real needs more and a deep tree is
+      a cheap way to make a filesystem unhappy.
+    """
+    text = (name or "").strip().replace("\\", "/")
+    if not text or text.startswith("/") or ":" in text:
+        return ""
+    parts = [p for p in text.split("/") if p]
+    if not parts or len(parts) > 8:
+        return ""
+    if not all(_SEGMENT.match(part) for part in parts):
+        return ""
+    return "/".join(parts)
+
+
+def check_tree(tree: dict[str, str]) -> str:
+    """Say what is wrong with an uploaded tree, or "" if nothing is.
+
+    Called in three places on purpose — the page before it sends, the guard
+    before it authorizes, and the graph before it writes — because each of them
+    is the last line of defence for a different caller.
+    """
+    if not tree:
+        return "No files. Upload the TypeScript files, or a zip of the folder."
+    if len(tree) > MAX_TREE_FILES:
+        return f"{len(tree)} files. The limit is {MAX_TREE_FILES} per suite."
+    total = 0
+    for name, text in tree.items():
+        if not safe_path(name):
+            return (f"`{name}` is not a name this will create. Use a relative path "
+                    "like `pages/LoginPage.ts` — no leading slash, no `..`.")
+        total += len((text or "").encode("utf-8"))
+    if total > MAX_TREE_BYTES:
+        return f"That is {total // 1024} KB. The limit is {MAX_TREE_BYTES // 1024} KB per suite."
+    if not any(Path(name).suffix.lower() in SOURCE_SUFFIXES for name in tree):
+        return ("None of those files are source files this can convert "
+                f"({', '.join(SOURCE_SUFFIXES)}).")
+    return ""
+
+
+def materialize(tree: dict[str, str], root: Path) -> Path:
+    """Write a text tree into a real directory, and hand back the directory.
+
+    Refuses the whole tree rather than skipping a bad key: a suite that silently
+    dropped one file would convert and compile and be wrong in a way nobody
+    would look for.
+    """
+    complaint = check_tree(tree)
+    if complaint:
+        raise ValueError(complaint)
+    root.mkdir(parents=True, exist_ok=True)
+    for name, text in tree.items():
+        target = root / safe_path(name)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text or "", encoding="utf-8")
+    return root
