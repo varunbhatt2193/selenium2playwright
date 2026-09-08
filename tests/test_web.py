@@ -17,10 +17,13 @@ from __future__ import annotations
 import io
 import json
 import sys
+import tempfile
 import unittest
 import zipfile
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
+from urllib.parse import quote
 
 import httpx
 from fastapi.testclient import TestClient
@@ -376,6 +379,52 @@ class WebTests(unittest.TestCase):
         self.assertIn(response.status_code, (200, 503))
         if response.status_code == 503:
             self.assertIn("npm", response.json()["detail"])
+
+    def test_a_url_cannot_climb_out_of_the_build_directory(self):
+        """A visitor may read the page. Nothing above it.
+
+        The route used to ask `(DIST / path).is_file()`, which is true for a
+        path that has already climbed out — and the server percent-decodes the
+        URL first, so `..` needs no literal dots to arrive. On Fly the file
+        within reach is `/proc/self/environ`, and the model key is in it.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            dist = root / "dist"
+            dist.mkdir()
+            (dist / "index.html").write_text("<!doctype html><title>page</title>")
+            (root / "environ").write_text("OPENAI_API_KEY=sk-the-thing-worth-stealing")
+
+            with patch.object(server, "DIST", dist):
+                # Not a vacuous test: the check this replaced answers yes here.
+                self.assertTrue((dist / "../environ").is_file())
+                self.assertIsNone(server.built_file("../environ"))
+
+                response = self.client.get("/" + quote("../environ", safe=""))
+                self.assertNotIn(b"sk-the-thing-worth-stealing", response.content)
+                self.assertEqual(response.status_code, 200)
+
+    def test_an_absolute_url_cannot_replace_the_build_directory(self):
+        # `//etc/hosts` binds `path` to `/etc/hosts`, and `DIST / "/etc/hosts"`
+        # is `/etc/hosts`: pathlib drops the left side for an absolute right one.
+        self.assertTrue(Path("/etc/hosts").is_file())
+        self.assertIsNone(server.built_file("/etc/hosts"))
+
+    def test_the_files_the_page_is_built_from_are_still_served(self):
+        # The check has to refuse the way out without refusing the way in.
+        with tempfile.TemporaryDirectory() as tmp:
+            dist = Path(tmp).resolve()
+            (dist / "assets").mkdir()
+            (dist / "assets" / "app.js").write_text("console.log(1)")
+            (dist / "favicon.svg").write_text("<svg/>")
+
+            with patch.object(server, "DIST", dist):
+                self.assertEqual(server.built_file("favicon.svg"), dist / "favicon.svg")
+                self.assertEqual(
+                    server.built_file("assets/app.js"), dist / "assets" / "app.js"
+                )
+                self.assertIsNone(server.built_file("assets/never-built.js"))
+                self.assertIsNone(server.built_file(""))
 
 
 if __name__ == "__main__":

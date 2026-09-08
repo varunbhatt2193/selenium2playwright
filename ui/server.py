@@ -398,6 +398,28 @@ if (DIST / "assets").is_dir():
     app.mount("/assets", StaticFiles(directory=DIST / "assets"), name="assets")
 
 
+def built_file(path: str) -> Path | None:
+    """The file `path` names *inside* `dist`, or None if it names anything else.
+
+    `DIST / path` is not a check. uvicorn percent-decodes the URL before
+    Starlette binds `{path:path}`, so `%2e%2e%2f` arrives here as `../` and
+    climbs out of the build directory; and pathlib lets an absolute segment
+    replace the left-hand side outright, so `//etc/passwd` becomes `/etc/passwd`.
+    Either one, on Fly, reaches `/proc/self/environ` and the key inside it.
+
+    So resolve first and ask where the answer landed. `DIST` is resolved at
+    import, and a real file under it always has it among its parents — a
+    traversal, an absolute path, and a symlink pointing out of the tree all fail
+    that question, which `is_file()` alone never asked.
+    """
+    if not path:
+        return None
+    candidate = (DIST / path).resolve()
+    if DIST not in candidate.parents or not candidate.is_file():
+        return None
+    return candidate
+
+
 @app.get("/{path:path}", include_in_schema=False)
 def page(path: str) -> Response:
     """The React page, for any path that is not the API.
@@ -407,8 +429,9 @@ def page(path: str) -> Response:
     """
     if path.startswith("api/"):
         raise HTTPException(status_code=404)
-    if path and (DIST / path).is_file():
-        return FileResponse(DIST / path)
+    file = built_file(path)
+    if file:
+        return FileResponse(file)
     index = DIST / "index.html"
     if not index.is_file():
         return JSONResponse(
