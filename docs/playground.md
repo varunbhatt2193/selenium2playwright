@@ -398,9 +398,15 @@ suite is one run and twelve conversions — so one request would have spent twel
 times its share of a budget everybody shares. `limits.spend(runs=n)` charges per
 file, atomically (`INCRBY`, not a loop), so a suite that does not fit is refused
 whole and refunded: "this needs 12 and 5 are left" is a better answer than half a
-suite. Support files that are only copied are charged too — the guard cannot
-classify them without doing the scan itself, and over-charging makes the demo
-stop early, which is the direction to be wrong in.
+suite. Support files that are only copied are **not** charged: they never reach
+a model, so they cost nothing. They were, at first — the guard could not
+classify them without a scan, and a scan needed a folder. `suite.scan_sources`
+plans a tree from text now, so the guard prices an upload the same way the page
+does (`suite.conversions`, after `only`), and a sixteen-file repo with four
+Selenium files in it is four conversions. That fix came from a real upload: the
+`goenning/typescript-selenium-example` zip was refused as sixteen files against
+a fifteen-a-day cap, and the advice to filter with "Only these files" changed
+nothing because the count ignored the filter.
 
 ### What is left that only works locally
 

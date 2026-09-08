@@ -991,6 +991,28 @@ class UploadTests(unittest.TestCase):
         self.assertEqual(plan.billable, 2)
         self.assertIn("2 file(s)", plan.line)
 
+    def test_the_price_is_the_conversions_not_the_files_sent(self):
+        """A real repo is mostly helpers, and helpers are free.
+
+        The page quotes what the guard will charge, and the guard charges what
+        reaches a model — so twelve copied files and four Selenium files is a
+        bill of four, and "Only these files" brings it down further. Before
+        this, the number was the file count, and the advice to filter changed
+        nothing.
+        """
+        tree = {f"lib/helper{i}.ts": f"export const H{i} = {i};\n" for i in range(12)}
+        tree.update({f"pages/P{i}.ts": SELENIUM for i in range(4)})
+        plan = pg.plan_tree(tree)
+        self.assertEqual(len(plan.copied), 12)
+        self.assertEqual(plan.billable, 4)
+        self.assertEqual(pg.plan_tree(tree, ["pages/P1.ts"]).billable, 1)
+        self.assertEqual(plan.billable, suite.conversions(tree))
+
+    def test_unaffordable_talks_about_conversions(self):
+        snapshot = {"per_visitor": {"daily": 15}, "budget": {"remaining": 41}}
+        self.assertEqual(pg.affordable(snapshot, 4), "")
+        self.assertIn("needs 16 conversions", pg.affordable(snapshot, 16))
+
 
 class DownloadTests(unittest.TestCase):
     """Giving the suite back, which is the half an upload is useless without."""
@@ -1049,7 +1071,7 @@ class AffordabilityTests(unittest.TestCase):
         # The advice has to be "convert fewer at a time", not "come back
         # tomorrow": this one is a shape, not a balance.
         said = pg.affordable(self.SNAPSHOT, 12)
-        self.assertIn("12 files", said)
+        self.assertIn("12 conversions", said)
         self.assertIn("10 conversions per visitor", said)
         self.assertIn("Only these files", said)
 

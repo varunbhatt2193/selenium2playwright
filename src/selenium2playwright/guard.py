@@ -269,14 +269,23 @@ async def guard_run(ctx, value: dict) -> bool:
         if complaint:
             raise Auth.exceptions.HTTPException(status_code=403, detail=complaint)
 
-        # Metered per FILE, because that is what it costs. The meter counts
-        # runs, and a twelve-file suite is one run and twelve conversions — so
-        # charging it once would let one request spend twelve times its share of
-        # a shared daily budget. Support files that are only copied are charged
-        # too: the guard cannot classify them without doing the scan itself, and
-        # over-charging makes the demo stop early, which is the direction to be
-        # wrong in.
-        decision = await limits.spend(ctx.user.identity, runs=len(tree))
+        # Metered per CONVERSION, because that is what it costs. The meter
+        # counts runs, and a twelve-file suite is one run and twelve conversions
+        # — so charging it once would let one request spend twelve times its
+        # share of a shared daily budget. It used to charge every file sent,
+        # copied helpers included, because classifying them meant a scan. The
+        # scan works on text now (`suite.scan_sources`), so the guard plans the
+        # tree the same way the graph will and charges for the files that
+        # reach a model — after `only`, which is the page's own filter and
+        # would otherwise be advice that changed nothing. `only` is read
+        # defensively for the same reason as everything else here: this runs
+        # before validation.
+        only = payload.get("only")
+        runs = suite.conversions(
+            {str(k): str(v) for k, v in tree.items()},
+            only if isinstance(only, list) else [],
+        )
+        decision = await limits.spend(ctx.user.identity, runs=runs)
         if not decision.allowed:
             raise Auth.exceptions.HTTPException(
                 status_code=429, detail=decision.reason,

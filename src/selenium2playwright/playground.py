@@ -665,10 +665,10 @@ class SuitePlan:
     copied: list[str]
     skipped: list[tuple[str, str]]  # (path, why)
     notes: list[str] = field(default_factory=list)
-    # What the guard will charge for an uploaded tree: every file sent, not just
-    # the convertible ones. It cannot classify them without doing the scan
-    # itself, so it over-charges — and the page should say the same number the
-    # meter will, rather than the flattering one.
+    # What the guard will charge for an uploaded tree: the files that will be
+    # converted, after `--only`. Copied helpers are free, because they cost
+    # nothing. The guard counts with `suite.conversions`, and so does this, so
+    # the number on screen is the number the meter takes.
     billable: int = 0
 
     @property
@@ -708,11 +708,11 @@ def plan_tree(tree: dict[str, str], only: list[str] | None = None) -> SuitePlan:
 
 def _plan_from(manifest, root: str, only: list[str] | None) -> SuitePlan:
     patterns = list(only or [])
-    chosen = [f.path for f in manifest.convertible if suite_graph.selected(f.path, patterns)]
+    chosen = [f.path for f in manifest.convertible if suite.selected(f.path, patterns)]
     keep = set(chosen)
     return SuitePlan(
         root=str(root),
-        billable=len(manifest.files),
+        billable=len(chosen),
         waves=[[p for p in wave if p in keep] for wave in manifest.waves
                if any(p in keep for p in wave)],
         convert=chosen,
@@ -770,8 +770,8 @@ def affordable(snapshot: dict[str, Any], files: int) -> str:
     per = snapshot.get("per_visitor") or {}
     cap = per.get("daily")
     if isinstance(cap, int) and files > cap:
-        return (f"This suite is {files} files and the demo allows {cap} conversions "
-                f"per visitor per day. Convert fewer at a time with “Only these "
+        return (f"This suite needs {files} conversions and the demo allows {cap} "
+                f"conversions per visitor per day. Convert fewer at a time with “Only these "
                 f"files”, or run it against your own machine.")
     budget = snapshot.get("budget") or {}
     remaining = budget.get("remaining")

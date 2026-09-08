@@ -44,6 +44,16 @@ OWNER = FakeCtx("owner", ["owner"])
 VISITOR = FakeCtx("demo:alice", ["demo"])
 OTHER = FakeCtx("demo:mallory", ["demo"])
 
+# A file the scan will classify as convertible — it drives Selenium — and one
+# it will copy across untouched. The guard charges for the first kind only.
+SELENIUM = """import { By, WebDriver } from 'selenium-webdriver';
+export class Page {
+  constructor(private driver: WebDriver) {}
+  async go() { await this.driver.findElement(By.id('x')).click(); }
+}
+"""
+HELPER = "export const BASE_URL = 'https://example.test';\n"
+
 
 def run_body(**payload):
     """A create-run request the way the server hands it to an authorization handler."""
@@ -337,17 +347,51 @@ class SuiteUploadTests(unittest.TestCase):
         conversions. Charging it once would let a single request spend twelve
         times its share of a budget everybody is sharing.
         """
-        tree = {f"pages/P{i}.ts": "export class P {}" for i in range(5)}
+        tree = {f"pages/P{i}.ts": SELENIUM for i in range(5)}
         before = run(limits.snapshot())
         run(guard.guard_run(VISITOR, {"kwargs": {"input": {"source_tree": tree}}}))
         after = run(limits.snapshot())
         self.assertEqual(after["budget"]["used"] - before["budget"]["used"], 5)
 
+    def test_copied_helpers_are_not_charged(self):
+        """A real suite is a few page objects and a lot of helpers.
+
+        The helpers are copied across, never sent to a model, and cost nothing
+        — so they must not count. A sixteen-file repo with four Selenium files
+        in it is four conversions, not sixteen, and it fits a fifteen-a-day cap.
+        """
+        tree = {f"lib/helper{i}.ts": HELPER for i in range(12)}
+        tree.update({f"pages/P{i}.ts": SELENIUM for i in range(4)})
+        with patch.object(limits, "DAILY_LIMIT", 15):
+            before = run(limits.snapshot())
+            self.assertTrue(run(guard.guard_run(
+                VISITOR, {"kwargs": {"input": {"source_tree": tree}}})))
+            after = run(limits.snapshot())
+        self.assertEqual(after["budget"]["used"] - before["budget"]["used"], 4)
+
+    def test_only_narrows_the_charge_to_what_is_asked_for(self):
+        # "Convert fewer at a time with Only these files" is the advice the page
+        # gives when a suite is over the cap. It has to be true.
+        tree = {f"pages/P{i}.ts": SELENIUM for i in range(5)}
+        before = run(limits.snapshot())
+        run(guard.guard_run(VISITOR, {"kwargs": {"input": {
+            "source_tree": tree, "only": ["pages/P1.ts", "P2.ts"]}}}))
+        after = run(limits.snapshot())
+        self.assertEqual(after["budget"]["used"] - before["budget"]["used"], 2)
+
+    def test_a_malformed_only_is_ignored_not_a_500(self):
+        # This runs before validation; a bad `only` is the graph's to reject.
+        tree = {"pages/P.ts": SELENIUM}
+        for bad in ("pages/*", 7, [3, None], {"a": 1}):
+            limits._counter.reset()
+            self.assertTrue(run(guard.guard_run(
+                VISITOR, {"kwargs": {"input": {"source_tree": tree, "only": bad}}})), bad)
+
     def test_a_suite_too_big_for_what_is_left_is_refused_whole(self):
         # Half a suite converted and half refused is a worse answer than
         # "this needs 12 and 5 are left".
         with patch.object(limits, "BUDGET_RUNS", 4), patch.object(limits, "DAILY_LIMIT", 99):
-            tree = {f"p{i}.ts": "x" for i in range(6)}
+            tree = {f"p{i}.ts": SELENIUM for i in range(6)}
             with self.assertRaises(Exception) as caught:
                 run(guard.guard_run(VISITOR, {"kwargs": {"input": {"source_tree": tree}}}))
             self.assertIn("6 conversions", str(caught.exception))

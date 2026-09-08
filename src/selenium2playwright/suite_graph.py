@@ -61,7 +61,6 @@ import shutil
 import tempfile
 import time
 from dataclasses import dataclass, replace
-from fnmatch import fnmatch
 from pathlib import Path
 from typing import Annotated, Optional, TypedDict
 
@@ -269,13 +268,10 @@ def plan(state: SuiteState) -> SuiteState:
             "wave": 0, "started": time.time(), **made}
 
 
-def selected(path: str, patterns: list[str]) -> bool:
-    """Does --only cover this file? No patterns means everything.
-
-    A pattern matches the relative path (`pages/*.ts`) or the bare name
-    (`LoginPage.ts`), because both are what a person types.
-    """
-    return not patterns or any(fnmatch(path, p) or fnmatch(Path(path).name, p) for p in patterns)
+# `selected` lives in `suite` now, next to `conversions`, so the guard can apply
+# `--only` without importing the graph. Re-exported so nothing that says
+# `suite_graph.selected` has to change.
+selected = suite.selected
 
 
 def next_wave(state: SuiteState) -> SuiteState:

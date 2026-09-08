@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import os
 import re
+from fnmatch import fnmatch
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -216,6 +217,25 @@ def scan(root: Path) -> Manifest:
     paths = discover(root)
     sources = {p.relative_to(root).as_posix(): p.read_text(encoding="utf-8", errors="replace")
                for p in paths}
+    return scan_sources(sources, root.as_posix())
+
+
+def scan_sources(sources: dict[str, str], root: str = "uploaded files") -> Manifest:
+    """`scan`, for a tree that is already text: the same plan, with no disk.
+
+    The folder walk is the only part of `scan` that needs a filesystem; the
+    classification, the import graph and the waves work on strings. Splitting
+    it here lets anything holding an uploaded tree — the page, the guard —
+    plan it without first writing it somewhere, which is what lets the guard
+    charge for the files that will be converted rather than for every file sent.
+
+    `discover`'s two rules are applied to the keys so a text tree and the same
+    tree on disk give the same answer: files in a `SKIP_DIRS` directory and files
+    without a source suffix are not part of the plan.
+    """
+    sources = {path: text for path, text in sources.items()
+               if Path(path).suffix.lower() in SOURCE_SUFFIXES
+               and not (set(Path(path).parts[:-1]) & SKIP_DIRS)}
     known = set(sources)
 
     files: dict[str, SuiteFile] = {}
@@ -242,8 +262,31 @@ def scan(root: Path) -> Manifest:
             files[path] = replace(files[path], wave=number)
     if not files:
         notes.append(f"no TypeScript or JavaScript source files under {root}")
-    return Manifest(root=root.as_posix(), files=tuple(files[p] for p in sorted(files)),
+    return Manifest(root=root, files=tuple(files[p] for p in sorted(files)),
                     waves=waves, notes=tuple(notes))
+
+
+def selected(path: str, patterns: list[str]) -> bool:
+    """Does --only cover this file? No patterns means everything.
+
+    A pattern matches the relative path (`pages/*.ts`) or the bare name
+    (`LoginPage.ts`), because both are what a person types.
+    """
+    return not patterns or any(fnmatch(path, p) or fnmatch(Path(path).name, p) for p in patterns)
+
+
+def conversions(tree: dict[str, str], only: list[str] | None = None) -> int:
+    """How many files a run over this tree will send to the model.
+
+    This is the number the meter should charge and the page should quote, and
+    it is the same number in both places because both call this. It is smaller
+    than `len(tree)` twice over: support files are copied, not converted, and
+    `--only` narrows what is left. A suite that is two page objects, a test and
+    a dozen helpers costs three, and a visitor who asks for one file pays for one.
+    """
+    patterns = [p for p in (only or []) if isinstance(p, str) and p.strip()]
+    manifest = scan_sources(tree)
+    return sum(1 for f in manifest.convertible if selected(f.path, patterns))
 
 
 def _with_dependent(item: SuiteFile, dependent: str) -> SuiteFile:

@@ -129,6 +129,35 @@ class ToySuite(unittest.TestCase):
         self.assertEqual(suite.manifest_json(self.manifest), suite.manifest_json(again))
 
 
+class TextTree(unittest.TestCase):
+    """The same plan from a dict of text as from the folder it would be.
+
+    `scan_sources` exists so the guard can price an upload without writing it
+    to disk; the only thing that can go wrong is disagreeing with `scan`.
+    """
+
+    def test_scan_sources_matches_scan(self):
+        with TemporaryDirectory() as tmp:
+            on_disk = suite.scan(build(Path(tmp), TOY))
+        as_text = suite.scan_sources(TOY)
+        strip = lambda m: [(f.path, f.kind, f.action, f.imports, f.wave) for f in m.files]  # noqa: E731
+        self.assertEqual(strip(as_text), strip(on_disk))
+        self.assertEqual(as_text.waves, on_disk.waves)
+
+    def test_junk_directories_and_non_source_files_are_left_out_like_discover_does(self):
+        tree = {**TOY, "node_modules/x/index.ts": TOY["pages/BasePage.ts"],
+                "README.md": "# hi", "package.json": "{}"}
+        self.assertEqual([f.path for f in suite.scan_sources(tree).files], sorted(TOY))
+
+    def test_conversions_counts_what_reaches_a_model(self):
+        # Six files: three convert, one is copied, two are skipped. The bill is three.
+        self.assertEqual(suite.conversions(TOY), 3)
+        self.assertEqual(suite.conversions(TOY, ["pages/*"]), 2)
+        self.assertEqual(suite.conversions(TOY, ["login.spec.ts"]), 1)
+        self.assertEqual(suite.conversions(TOY, ["nothing-matches"]), 0)
+        self.assertEqual(suite.conversions({"a.ts": "export const A = 1;\n"}), 0)
+
+
 class RealSuite(unittest.TestCase):
     """The suite the whole project demos on: six page objects, six tests."""
 

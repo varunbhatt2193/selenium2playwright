@@ -34,8 +34,10 @@ Three things that had to hold, and would be expensive to rediscover:
 - `sweep_workspaces()` runs at the start of each suite and deletes workspaces
   older than an hour, because `finish` cannot clean up after a run that never
   reached it.
-- `limits.spend(runs=n)` charges **per file** (INCRBY, atomic). The meter counted
-  runs, and one twelve-file suite is twelve conversions.
+- `limits.spend(runs=n)` charges **per conversion** (INCRBY, atomic). The meter
+  counted runs, and one twelve-file suite is twelve conversions. Copied helpers
+  are free: the guard prices a tree with `suite.conversions`, the same call the
+  page uses for the number on screen.
 
 **Playbook rule 28.** A wait fused to a getter is not behaviour to preserve —
 web-first assertions retry, so `expect(locator).toHaveText(/\S/)` is the wait
