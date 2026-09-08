@@ -107,7 +107,11 @@ def assemble_report(plan: dict, records: list[dict], experiment: dict,
                 status = "missing_feedback" if not by_key[key] or not by_key[key + "_status"] else "invalid_feedback"
             metrics[key] = {"score": score, "status": status}
         rows.append({"example_id": identity, "case_id": case_id, "scenario": example["metadata"]["scenario"],
-                     "kind": example["metadata"]["kind"], "run_id": run.get("id"), "outputs": outputs,
+                     "kind": example["metadata"]["kind"],
+                     # Only the hard-case benchmark carries these; the Phase 6.1
+                     # rows have none, and an empty dimension renders nothing.
+                     "hard_cases": list(example["metadata"].get("hard_cases", [])),
+                     "run_id": run.get("id"), "outputs": outputs,
                      "run_error": run.get("error"), "feedback": feedback, "metrics": metrics,
                      "cost_usd": record.get("remote_cost_usd") if record else None})
     if execution_error:
@@ -118,6 +122,12 @@ def assemble_report(plan: dict, records: list[dict], experiment: dict,
             "aggregate": aggregate(rows), "by_scenario": {
                 name: aggregate([row for row in rows if row["scenario"] == name]) for name in sorted({r["scenario"] for r in rows})},
             "by_kind": {name: aggregate([row for row in rows if row["kind"] == name]) for name in sorted({r["kind"] for r in rows})},
+            # A row exercises several hard cases at once, so these groups
+            # deliberately overlap and their scheduled counts do not add up to
+            # the experiment total. That is the price of asking "is pattern 7
+            # handled?" rather than "did file X pass?".
+            "by_hard_case": {str(number): aggregate([row for row in rows if number in row["hard_cases"]])
+                             for number in sorted({n for r in rows for n in r["hard_cases"]})},
             "rows": rows, "cloud_verification": {"status": "not_checked"}}
 
 
@@ -152,14 +162,28 @@ def render_markdown(report: dict) -> str:
         for name, group in report[dimension].items():
             scores = " | ".join(str(group["metrics"][key]["passed"]) for key in GATE_KEYS.values())
             lines.append(f"| {name} | {group['scheduled']} | {scores} | {group['all_static_passed']} | {group['graph_report_passed']} |")
+    if report.get("by_hard_case"):
+        from selenium2playwright.eval_hardcases import HARD_CASES
+        lines += ["", "## Per hard case", "",
+                  "One row exercises several patterns, so these groups overlap on purpose and their",
+                  "scheduled counts do not sum to the experiment total. A pattern counts as handled",
+                  "only when every row that exercises it passed all four gates.", "",
+                  "| # | Pattern | Rows | All static | Graph passed |",
+                  "| --- | --- | --- | --- | --- |"]
+        for number, group in report["by_hard_case"].items():
+            title = HARD_CASES.get(int(number), "")
+            lines.append(f"| {number} | {title} | {group['scheduled']} | "
+                         f"{group['all_static_passed']} | {group['graph_report_passed']} |")
     lines += ["", "## Each scheduled conversion", "",
-              "| Case | Graph report | Attempts | Compile | Residue | Lint | Parity | TODOs |",
+              "| Case | Hard cases | Graph report | Attempts | Compile | Residue | Lint | Parity | TODOs |",
               "| --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
     for row in report["rows"]:
         final = row["outputs"].get("report") or {}
         scores = " | ".join(row["metrics"][key]["status"] for key in GATE_KEYS.values())
         todos = len((final.get("result") or {}).get("todos", [])) if final.get("result") is not None else "unknown"
-        lines.append(f"| {row['case_id']} | {final.get('status', row['outputs'].get('conversion_status', 'missing'))} | "
+        covers = ", ".join(str(n) for n in row.get("hard_cases", [])) or "—"
+        lines.append(f"| {row['case_id']} | {covers} | "
+                     f"{final.get('status', row['outputs'].get('conversion_status', 'missing'))} | "
                      f"{final.get('attempts', 'unknown')} | {scores} | {todos} |")
     lines += ["", "## Time, tokens, and available cost", "",
               "Target time includes internal graph checks; evaluator time measures the additional checks.",

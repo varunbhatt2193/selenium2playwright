@@ -82,8 +82,8 @@ def run_experiment(plan: dict, client, folder: Path, *, upload_results: bool = T
                 results = evaluate(
                     target, data=examples, evaluators=EVALUATORS, client=client,
                     experiment_prefix=f"s2p-{phase}-{short(config['model'])}{critic}-attempts{config['max_attempts']}",
-                    description=(f"Pinned 12-file benchmark; {config['max_attempts']} total conversion attempt(s); "
-                                 "independent static checks; golden POM context for tests."),
+                    description=(f"{plan['metadata'].get('description', 'Pinned benchmark')} "
+                                 f"{config['max_attempts']} total conversion attempt(s)."),
                     metadata=copy.deepcopy(plan["metadata"]), max_concurrency=1, num_repetitions=1,
                     blocking=False, upload_results=upload_results, error_handling="log",
                 )

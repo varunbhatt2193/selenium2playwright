@@ -13,12 +13,33 @@ from uuid import UUID
 
 from selenium2playwright.eval_collection import build_collection
 from selenium2playwright.eval_evaluators import EVALUATOR_VERSION, GATE_KEYS
+from selenium2playwright.eval_hard_collection import build_hard_collection
 from selenium2playwright.eval_upload import expected_examples
 from selenium2playwright.llm import MAX_OUTPUT_TOKENS
 from selenium2playwright.reflection import MAX_ATTEMPTS, resolve_attempt_cap
 
 DEFAULT_EVAL_MODEL = "anthropic:claude-opus-5"  # Learning agreement: Opus for evals.
 FEEDBACK_KEYS = [key for metric in GATE_KEYS.values() for key in (metric, metric + "_status")]
+
+# Two benchmarks now exist, and an experiment must say which one it ran against.
+# Each entry binds a preflight builder to the upload receipt that proves those
+# exact rows are in LangSmith; build_plan refuses a pair that disagrees.
+BENCHMARKS = {
+    "base": {
+        "build": lambda root: build_collection(
+            root / "samples", root / "docs/evaluation-fixture-evidence.json"),
+        "receipt": "docs/phase-6.1-receipt.json",
+        "description": ("Pinned 12-file Phase 6.1 benchmark; six scenarios; "
+                        "independent static checks; golden POM context for tests."),
+    },
+    "hard": {
+        "build": lambda root: build_hard_collection(
+            root / "samples", root / "docs/evaluation-hard-fixture-evidence.json"),
+        "receipt": "docs/phase-11.1-receipt.json",
+        "description": ("Pinned 11-file hard-case benchmark; the twelve SDET patterns from "
+                        "plan-review.md; independent static checks; golden companions supplied."),
+    },
+}
 
 
 def digest(value: dict) -> str:
@@ -71,15 +92,22 @@ def configuration(root: Path, model: str, max_attempts: int = MAX_ATTEMPTS, crit
 
 
 def build_plan(root: Path, model: str = DEFAULT_EVAL_MODEL, max_attempts: int = MAX_ATTEMPTS,
-               phase: str = "6.2", critic_model: str | None = None) -> dict:
+               phase: str = "6.2", critic_model: str | None = None,
+               benchmark: str = "base") -> dict:
     """Bind the complete local collection to its verified upload receipt and configuration.
 
     phase labels the experiment (name prefix, report title, project metadata);
     max_attempts is the lap budget every row of this experiment will use;
-    critic_model reviews every draft (default: the same model as the actor).
+    critic_model reviews every draft (default: the same model as the actor);
+    benchmark selects which of BENCHMARKS this experiment measures. The local
+    rebuild must reproduce the uploaded fingerprint exactly, so an edited fixture
+    stops the experiment here rather than scoring the converter against rows that
+    are no longer the ones in the cloud.
     """
-    collection = build_collection(root / "samples", root / "docs/evaluation-fixture-evidence.json")
-    receipt = json.loads((root / "docs/phase-6.1-receipt.json").read_text())
+    if benchmark not in BENCHMARKS:
+        raise ValueError(f"Unknown benchmark {benchmark!r}; expected one of {sorted(BENCHMARKS)}")
+    collection = BENCHMARKS[benchmark]["build"](root)
+    receipt = json.loads((root / BENCHMARKS[benchmark]["receipt"]).read_text())
     if (receipt["status"] != "verified" or receipt["collection_sha256"] != collection["collection_sha256"]
             or receipt["dataset_name"] != collection["dataset_name"]):
         raise ValueError("The upload receipt does not identify the current verified collection")
@@ -95,7 +123,9 @@ def build_plan(root: Path, model: str = DEFAULT_EVAL_MODEL, max_attempts: int = 
         "schema_version": 1, "dataset_id": receipt["dataset_id"], "dataset_url": receipt["dataset_url"],
         "dataset_name": receipt["dataset_name"], "dataset_version": receipt["dataset_version"],
         "examples": expected, "coverage": collection["coverage"],
-        "metadata": {"phase": phase, "collection_sha256": collection["collection_sha256"],
+        "metadata": {"phase": phase, "benchmark": benchmark,
+                     "description": BENCHMARKS[benchmark]["description"],
+                     "collection_sha256": collection["collection_sha256"],
                      "pinned_dataset_version": receipt["dataset_version"], "models": sorted({model, config["critic_model"]}),
                      "configuration": config, "configuration_sha256": digest(config),
                      "expected_examples": len(expected), "expected_feedback_keys": FEEDBACK_KEYS},
