@@ -1,0 +1,60 @@
+# The playground: the page a person opens. `s2p.fly.dev` is a JSON API and
+# always was — somebody who opens it in a browser gets {"detail":"Not Found"} —
+# so this is the half of the deployment that is meant to be looked at.
+#
+# It holds S2P_DEMO_KEY and never hands it out. A visitor gets a URL, not a
+# credential, which is the whole point: the demo is something you can put on a
+# CV without giving anyone your keys.
+
+app = "varun-s2p"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile.ui"
+
+[env]
+  # The graph, over its public hostname — NOT `http://s2p.internal:8000`, which
+  # is the obvious thing to write and does not work. Measured from inside this
+  # machine:
+  #
+  #   s2p.internal resolves -> fdaa:c2:e571:a7b:303:2178:2194:2   (DNS is fine)
+  #   http://s2p.internal:8000/ok -> [Errno 111] Connection refused
+  #   https://s2p.fly.dev/ok      -> {"ok":true}
+  #
+  # Fly's private network is IPv6-only, and the LangGraph image binds
+  # `0.0.0.0:8000` — IPv4. A service on 0.0.0.0 is invisible to the rest of the
+  # org exactly as one on 127.0.0.1 is, which is the same trap `redis.toml`
+  # answers with `--bind ::`. We do not control this image's bind address, so
+  # the traffic goes out to Fly's edge and back: a few milliseconds and TLS,
+  # against a graph run measured in minutes.
+  #
+  # `is_local()` reads this as NOT local — it checks for localhost/127.0.0.1 —
+  # so the folder-path input stays hidden and suite runs authenticate with the
+  # demo key, which is what keeps them metered.
+  LANGGRAPH_DEPLOYMENT_URL = "https://s2p.fly.dev"
+
+[http_service]
+  internal_port = 8501
+  force_https = true
+  # A conversion is a minutes-long streamed run. Stopping the machine between
+  # requests would kill one mid-flight, and a cold start is the first thing a
+  # visitor would experience.
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "30s"
+    interval = "30s"
+    method = "GET"
+    timeout = "10s"
+    # Streamlit's own health endpoint. `/` returns the app shell and would look
+    # healthy even if the server were failing to run the script.
+    path = "/_stcore/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  # 512 MB. The graph's app needs 2 GB because tsc is memory-hungry; nothing
+  # here compiles anything, so this is a Python process holding some session
+  # state and a few uploaded files.
+  memory = "512mb"

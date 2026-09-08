@@ -1,0 +1,41 @@
+# The playground, as its own app.
+#
+# Deliberately NOT the graph's image. That one carries Node, a pinned TypeScript
+# compiler and ESLint, because the four gates shell out to them — 330 MB of
+# toolchain this page never touches. The playground draws widgets and makes HTTP
+# calls; everything that compiles anything happens on the other side of that
+# call. Two images because they are two jobs.
+FROM python:3.12-slim
+
+COPY --from=ghcr.io/astral-sh/uv:0.9.7 /uv /usr/local/bin/uv
+
+WORKDIR /app
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
+
+# Dependencies first, from the lockfile, in their own layer: they change far
+# less often than the page does, so an edit to ui/app.py reuses this.
+COPY pyproject.toml uv.lock README.md ./
+RUN mkdir -p src/selenium2playwright && touch src/selenium2playwright/__init__.py \
+ && uv sync --frozen --group ui --no-install-project
+
+# `env.REPO_ROOT` is `Path(__file__).resolve().parents[2]`, so the package has to
+# stay in a source layout — hence an editable install of the project at /app
+# rather than a copy into site-packages, where parents[2] would be the Python
+# install and every path in the app would point at nothing.
+COPY src ./src
+COPY ui ./ui
+# The sample buttons read these files at runtime; they are the fastest way for
+# somebody who has never seen the tool to watch it work. node_modules and out/
+# are excluded by .dockerignore, so this is ~150 KB of TypeScript.
+COPY samples/selenium-suite ./samples/selenium-suite
+COPY samples/playwright-golden ./samples/playwright-golden
+RUN uv sync --frozen --group ui
+
+EXPOSE 8501
+# --server.address 0.0.0.0 because Fly's proxy reaches the machine over the
+# private network; a process bound to 127.0.0.1 is invisible to it. That is safe
+# here in a way it is not on a laptop: the only local-only input (a folder path)
+# is hidden by `folder_blocker()` the moment the backend is not this machine.
+CMD ["/app/.venv/bin/streamlit", "run", "ui/app.py", \
+     "--server.port", "8501", "--server.address", "0.0.0.0", \
+     "--server.headless", "true", "--browser.gatherUsageStats", "false"]
