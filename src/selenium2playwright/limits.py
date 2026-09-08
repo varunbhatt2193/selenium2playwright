@@ -19,13 +19,27 @@ The budget is the one that cannot be argued with: when it is gone, it is gone
 for everybody until midnight UTC, and that is the whole point. An alert fires on
 the way up so the ceiling is never a surprise.
 
-**Where the counts live.** In Redis, which the deployment already runs for the
-run queue. Redis is the right shape for this: `INCR` is atomic, so two requests
-arriving at the same instant on two workers cannot both see "9 of 10 used", and
-`EXPIRE` means a window cleans itself up rather than needing a sweeper. With no
-`REDIS_URI` — a laptop, a test — it falls back to a dictionary in this process,
-which is correct for one process and wrong for two, and says so rather than
-pretending otherwise.
+**Where the counts live.** In Postgres, which the deployment already runs for
+the checkpointer. It used to be Redis, and Redis was the wrong shelf: the
+deployment starts it with `--appendonly no` and no volume, deliberately, because
+`redis.toml` says it holds "in-flight run state" and losing that costs only
+whatever was mid-flight. The budget counter is not in-flight state. It is the
+record of what the day has already cost, and on 2026-09-08 a routine redeploy
+restarted Redis mid-afternoon and set the day's spend back from 22 to 0 — which
+means the ceiling that is the only thing standing between a public URL and the
+card was really $5 *per deploy*, not per day.
+
+Postgres has a volume and survives a restart, and one `INSERT ... ON CONFLICT DO
+UPDATE ... RETURNING count` is as atomic as `INCRBY`: two requests arriving at
+the same instant on two workers cannot both see "9 of 10 used". What Postgres
+does not have is `EXPIRE`, so a window carries its own `expires_at` and a row
+past its deadline is treated as absent and swept later — the deadline is the
+truth, the sweep is only housekeeping.
+
+With no usable `POSTGRES_URI` this falls back to Redis, and with neither to a
+dictionary in this process — correct for one process and wrong for two, and it
+says so rather than pretending otherwise. Falling back to Redis is a downgrade
+in durability, never in enforcement, and it prints which shelf it chose.
 
 **Fail closed.** If Redis is unreachable we cannot know what has been spent, and
 "we cannot know" is not a reason to allow spending. Anonymous and demo callers
@@ -110,18 +124,63 @@ class Decision:
         return self.reason or "allowed"
 
 
-class _Counter:
-    """Atomic increment-with-expiry, over Redis when there is one.
+# One row per counter. `expires_at` is what `EXPIRE` was: a row past its
+# deadline is read as absent and overwritten in place by the next bump, so the
+# deadline is the truth and the sweep below is only housekeeping.
+_DDL = (
+    """CREATE TABLE IF NOT EXISTS s2p_limits (
+           key        text PRIMARY KEY,
+           count      bigint NOT NULL DEFAULT 0,
+           expires_at timestamptz NOT NULL
+       )""",
+    "CREATE INDEX IF NOT EXISTS s2p_limits_expires_at ON s2p_limits (expires_at)",
+)
 
-    The in-memory fallback is not a second implementation of the same thing —
-    it is a single-process approximation, and calling it that matters. Two
-    uvicorn workers each get their own dictionary, so the real limit becomes
-    twice what the configuration says. That is fine on a laptop and wrong in
-    production, which is exactly the split between where each backend is used.
+# The atomic bump. One statement, so two workers cannot interleave a read and a
+# write and both come away with a total that was never true. The CASE arms are
+# the expiry: an existing row whose deadline has passed is *replaced* (the new
+# count and the new deadline) rather than added to, which is what Redis does
+# when a key expires between two INCRs.
+_BUMP = """
+    INSERT INTO s2p_limits (key, count, expires_at)
+    VALUES (%(key)s, %(amount)s, now() + (%(ttl)s * interval '1 second'))
+    ON CONFLICT (key) DO UPDATE SET
+        count = CASE WHEN s2p_limits.expires_at <= now() THEN EXCLUDED.count
+                     ELSE s2p_limits.count + EXCLUDED.count END,
+        expires_at = CASE WHEN s2p_limits.expires_at <= now() THEN EXCLUDED.expires_at
+                          ELSE s2p_limits.expires_at END
+    RETURNING count
+"""
+
+# `SET ... NX` in one statement. A row is returned only when this call either
+# inserted it or reclaimed an expired one, which is exactly "first time only".
+_MARK_ONCE = """
+    INSERT INTO s2p_limits (key, count, expires_at)
+    VALUES (%(key)s, 1, now() + (%(ttl)s * interval '1 second'))
+    ON CONFLICT (key) DO UPDATE SET count = 1, expires_at = EXCLUDED.expires_at
+    WHERE s2p_limits.expires_at <= now()
+    RETURNING count
+"""
+
+
+class _Counter:
+    """Atomic increment-with-expiry, over Postgres when there is one.
+
+    Three backends, in descending order of how much they can be trusted:
+    Postgres (durable, shared, survives a restart), Redis (shared, and on this
+    deployment explicitly not durable), and a dictionary in this process. The
+    in-memory one is not a second implementation of the same thing — it is a
+    single-process approximation, and calling it that matters. Two uvicorn
+    workers each get their own dictionary, so the real limit becomes twice what
+    the configuration says. That is fine on a laptop and wrong in production,
+    which is exactly the split between where each backend is used.
     """
 
     def __init__(self) -> None:
         self._redis = None
+        self._pool = None
+        self._ready = False
+        self._swept = 0.0
         self._memory: dict[str, tuple[int, float]] = {}
         self._lock = asyncio.Lock()
         uri = os.environ.get("REDIS_URI") or os.environ.get("REDIS_URL") or ""
@@ -131,10 +190,101 @@ class _Counter:
         # laptop — a limiter that breaks local development gets switched off,
         # and a limiter that is switched off is not a limiter.
         self._uri = uri if uri.startswith(("redis://", "rediss://", "unix://")) else ""
+        # Same rule for Postgres, and the same reason. `DATABASE_URI` is the
+        # second name `deploy.sh` sets it under, because the compose file the
+        # LangGraph CLI generates uses one and the runtime reads the other.
+        pg = (os.environ.get("POSTGRES_URI") or os.environ.get("DATABASE_URI")
+              or os.environ.get("DATABASE_URL") or "")
+        self._pg = pg if pg.startswith(("postgres://", "postgresql://")) else ""
+
+    @property
+    def backend(self) -> str:
+        """Which shelf the counts are actually on. Reported by `/limits`."""
+        if self._pg:
+            return "postgres"
+        return "redis" if self._uri else "memory"
+
+    @property
+    def durable(self) -> bool:
+        """Do the counts survive a restart of the thing holding them?
+
+        Only Postgres does here. Redis on this deployment runs `--appendonly no`
+        with no volume, so it is shared but not durable — which is the whole
+        reason the budget moved off it.
+        """
+        return bool(self._pg)
 
     @property
     def distributed(self) -> bool:
-        return bool(self._uri)
+        return bool(self._pg or self._uri)
+
+    async def _pool_or_none(self):
+        """The Postgres pool, or None if this image cannot talk to Postgres.
+
+        The fallback is deliberate and one-way. If `psycopg` is missing the
+        alternative would be to fail closed and refuse every conversion, which
+        turns a durability problem into an outage; dropping to Redis keeps the
+        meter enforcing exactly as it did before, just without surviving a
+        restart. It is a downgrade in durability, never in enforcement, and it
+        says so out loud rather than degrading quietly.
+        """
+        if self._pool is None:
+            try:
+                from psycopg_pool import AsyncConnectionPool
+            except ImportError:
+                print("[s2p][limits] psycopg missing — counts fall back to "
+                      f"{'redis' if self._uri else 'memory'} and will not "
+                      "survive a restart", flush=True)
+                self._pg = ""
+                return None
+            pool = AsyncConnectionPool(self._pg, min_size=1, max_size=4,
+                                       open=False, kwargs={"autocommit": True})
+            try:
+                await pool.open()
+            except Exception:
+                # Bind the pool only once it is actually open. Assigning first
+                # and failing here would leave a pool that every later call
+                # skipped re-opening — because it is no longer None — and then
+                # used, so a database that was briefly unreachable would look
+                # permanently broken. Raising instead lets `spend()` fail closed
+                # for this request and try again cleanly on the next one.
+                await pool.close()
+                raise
+            self._pool = pool
+        if not self._ready:
+            async with self._pool.connection() as conn:
+                for statement in _DDL:
+                    try:
+                        await conn.execute(statement)
+                    except Exception:  # noqa: BLE001
+                        # Two workers can run CREATE ... IF NOT EXISTS at the
+                        # same instant, and one loses the race with a duplicate
+                        # -object error rather than a quiet no-op. The table is
+                        # there either way; if it genuinely is not, the very
+                        # next statement says so and `spend()` fails closed.
+                        pass
+            self._ready = True
+        return self._pool
+
+    async def _sweep(self) -> None:
+        """Delete long-dead rows, at most hourly per process. Never load-bearing.
+
+        Expiry is enforced by `expires_at` on every read and write, so a row
+        left lying about is wasted space and nothing else — which is why this
+        swallows its own failures and why the clock is advanced before the
+        attempt rather than after, so a sweep that cannot run is not retried on
+        every single request.
+        """
+        now = time.monotonic()
+        if now - self._swept < 3600:
+            return
+        self._swept = now
+        try:
+            async with self._pool.connection() as conn:
+                await conn.execute(
+                    "DELETE FROM s2p_limits WHERE expires_at < now() - interval '1 day'")
+        except Exception:  # noqa: BLE001
+            pass
 
     async def _client(self):
         if self._redis is None:
@@ -153,6 +303,16 @@ class _Counter:
         not be — two callers interleaving would each read a total that was never
         true.
         """
+        if self._pg:
+            pool = await self._pool_or_none()
+            if pool is not None:
+                async with pool.connection() as conn:
+                    cur = await conn.execute(
+                        _BUMP, {"key": key, "amount": amount, "ttl": ttl})
+                    row = await cur.fetchone()
+                await self._sweep()
+                return int(row[0])
+
         if not self._uri:
             async with self._lock:
                 now = time.monotonic()
@@ -186,6 +346,20 @@ class _Counter:
 
     async def undo(self, key: str, amount: int = 1) -> None:
         """Give back `amount` counts. See `spend()` for when this is and is not right."""
+        if self._pg:
+            pool = await self._pool_or_none()
+            if pool is not None:
+                async with pool.connection() as conn:
+                    # `GREATEST(0, ...)` so a refund can never drive a counter
+                    # negative and hand somebody a free allowance, and the
+                    # `expires_at` guard so a refund arriving after the window
+                    # closed does not resurrect a dead row.
+                    await conn.execute(
+                        """UPDATE s2p_limits SET count = GREATEST(0, count - %(amount)s)
+                           WHERE key = %(key)s AND expires_at > now()""",
+                        {"key": key, "amount": amount})
+                return
+
         if not self._uri:
             async with self._lock:
                 count, expires = self._memory.get(key, (0, 0.0))
@@ -196,6 +370,16 @@ class _Counter:
         await client.decrby(key, amount)
 
     async def read(self, key: str) -> int:
+        if self._pg:
+            pool = await self._pool_or_none()
+            if pool is not None:
+                async with pool.connection() as conn:
+                    cur = await conn.execute(
+                        "SELECT count FROM s2p_limits WHERE key = %(key)s AND expires_at > now()",
+                        {"key": key})
+                    row = await cur.fetchone()
+                return int(row[0]) if row else 0
+
         if not self._uri:
             count, expires = self._memory.get(key, (0, 0.0))
             return count if expires > time.monotonic() else 0
@@ -204,6 +388,13 @@ class _Counter:
 
     async def mark_once(self, key: str, ttl: int) -> bool:
         """True the first time only. Used so an alert fires once, not per request."""
+        if self._pg:
+            pool = await self._pool_or_none()
+            if pool is not None:
+                async with pool.connection() as conn:
+                    cur = await conn.execute(_MARK_ONCE, {"key": key, "ttl": ttl})
+                    return (await cur.fetchone()) is not None
+
         if not self._uri:
             async with self._lock:
                 now = time.monotonic()
@@ -402,4 +593,10 @@ async def snapshot() -> dict[str, object]:
         "budget_usd_per_day": DAILY_BUDGET_USD,
         "alert_at": ALERT_AT,
         "shared_across_workers": _counter.distributed,
+        # Reported because the day this was wrong, nothing showed it. The spend
+        # went back to zero on a redeploy and the page cheerfully said "41 of 41
+        # left"; a meter that cannot survive a restart should say so where
+        # somebody will read it, not only in the module that implements it.
+        "counts_in": _counter.backend,
+        "survives_restart": _counter.durable,
     }

@@ -403,3 +403,57 @@ class SuiteUploadTests(unittest.TestCase):
         owner = FakeCtx("owner", ["owner"])
         self.assertTrue(run(guard.guard_run(
             owner, {"kwargs": {"input": {"root": "/anywhere", "out_root": "/tmp/out"}}})))
+
+
+class WhereTheCountsLiveTests(unittest.TestCase):
+    """Which shelf the meter picks, and whether it admits how sturdy it is.
+
+    This is the regression test for a real afternoon. The budget counter lived
+    in Redis, the deployment starts Redis with `--appendonly no` and no volume,
+    and a routine redeploy set the day's spend back from 22 to 0 — so the only
+    ceiling between a public URL and the card was really per-deploy. Nothing on
+    screen said so; `/limits` cheerfully reported a full allowance. Hence both
+    halves of what is checked here: the order the backends are preferred in, and
+    that the answer is *reported* rather than known only to this module.
+    """
+
+    def _counter(self, **env):
+        with patch.dict(os.environ, env, clear=True):
+            return limits._Counter()
+
+    def test_postgres_is_preferred_over_redis(self):
+        counter = self._counter(POSTGRES_URI="postgres://u:p@db:5432/x",
+                                REDIS_URI="redis://cache:6379")
+        self.assertEqual(counter.backend, "postgres")
+        self.assertTrue(counter.durable)
+        self.assertTrue(counter.distributed)
+
+    def test_redis_is_used_when_there_is_no_postgres(self):
+        counter = self._counter(REDIS_URI="redis://cache:6379")
+        self.assertEqual(counter.backend, "redis")
+        self.assertTrue(counter.distributed)
+        # The point of the whole change: shared across workers, but a restart
+        # loses the count, so this must not claim to be durable.
+        self.assertFalse(counter.durable)
+
+    def test_with_neither_it_falls_back_to_this_process(self):
+        counter = self._counter()
+        self.assertEqual(counter.backend, "memory")
+        self.assertFalse(counter.distributed)
+        self.assertFalse(counter.durable)
+
+    def test_a_uri_that_is_not_really_postgres_is_ignored(self):
+        # Same trap the Redis URI already guarded against: `langgraph dev` sets
+        # these to values its in-memory runtime understands and a real driver
+        # does not. Treating one as usable would fail every request closed on a
+        # laptop, and a limiter that breaks local development gets switched off.
+        counter = self._counter(POSTGRES_URI="memory://", REDIS_URI="redis://cache:6379")
+        self.assertEqual(counter.backend, "redis")
+
+    def test_the_snapshot_says_whether_the_count_survives_a_restart(self):
+        snapshot = run(limits.snapshot())
+        self.assertIn("counts_in", snapshot)
+        self.assertIn("survives_restart", snapshot)
+        # These tests run on the in-process fallback, which survives nothing.
+        self.assertEqual(snapshot["counts_in"], "memory")
+        self.assertFalse(snapshot["survives_restart"])

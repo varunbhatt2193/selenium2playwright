@@ -114,9 +114,25 @@ or refused before the model answers and the price is only known afterwards.
 `S2P_COST_PER_RUN` bridges the two and is a deliberate overestimate — the
 ceiling should bind early rather than late.
 
-Counts live in Redis, which the deployment already runs for the run queue.
-`INCR` is atomic, so two requests arriving at the same instant on two workers
-cannot both see "9 of 10 used", and `EXPIRE` means a window cleans itself up.
+Counts live in **Postgres**, which the deployment already runs for the
+checkpointer. One `INSERT ... ON CONFLICT DO UPDATE ... RETURNING count` is as
+atomic as `INCRBY`, so two requests arriving at the same instant on two workers
+cannot both see "9 of 10 used". Postgres has no `EXPIRE`, so each row carries an
+`expires_at` and a row past its deadline reads as absent and is replaced in
+place by the next bump; a sweep deletes long-dead rows as housekeeping only.
+
+They lived in Redis until 2026-09-08, and Redis was the wrong shelf. The
+deployment starts it with `--appendonly no` and no volume on purpose —
+`redis.toml` says it holds "in-flight run state", and losing that costs only
+whatever was mid-flight. The budget counter is not in-flight state. A routine
+redeploy restarted Redis mid-afternoon and set the day's spend back from 22 to
+0, which made the ceiling $5 *per deploy* rather than per day, on the one limit
+that exists to stop the bill. `/limits` now reports `counts_in` and
+`survives_restart` so the same failure would be visible rather than silent.
+
+With no usable `POSTGRES_URI` this falls back to Redis, and with neither to a
+dictionary in this process. Falling back is a downgrade in durability, never in
+enforcement, and it says which shelf it chose.
 
 Two refunds, for opposite reasons, and the asymmetry is the design:
 
