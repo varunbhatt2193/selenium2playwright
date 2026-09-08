@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Check,
   ChevronRight,
@@ -9,14 +9,11 @@ import {
   Play,
   RotateCcw,
   ShieldCheck,
-  ThumbsDown,
-  ThumbsUp,
   UploadCloud,
-  Wand2,
   X,
   Zap,
 } from 'lucide-react'
-import { convert, download, sendFeedback } from '../api'
+import { convert, download } from '../api'
 import type { ConvertDone, Limits, Sample, Session } from '../types'
 import Code from './Code'
 import Ring from './Ring'
@@ -25,9 +22,8 @@ type Props = { session: Session | null; limits: Limits | null; onSpent: () => vo
 type Tab = 'before' | 'after' | 'diff'
 type Status = 'idle' | 'running' | 'done'
 
-// What the agent does, in order, for the empty state. Same six steps the
-// Streamlit sidebar listed, kept here so the empty right-hand pane teaches
-// instead of waiting.
+// What the agent does, in order, for the empty state — so the right-hand pane
+// teaches instead of waiting.
 const STEPS: [string, string][] = [
   ['Intake', 'reads the file and classifies it: page object, spec, or something to refuse'],
   ['Recall', 'looks in long-term memory for conventions worth applying'],
@@ -52,20 +48,17 @@ function complaint(source: string, filename: string, companionName: string, comp
   return ''
 }
 
-const Lab = forwardRef<HTMLElement, Props>(function Lab({ session, limits, onSpent }, ref) {
+export default function Lab({ session, limits, onSpent }: Props) {
   const [source, setSource] = useState('')
   const [filename, setFilename] = useState('')
   const [companionName, setCompanionName] = useState('')
   const [companionText, setCompanionText] = useState('')
-  const [showCompanion, setShowCompanion] = useState(false)
+  const [showAdvanced, setShowAdvanced] = useState(false)
   const [status, setStatus] = useState<Status>('idle')
   const [trail, setTrail] = useState<string[]>([])
   const [result, setResult] = useState<ConvertDone | null>(null)
   const [error, setError] = useState('')
   const [tab, setTab] = useState<Tab>('before')
-  const [refinement, setRefinement] = useState('')
-  const [comment, setComment] = useState('')
-  const [verdict, setVerdict] = useState('')
   const [copied, setCopied] = useState(false)
   const [showUploader, setShowUploader] = useState(false)
   const [dragging, setDragging] = useState(false)
@@ -94,7 +87,6 @@ const Lab = forwardRef<HTMLElement, Props>(function Lab({ session, limits, onSpe
     setFilename(sample.name)
     setCompanionName(sample.companion_name)
     setCompanionText(sample.companion_text)
-    setShowCompanion(Boolean(sample.companion_text))
     clearResult()
   }
 
@@ -102,8 +94,6 @@ const Lab = forwardRef<HTMLElement, Props>(function Lab({ session, limits, onSpe
     setResult(null)
     setTrail([])
     setError('')
-    setVerdict('')
-    setRefinement('')
     setTab('before')
     setStatus('idle')
   }
@@ -119,20 +109,17 @@ const Lab = forwardRef<HTMLElement, Props>(function Lab({ session, limits, onSpe
     }
   }
 
-  async function run(refine = '') {
+  async function run() {
     setStatus('running')
     setError('')
-    setVerdict('')
     setTrail([])
-    if (!refine) setResult(null)
+    setResult(null)
     try {
       for await (const event of convert({
         source,
         filename,
         companion_name: companionName,
         companion_text: companionText,
-        refinement: refine,
-        thread_id: refine ? result?.thread_id : '',
       })) {
         if (event.kind === 'node') setTrail((t) => [...t, event.label])
         else if (event.kind === 'done') {
@@ -144,7 +131,6 @@ const Lab = forwardRef<HTMLElement, Props>(function Lab({ session, limits, onSpe
       setError((err as Error).message)
     } finally {
       setStatus('done')
-      setRefinement('')
       onSpent()
     }
   }
@@ -155,7 +141,7 @@ const Lab = forwardRef<HTMLElement, Props>(function Lab({ session, limits, onSpe
       if (uploaderTarget.current === 'companion') {
         setCompanionName(file.name)
         setCompanionText(text.replace(/^﻿/, ''))
-        setShowCompanion(true)
+        setShowAdvanced(true)
       } else {
         setSource(text.replace(/^﻿/, ''))
         setFilename(file.name)
@@ -181,31 +167,21 @@ const Lab = forwardRef<HTMLElement, Props>(function Lab({ session, limits, onSpe
     }
   }
 
-  async function vote(score: number) {
-    if (!result?.run_id) return
-    const answer = await sendFeedback({
-      run_id: result.run_id,
-      score,
-      comment,
-      source_text: source,
-      source_path: filename,
-    })
-    setVerdict(answer.detail)
-  }
-
   const running = status === 'running'
   const budgetOut = Boolean(limits?.budget && limits.budget.remaining <= 0)
+  const sendingCompanion = Boolean(companionText.trim() && companionName)
 
   return (
-    <section className="lab-section" ref={ref} aria-labelledby="lab-title" id="lab">
-      <div className="section-kicker">01 · Live conversion</div>
+    <section className="lab-section" aria-labelledby="lab-title" id="lab">
       <div className="section-heading-row">
         <div>
-          <h2 id="lab-title">Watch one file convert, gate by gate.</h2>
-          <p>
-            Pick a sample from the real suite or paste your own. Every result below was compiled by a real
-            TypeScript compiler before you saw it.
-          </p>
+          <h1 id="lab-title">Convert one file</h1>
+          <p>Pick a sample or paste your own Selenium file, press Run, and watch it convert, check by check.</p>
+          {limits?.line && (
+            <p className="page-meter">
+              <ShieldCheck size={13} /> {limits.line}
+            </p>
+          )}
         </div>
         <button className="secondary-button" onClick={() => openUploader('source')}>
           <UploadCloud size={16} /> Upload .ts
@@ -260,7 +236,7 @@ const Lab = forwardRef<HTMLElement, Props>(function Lab({ session, limits, onSpe
             </button>
             <button
               className="run-button"
-              onClick={() => run()}
+              onClick={run}
               disabled={running || Boolean(problem) || budgetOut}
               title={problem || (budgetOut ? limits?.line : 'Send it to the agent')}
             >
@@ -327,16 +303,21 @@ const Lab = forwardRef<HTMLElement, Props>(function Lab({ session, limits, onSpe
 
             {tab === 'before' && (
               <div className="companion">
-                <button className="companion-toggle" onClick={() => setShowCompanion((v) => !v)}>
-                  <ChevronRight size={14} className={showCompanion ? 'rot' : ''} />
-                  Companion file
-                  {companionText.trim() && companionName ? <span className="chip-note">sending {companionName}</span> : <span className="chip-note muted">optional</span>}
+                <button className="companion-toggle" onClick={() => setShowAdvanced((v) => !v)} aria-expanded={showAdvanced}>
+                  <ChevronRight size={14} className={showAdvanced ? 'rot' : ''} />
+                  Advanced
+                  {sendingCompanion ? (
+                    <span className="chip-note">sending companion {companionName}</span>
+                  ) : (
+                    <span className="chip-note muted">companion file · optional</span>
+                  )}
                 </button>
-                {showCompanion && (
+                {showAdvanced && (
                   <div className="companion-body">
                     <p>
-                      If this file imports another one, give the compiler the <strong>already-converted</strong>{' '}
-                      Playwright version of it — the same thing the suite run does in wave two.
+                      Does this file import another one? Give the compiler the <strong>already-converted</strong>{' '}
+                      Playwright version of it, so the converted file has something to import. The samples that
+                      need one bring their own.
                     </p>
                     <div className="companion-row">
                       <input
@@ -454,23 +435,6 @@ const Lab = forwardRef<HTMLElement, Props>(function Lab({ session, limits, onSpe
                   </div>
                 )}
 
-                {Object.keys(card.models).length > 0 && (
-                  <div className="models-line">
-                    {Object.entries(card.models).map(([role, name]) => (
-                      <span key={role}>
-                        <small>{role}</small> <code>{name}</code>
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {result && result.trail.length > 0 && (
-                  <details className="trail-details">
-                    <summary>What it did — {result.trail.length} steps</summary>
-                    <Trail trail={result.trail} />
-                  </details>
-                )}
-
                 <div className={`review-note ${card.todos.length ? 'warn' : ''}`}>
                   <ShieldCheck size={16} />
                   <span>
@@ -489,16 +453,6 @@ const Lab = forwardRef<HTMLElement, Props>(function Lab({ session, limits, onSpe
                     ))}
                   </ul>
                 )}
-                {card.notes.length > 0 && (
-                  <details className="trail-details">
-                    <summary>Notes from the conversion — {card.notes.length}</summary>
-                    <ul className="todo-list plain">
-                      {card.notes.map((note, i) => (
-                        <li key={i}>{note}</li>
-                      ))}
-                    </ul>
-                  </details>
-                )}
                 {card.errors.length > 0 && (
                   <ul className="todo-list errors">
                     {card.errors.map((e, i) => (
@@ -508,61 +462,15 @@ const Lab = forwardRef<HTMLElement, Props>(function Lab({ session, limits, onSpe
                 )}
 
                 {card.code && (
-                  <>
-                    <div className="download-row">
-                      <button onClick={() => download(result!.download_name, card.code, 'text/typescript')}>
-                        <Download size={15} /> Download {result!.download_name}
-                      </button>
-                      <button onClick={copyCode}>
-                        {copied ? <Check size={15} /> : <Copy size={15} />} {copied ? 'Copied' : 'Copy'}
-                      </button>
-                    </div>
-
-                    <form
-                      className="refine"
-                      onSubmit={(e) => {
-                        e.preventDefault()
-                        if (refinement.trim()) run(refinement.trim())
-                      }}
-                    >
-                      <label htmlFor="refine-input">
-                        <Wand2 size={14} /> Ask for a change
-                        <small>a second turn on the same thread — the agent still has this draft</small>
-                      </label>
-                      <div className="refine-row">
-                        <input
-                          id="refine-input"
-                          value={refinement}
-                          onChange={(e) => setRefinement(e.target.value)}
-                          placeholder="Use getByRole for the buttons."
-                          disabled={running}
-                        />
-                        <button type="submit" disabled={!refinement.trim() || running || budgetOut}>
-                          Refine
-                        </button>
-                      </div>
-                    </form>
-                  </>
-                )}
-
-                <div className="verdict-row">
-                  <span>Was this a good conversion?</span>
-                  <input
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
-                    placeholder="Anything to add? (optional)"
-                    aria-label="Feedback comment"
-                  />
-                  <div className="thumbs">
-                    <button onClick={() => vote(1)} disabled={!result?.run_id} aria-label="Good conversion">
-                      <ThumbsUp size={15} />
+                  <div className="download-row">
+                    <button onClick={() => download(result!.download_name, card.code, 'text/typescript')}>
+                      <Download size={15} /> Download {result!.download_name}
                     </button>
-                    <button onClick={() => vote(0)} disabled={!result?.run_id} aria-label="Bad conversion">
-                      <ThumbsDown size={15} />
+                    <button onClick={copyCode}>
+                      {copied ? <Check size={15} /> : <Copy size={15} />} {copied ? 'Copied' : 'Copy'}
                     </button>
                   </div>
-                </div>
-                {verdict && <div className="verdict-note">{verdict}</div>}
+                )}
               </>
             )}
           </aside>
@@ -625,9 +533,7 @@ const Lab = forwardRef<HTMLElement, Props>(function Lab({ session, limits, onSpe
       )}
     </section>
   )
-})
-
-export default Lab
+}
 
 const GATE_NOTE: Record<string, string> = {
   compile: 'the written file, through the real tsc',

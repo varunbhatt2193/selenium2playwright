@@ -1,40 +1,46 @@
-import { ArrowRight, Github, Radio } from 'lucide-react'
+import { FileCode2, FlaskConical, FolderArchive, Github, Home, Linkedin, Workflow } from 'lucide-react'
+import { GITHUB, LINKEDIN } from '../links'
+import { Link, type Page } from '../router'
 import Brand from './Brand'
 
-type Props = { onOpenLab: () => void; onOpenSuite: () => void }
+type Props = { page: Page | null }
 
-export default function Nav({ onOpenLab, onOpenSuite }: Props) {
+const ITEMS: [Page, string, typeof Home][] = [
+  ['/', 'Home', Home],
+  ['/convert', 'Single file', FileCode2],
+  ['/suite', 'Whole suite', FolderArchive],
+  ['/how-it-works', 'How it works', Workflow],
+  ['/evaluation', 'Evaluation', FlaskConical],
+]
+
+export default function Nav({ page }: Props) {
   return (
     <header className="nav-wrap">
       <nav className="nav" aria-label="Primary navigation">
-        <button className="brand" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} aria-label="Back to top">
+        <Link to="/" className="brand" aria-label="Home">
           <Brand />
           <span>
             Selenium <span className="brand-arrow">→</span> Playwright
           </span>
-        </button>
+        </Link>
         <div className="nav-meta">
-          <span className="live-pill">
-            <Radio size={12} /> Live agent · metered
-          </span>
-          <button className="nav-link" onClick={onOpenSuite}>
-            Whole suite
-          </button>
-          <a className="nav-link" href="#approach">
-            How it works
+          {ITEMS.map(([to, label, Icon]) => (
+            <Link
+              key={to}
+              to={to}
+              className={`nav-link ${page === to ? 'active' : ''}`}
+              aria-current={page === to ? 'page' : undefined}
+            >
+              <Icon size={15} /> <span>{label}</span>
+            </Link>
+          ))}
+          <span className="nav-sep" aria-hidden="true" />
+          <a className="nav-link nav-icon" href={GITHUB} target="_blank" rel="noreferrer" aria-label="Source on GitHub">
+            <Github size={16} /> <span>GitHub</span>
           </a>
-          <a
-            className="nav-link nav-icon"
-            href="https://github.com/varunbhatt2193/selenium2playwright"
-            target="_blank"
-            rel="noreferrer"
-            aria-label="Source on GitHub"
-          >
-            <Github size={16} /> <span>Source</span>
+          <a className="nav-link nav-icon" href={LINKEDIN} target="_blank" rel="noreferrer" aria-label="Varun Bhatt on LinkedIn">
+            <Linkedin size={16} /> <span>LinkedIn</span>
           </a>
-          <button className="nav-cta" onClick={onOpenLab}>
-            Open lab <ArrowRight size={15} />
-          </button>
         </div>
       </nav>
     </header>

@@ -1,28 +1,20 @@
-import { forwardRef, useRef, useState } from 'react'
-import {
-  Check,
-  Download,
-  FolderArchive,
-  Layers,
-  Loader2,
-  Play,
-  ShieldCheck,
-  Sparkles,
-  X,
-} from 'lucide-react'
+import { useRef, useState } from 'react'
+import { Check, Download, FolderArchive, Layers, Loader2, Play, ShieldCheck, Sparkles, X } from 'lucide-react'
 import { convertSuite, download, planSuite, sampleSuite, suiteZip } from '../api'
 import type { FileRow, Limits, PlanResponse, SuiteResult } from '../types'
 import Code from './Code'
 
 type Props = { limits: Limits | null; onSpent: () => void }
 type Status = 'idle' | 'planning' | 'running' | 'done'
-type ResultTab = 'files' | 'tree' | 'parity' | 'todos' | 'report'
+type ResultTab = 'files' | 'todos' | 'report'
 
-const SuiteLab = forwardRef<HTMLElement, Props>(function SuiteLab({ limits, onSpent }, ref) {
+// The two knobs the page used to show, fixed at the values the sample suite
+// converts with: four files at a time, up to three attempts each.
+const PARALLEL = 4
+const ATTEMPTS = 3
+
+export default function SuiteLab({ limits, onSpent }: Props) {
   const [planned, setPlanned] = useState<PlanResponse | null>(null)
-  const [only, setOnly] = useState('')
-  const [parallel, setParallel] = useState(4)
-  const [attempts, setAttempts] = useState(3)
   const [status, setStatus] = useState<Status>('idle')
   const [dragging, setDragging] = useState(false)
   const [error, setError] = useState('')
@@ -34,20 +26,18 @@ const SuiteLab = forwardRef<HTMLElement, Props>(function SuiteLab({ limits, onSp
   const [reading, setReading] = useState('')
   const [zipping, setZipping] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
-  const lastFiles = useRef<File[]>([])
 
   const running = status === 'running'
   const budgetOut = Boolean(limits?.budget && limits.budget.remaining <= 0)
 
-  async function plan(files: File[], filter = only) {
+  async function plan(files: File[]) {
     if (!files.length) return
-    lastFiles.current = files
     setStatus('planning')
     setError('')
     setResult(null)
     setRows([])
     try {
-      setPlanned(await planSuite(files, filter))
+      setPlanned(await planSuite(files, ''))
     } catch (err) {
       setPlanned(null)
       setError((err as Error).message)
@@ -61,9 +51,8 @@ const SuiteLab = forwardRef<HTMLElement, Props>(function SuiteLab({ limits, onSp
     setError('')
     setResult(null)
     setRows([])
-    lastFiles.current = []
     try {
-      setPlanned(await sampleSuite(only))
+      setPlanned(await sampleSuite(''))
     } catch (err) {
       setPlanned(null)
       setError((err as Error).message)
@@ -83,9 +72,9 @@ const SuiteLab = forwardRef<HTMLElement, Props>(function SuiteLab({ limits, onSp
     try {
       for await (const event of convertSuite({
         tree: planned.tree,
-        only,
-        parallel,
-        attempts,
+        only: '',
+        parallel: PARALLEL,
+        attempts: ATTEMPTS,
         model: '',
       })) {
         if (event.kind === 'start') setExpected(event.files)
@@ -125,15 +114,16 @@ const SuiteLab = forwardRef<HTMLElement, Props>(function SuiteLab({ limits, onSp
   const counts = result?.totals ?? {}
 
   return (
-    <section className="lab-section suite-section" ref={ref} aria-labelledby="suite-title" id="suite">
-      <div className="section-kicker">02 · Whole suite</div>
+    <section className="lab-section suite-section" aria-labelledby="suite-title" id="suite">
       <div className="section-heading-row">
         <div>
-          <h2 id="suite-title">Or drop the folder, and get a folder back.</h2>
-          <p>
-            Page objects first, then the specs that import them — each wave converted in parallel, then the whole
-            tree compiled as <strong>one project</strong>. The report comes back inside the zip.
-          </p>
+          <h1 id="suite-title">Convert a whole suite</h1>
+          <p>Drop a zip of your Selenium folder, or load the sample suite, and get a Playwright folder back.</p>
+          {limits?.line && (
+            <p className="page-meter">
+              <ShieldCheck size={13} /> {limits.line}
+            </p>
+          )}
         </div>
         <button className="secondary-button" onClick={loadSample} disabled={running || status === 'planning'}>
           <Sparkles size={16} /> Use the 12-file sample suite
@@ -173,31 +163,11 @@ const SuiteLab = forwardRef<HTMLElement, Props>(function SuiteLab({ limits, onSp
               <span>or its files · a zip keeps the folder structure the imports need</span>
             </div>
 
-            <div className="suite-options">
-              <label>
-                <span>Only these files</span>
-                <input
-                  value={only}
-                  onChange={(e) => setOnly(e.target.value)}
-                  onBlur={() => (lastFiles.current.length ? plan(lastFiles.current, only) : planned && loadSample())}
-                  placeholder="pages/*.ts, LoginPage.ts — blank for the whole folder"
-                  spellCheck={false}
-                  disabled={running}
-                />
-              </label>
-              <label>
-                <span>
-                  Files at a time <b>{parallel}</b>
-                </span>
-                <input type="range" min={1} max={16} value={parallel} onChange={(e) => setParallel(Number(e.target.value))} disabled={running} />
-              </label>
-              <label>
-                <span>
-                  Attempts per file <b>{attempts}</b>
-                </span>
-                <input type="range" min={1} max={3} value={attempts} onChange={(e) => setAttempts(Number(e.target.value))} disabled={running} />
-              </label>
-            </div>
+            <ul className="suite-how">
+              <li>Page objects convert first, then the specs that import them.</li>
+              <li>The converted folder is compiled as one project, not file by file.</li>
+              <li>The report comes back inside the zip.</li>
+            </ul>
           </div>
 
           <aside className="coverage-pane plan-pane" aria-label="Suite plan">
@@ -214,7 +184,7 @@ const SuiteLab = forwardRef<HTMLElement, Props>(function SuiteLab({ limits, onSp
             )}
             {!p && status !== 'planning' && (
               <div className="plan-empty">
-                Drop the files, or load the sample suite, to see the wave plan: what converts, what is carried across
+                Drop the files, or load the sample suite, to see the plan: what converts, what is carried across
                 untouched, and what it costs of today's budget.
               </div>
             )}
@@ -253,8 +223,7 @@ const SuiteLab = forwardRef<HTMLElement, Props>(function SuiteLab({ limits, onSp
                   </details>
                 )}
                 <p className="plan-cost">
-                  Costs <strong>{p.billable}</strong> of today's conversions — every file sent, because the meter cannot
-                  tell them apart without doing the scan itself.
+                  Costs <strong>{p.billable}</strong> of today's conversions.
                 </p>
                 {blocked && <div className="error-box soft">{blocked}</div>}
               </>
@@ -313,9 +282,9 @@ const SuiteLab = forwardRef<HTMLElement, Props>(function SuiteLab({ limits, onSp
             </div>
 
             <div className="code-tabs" role="tablist">
-              {(['files', 'tree', 'parity', 'todos', 'report'] as ResultTab[]).map((t) => (
+              {(['files', 'todos', 'report'] as ResultTab[]).map((t) => (
                 <button key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)} role="tab">
-                  {t === 'files' ? 'Files' : t === 'tree' ? 'Tree' : t === 'parity' ? 'Parity' : t === 'todos' ? `TODOs · ${result.todos.length}` : 'Report'}
+                  {t === 'files' ? 'Files' : t === 'todos' ? `TODOs · ${result.todos.length}` : 'Report'}
                 </button>
               ))}
             </div>
@@ -341,74 +310,6 @@ const SuiteLab = forwardRef<HTMLElement, Props>(function SuiteLab({ limits, onSp
                   </div>
                 )}
               </>
-            )}
-
-            {tab === 'tree' && (
-              <div className="tab-body">
-                <p className="muted-copy">
-                  Every per-file verdict is a claim about that file compiling against the companions it happened to
-                  import. This is the converted folder compiled as <strong>one project</strong>.
-                </p>
-                {result.compiles ? (
-                  <div className="review-note ok">
-                    <Check size={16} />
-                    <span>
-                      <strong>{result.tree_files} files compile together.</strong>
-                      <small>No findings from tsc over the whole tree.</small>
-                    </span>
-                  </div>
-                ) : result.tree_error ? (
-                  <div className="error-box soft">The tree could not be compiled: {result.tree_error}</div>
-                ) : (
-                  <>
-                    <div className="error-box soft">The tree does not compile — {result.tree_findings.length} finding(s).</div>
-                    <Code code={result.tree_findings.join('\n')} language="plain" lineNumbers={false} />
-                  </>
-                )}
-              </div>
-            )}
-
-            {tab === 'parity' && (
-              <div className="tab-body">
-                <p className="muted-copy">
-                  What the source exposed publicly, and what became of it. A rename is a guess; a removal with no reason
-                  is the line worth reading.
-                </p>
-                <div className="stat-row">
-                  <Stat label="Kept" value={String(result.kept)} tone="good" />
-                  <Stat label="Renamed" value={String(result.renamed)} tone={result.renamed ? 'warn' : 'idle'} />
-                  <Stat label="Removed" value={String(result.removed)} tone={result.removed ? 'warn' : 'idle'} />
-                  <Stat label="Unexplained" value={String(result.unexplained)} tone={result.unexplained ? 'bad' : 'idle'} />
-                </div>
-                {result.losses.length ? (
-                  <table className="file-table">
-                    <thead>
-                      <tr>
-                        <th>file</th>
-                        <th>name</th>
-                        <th>verdict</th>
-                        <th>reason</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {result.losses.map(([path, name, verdict, reason], i) => (
-                        <tr key={i}>
-                          <td>
-                            <code>{path}</code>
-                          </td>
-                          <td>
-                            <code>{name}</code>
-                          </td>
-                          <td>{verdict}</td>
-                          <td>{reason}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <p className="muted-copy">Nothing lost or renamed.</p>
-                )}
-              </div>
             )}
 
             {tab === 'todos' && (
@@ -437,6 +338,64 @@ const SuiteLab = forwardRef<HTMLElement, Props>(function SuiteLab({ limits, onSp
 
             {tab === 'report' && (
               <div className="tab-body">
+                {result.compiles ? (
+                  <div className="review-note ok">
+                    <Check size={16} />
+                    <span>
+                      <strong>{result.tree_files} files compile together.</strong>
+                      <small>The converted folder was compiled as one project. No findings from tsc.</small>
+                    </span>
+                  </div>
+                ) : result.tree_error ? (
+                  <div className="error-box soft">The tree could not be compiled: {result.tree_error}</div>
+                ) : (
+                  <>
+                    <div className="error-box soft">
+                      The converted folder does not compile as one project — {result.tree_findings.length} finding(s).
+                    </div>
+                    <Code code={result.tree_findings.join('\n')} language="plain" lineNumbers={false} />
+                  </>
+                )}
+
+                <p className="muted-copy">
+                  Parity: what the source exposed publicly, and what became of it. A rename is a guess; a removal with
+                  no reason is the line worth reading.
+                </p>
+                <div className="stat-row">
+                  <Stat label="Kept" value={String(result.kept)} tone="good" />
+                  <Stat label="Renamed" value={String(result.renamed)} tone={result.renamed ? 'warn' : 'idle'} />
+                  <Stat label="Removed" value={String(result.removed)} tone={result.removed ? 'warn' : 'idle'} />
+                  <Stat label="Unexplained" value={String(result.unexplained)} tone={result.unexplained ? 'bad' : 'idle'} />
+                </div>
+                {result.losses.length > 0 && (
+                  <div className="table-scroll">
+                    <table className="file-table">
+                      <thead>
+                        <tr>
+                          <th>file</th>
+                          <th>name</th>
+                          <th>verdict</th>
+                          <th>reason</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {result.losses.map(([path, name, verdict, reason], i) => (
+                          <tr key={i}>
+                            <td>
+                              <code>{path}</code>
+                            </td>
+                            <td>
+                              <code>{name}</code>
+                            </td>
+                            <td>{verdict}</td>
+                            <td>{reason}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
                 {result.markdown ? (
                   <>
                     <div className="download-row">
@@ -456,9 +415,7 @@ const SuiteLab = forwardRef<HTMLElement, Props>(function SuiteLab({ limits, onSp
       </div>
     </section>
   )
-})
-
-export default SuiteLab
+}
 
 function Stat({ label, value, tone }: { label: string; value: string; tone: 'good' | 'warn' | 'bad' | 'idle' }) {
   return (
@@ -476,12 +433,8 @@ function FileTable({ rows }: { rows: FileRow[] }) {
         <thead>
           <tr>
             <th>file</th>
-            <th>wave</th>
             <th>status</th>
             <th>gates</th>
-            <th>critic</th>
-            <th>attempts</th>
-            <th>time</th>
             <th>why</th>
           </tr>
         </thead>
@@ -491,14 +444,10 @@ function FileTable({ rows }: { rows: FileRow[] }) {
               <td>
                 <code>{row.path}</code>
               </td>
-              <td>{row.wave}</td>
               <td>
                 <span className={`pill status-${row.status}`}>{row.status}</span>
               </td>
               <td>{row.gates_line}</td>
-              <td>{row.critic || '—'}</td>
-              <td>{row.attempts}</td>
-              <td>{row.seconds.toFixed(1)}s</td>
               <td className="why">
                 {row.reason}
                 {row.errors.length > 0 && <div className="row-error">{row.errors.join('; ')}</div>}

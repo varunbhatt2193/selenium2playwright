@@ -37,22 +37,57 @@ name. The page reads that stream with `fetch` (EventSource cannot POST) and
 draws the agent trace as it arrives, which is the most interesting thing on the
 page: you watch the reflection loop go round.
 
-What the page shows, top to bottom:
+The page is five pages (2026-09-08), one HTML file: the server answers every
+unknown path with `index.html`, and a thirty-line router in `ui/web/src/router.tsx`
+reads `location.pathname` and draws the right one — so `/convert` works on a
+refresh and as a link, with no router library. A shared top bar (Home · Single
+file · Whole suite · How it works · Evaluation · GitHub · LinkedIn) marks the current page.
 
-1. **Hero** — the sample suite's real numbers (12/12, ~20s) and the live budget
-   line from `GET /limits`, so the page says what is left before anyone spends it.
-2. **Live conversion** — six sample chips from the real suite, an editable
+1. **`/` — the front page.** Meant to be understood in ten seconds: a headline,
+   one sentence, the same login step in Selenium and in Playwright side by side,
+   two cards to the tool pages, and links to LinkedIn and the source. Nothing
+   else — the pipeline diagram and the sample-suite numbers are gone from the
+   page and live in the README. There is a slot for a demo video
+   (`DEMO_VIDEO` in `Home.tsx`: a YouTube or Loom link, or an `.mp4`; empty
+   renders nothing).
+2. **`/convert` — one file.** Six sample chips from the real suite, an editable
    Selenium pane, a Playwright pane with syntax colour, a diff, and the
    scorecard: a ring of gates passed, each gate PASS/FAIL with a one-line
-   explanation, the critic's verdict, which models did the work, the agent
-   trace, the TODO(review) ledger, Download and Copy, "Ask for a change" (a
-   second turn on the same thread) and 👍/👎.
-3. **Whole suite** — drop a zip (or press "Use the 12-file sample suite"), see the
-   wave plan and the price *before* the button, watch files tick off as they
-   land, then the result: per-file table, the whole-tree compile, the parity
-   ledger, every TODO, the report, and one button for the zip.
-4. **How it works** — the pipeline, and links to the source, the playbook and the
-   hard cases.
+   explanation, the critic's verdict, the TODO(review) ledger, Download and
+   Copy. The companion-file box sits behind an **Advanced** toggle; the samples
+   that need one bring their own. The budget line from `GET /limits` sits under
+   the heading.
+3. **`/suite` — a whole folder.** Drop a zip (or press "Use the 12-file sample
+   suite"), see the wave plan and the price *before* the button, watch files
+   tick off as they land, then the result: per-file table (file · status ·
+   gates · why), and three tabs — Files, TODOs, Report — where Report carries
+   the whole-tree compile verdict, the parity ledger and the markdown. Parallelism
+   (4) and attempts (3) are fixed; the API still takes both.
+4. **`/how-it-works` — for the person deciding whether to read the source.**
+   Two inline-SVG diagrams (the system: browser → FastAPI → LangGraph on Fly.io
+   → model, Node toolchain, Postgres/Redis, LangSmith; and the agent loop:
+   intake → recall → convert → validate → critic → report, failures back to
+   convert at most three times), the stack in four groups with one line each on
+   *why* the piece is there, and the one number Varun chose to publish: 12/12
+   on the sample suite in ~20s. Vendors are named, models are not — the
+   provider is one setting. The front page carries a compact "Built with" strip
+   that links here. Both read `ui/web/src/stack.ts`, so the list is edited once.
+5. **`/evaluation` — for evaluation roles.** The three measurement layers
+   (gates → calibrated judge → execution in a browser), the judge calibration
+   figures, the one-attempt-vs-reflection shootout as a grouped bar chart with
+   its table, the hard-case benchmark with held-out cases and the unsolved one,
+   the execution numbers and what only running caught, the feedback flywheel and
+   the gap taxonomy. Every figure lives in `ui/web/src/evals.ts` next to the
+   report it came from; change the report first. Chart colours (amber for one
+   attempt, teal for reflection) were validated for colour-vision deficiency
+   against the chart surface. Varun chose to publish the numbers here (2026-09-08),
+   reversing the front-page "12/12 only" rule for this page alone.
+
+What was removed on purpose, and why: the refine box, 👍/👎, the model-name
+line, the agent-trace and notes expanders, the file filter and the two sliders.
+Each was a knob a first-time visitor had to read past before the first click;
+the API behind every one of them is unchanged (`tests/test_web.py` still covers
+refinement and feedback), so any of them can come back as a page change alone.
 
 Things a demo should know:
 
