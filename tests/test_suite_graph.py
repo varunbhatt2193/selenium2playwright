@@ -20,6 +20,7 @@ import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 from typing import Annotated, TypedDict, get_type_hints
 from unittest.mock import Mock, patch
 
@@ -163,9 +164,20 @@ class FanOutTests(unittest.TestCase):
         self.assertEqual(calls["LoginPage.ts"]["inputs"]["context_paths"],
                          [str(self.out / "pages/BasePage.ts")])
         # The spec's companions are the *converted* page object and the copied
-        # support file, both read from the output tree, never from the source.
+        # support file, both read from the output tree, never from the source —
+        # plus `BasePage.ts`, which the spec does not import and cannot compile
+        # without.
+        #
+        # This assertion used to name only the first two, and that was the bug
+        # rather than the specification: this fixture is three deep
+        # (BasePage -> LoginPage -> spec), so the spec's compile gate was handed
+        # a page object whose own `./BasePage` import resolved to nothing. The
+        # gate then failed the file for a reason that had nothing to do with its
+        # conversion, and the repair loop spent its attempts on it. See
+        # `TransitiveContextTests` and `suite_graph.needed_by`.
         self.assertEqual(sorted(calls["login.spec.ts"]["inputs"]["context_paths"]),
                          sorted([str(self.out / "pages/LoginPage.ts"),
+                                 str(self.out / "pages/BasePage.ts"),
                                  str(self.out / "support/users.ts")]))
 
     def test_converted_files_are_written_support_is_copied_and_skipped_is_absent(self):
@@ -588,3 +600,81 @@ class WorkspaceSweepTests(unittest.TestCase):
         # than the mess.
         with patch.object(Path, "glob", side_effect=OSError("gone")):
             self.assertEqual(suite_graph.sweep_workspaces(), 0)
+
+
+class TransitiveContextTests(unittest.TestCase):
+    """What a file needs to compile, which is not what it imports.
+
+    `SuiteFile.imports` is direct imports. Handing only those to the compile
+    gate is right for a two-deep suite and wrong for every deeper one: the
+    spec's `../pages/BasePage` does not resolve, the gate reports a compile
+    failure that has nothing to do with the conversion, and the repair loop
+    spends all three attempts rewriting correct code to fix it.
+
+    Latent since 9.2, because `samples/selenium-suite` is exactly two deep.
+    """
+
+    @staticmethod
+    def graph(edges: dict) -> dict:
+        return {path: SimpleNamespace(path=path, imports=tuple(deps))
+                for path, deps in edges.items()}
+
+    def test_a_three_deep_chain_carries_the_whole_chain(self):
+        by = self.graph({"spec.ts": ["Page.ts"], "Page.ts": ["Base.ts"], "Base.ts": []})
+        self.assertEqual(suite_graph.needed_by("spec.ts", by), ["Page.ts", "Base.ts"])
+
+    def test_a_two_deep_suite_is_unchanged(self):
+        # The old behaviour has to survive: this is what every prior suite run
+        # and every published report was measured with.
+        by = self.graph({"spec.ts": ["Page.ts"], "Page.ts": []})
+        self.assertEqual(suite_graph.needed_by("spec.ts", by), ["Page.ts"])
+
+    def test_a_diamond_names_each_file_once(self):
+        by = self.graph({"spec.ts": ["A.ts", "B.ts"], "A.ts": ["Base.ts"],
+                         "B.ts": ["Base.ts"], "Base.ts": []})
+        self.assertEqual(suite_graph.needed_by("spec.ts", by),
+                         ["A.ts", "B.ts", "Base.ts"])
+
+    def test_a_cycle_terminates_rather_than_dying(self):
+        # TypeScript allows circular imports, so a suite containing one is a
+        # suite this still has to convert.
+        by = self.graph({"A.ts": ["B.ts"], "B.ts": ["A.ts"]})
+        self.assertEqual(suite_graph.needed_by("A.ts", by), ["B.ts"])
+
+    def test_a_file_never_lists_itself(self):
+        by = self.graph({"A.ts": ["A.ts", "B.ts"], "B.ts": []})
+        self.assertEqual(suite_graph.needed_by("A.ts", by), ["B.ts"])
+
+    def test_imports_of_files_outside_the_suite_are_ignored(self):
+        # `@playwright/test` is not in the manifest and is not ours to provide.
+        by = self.graph({"spec.ts": ["Page.ts", "node_modules/x.ts"], "Page.ts": []})
+        self.assertEqual(suite_graph.needed_by("spec.ts", by), ["Page.ts"])
+
+    def test_the_order_is_stable_across_calls(self):
+        # A companion list that reshuffled between runs would make two
+        # identical conversions produce two different prompts.
+        by = self.graph({"spec.ts": ["A.ts", "B.ts"], "A.ts": ["Base.ts"],
+                         "B.ts": [], "Base.ts": []})
+        self.assertEqual(suite_graph.needed_by("spec.ts", by),
+                         suite_graph.needed_by("spec.ts", by))
+
+    def test_dispatch_hands_the_deep_companion_to_the_gate(self):
+        """The bug itself, at the level it actually happened."""
+        with TemporaryDirectory() as tmp:
+            out = Path(tmp) / "out"
+            for rel in ("pages/BasePage.ts", "pages/DynamicControlsPage.ts"):
+                (out / rel).parent.mkdir(parents=True, exist_ok=True)
+                (out / rel).write_text("converted")
+            manifest = SimpleNamespace(files=[
+                SimpleNamespace(path="pages/BasePage.ts", imports=()),
+                SimpleNamespace(path="pages/DynamicControlsPage.ts",
+                                imports=("pages/BasePage.ts",)),
+                SimpleNamespace(path="tests/dc.spec.ts",
+                                imports=("pages/DynamicControlsPage.ts",)),
+            ])
+            sends = suite_graph.dispatch({
+                "waves": [["pages/BasePage.ts"], ["pages/DynamicControlsPage.ts"],
+                          ["tests/dc.spec.ts"]],
+                "wave": 3, "root": tmp, "out_root": str(out), "manifest": manifest})
+            context = [Path(p).name for p in sends[0].arg["context_paths"]]
+            self.assertEqual(context, ["DynamicControlsPage.ts", "BasePage.ts"])

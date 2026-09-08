@@ -283,6 +283,40 @@ def next_wave(state: SuiteState) -> SuiteState:
     return {"wave": state.get("wave", 0) + 1}
 
 
+def needed_by(path: str, by_path: dict) -> list[str]:
+    """Every in-suite file this one needs to compile — imports of imports included.
+
+    `SuiteFile.imports` is what a file imports *directly*, and handing only that
+    to the compile gate is wrong for any suite more than two deep. A spec
+    imports its page object; the page object extends a BasePage; the spec's gate
+    is then given the page object alone, `../pages/BasePage` does not resolve,
+    and the file fails compile for a reason that has nothing to do with its
+    conversion. Worse than a wrong verdict: the repair loop reads that finding
+    and spends all three attempts rewriting code that was already correct.
+
+    It stayed hidden because `samples/selenium-suite` is exactly two deep, where
+    direct and transitive are the same list. `samples/selenium-hard-suite` is
+    three, and shows it immediately.
+
+    Breadth-first, and it tolerates a cycle rather than dying on one: TypeScript
+    allows circular imports, so a suite containing one is a suite this must
+    still convert. Order is deterministic — the walk order, not a set — because
+    a companion list that reshuffles between runs would make two identical
+    conversions produce two different prompts.
+    """
+    seen: set[str] = set()
+    ordered: list[str] = []
+    queue = list(by_path[path].imports) if path in by_path else []
+    while queue:
+        dep = queue.pop(0)
+        if dep in seen or dep == path or dep not in by_path:
+            continue
+        seen.add(dep)
+        ordered.append(dep)
+        queue.extend(by_path[dep].imports)
+    return ordered
+
+
 def dispatch(state: SuiteState) -> list[Send] | str:
     """The fan-out itself: one Send per file in this wave, or "finish" when done.
 
@@ -302,7 +336,7 @@ def dispatch(state: SuiteState) -> list[Send] | str:
     by_path = {f.path: f for f in state["manifest"].files}
     jobs = []
     for path in waves[number - 1]:
-        companions = [out_root / dep for dep in by_path[path].imports]
+        companions = [out_root / dep for dep in needed_by(path, by_path)]
         jobs.append(Send("convert_file", FileJob(
             path=path, wave=number, source_path=str(root / path),
             output_path=str(out_root / path),
