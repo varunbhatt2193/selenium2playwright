@@ -159,9 +159,38 @@ hover is exercised — drag-and-drop and modifier clicks are still open.
 Every Anthropic model returns `400 invalid_request_error: You have reached your
 specified API usage limits. You will regain access on 2026-10-01 at 00:00 UTC.`
 Account-wide, not model-specific — a one-token `claude-sonnet-5` probe gives the
-same error. **<https://s2p.fly.dev> and the playground convert nothing for
-anybody**, and Fly is still billing for the machines. Fix it at Console →
-Settings (very likely the spend cap advised after 10.4), or wait for 2026-10-01.
+same error. Fix it at Console → Settings (very likely the spend cap advised after
+10.4), or wait for 2026-10-01.
+
+#### 🔁 The deployment now runs on OpenAI — flip it back when Anthropic returns
+
+The outage took `s2p.fly.dev` down with it, so on 2026-09-08 the live app was
+switched to OpenAI. This is the model-agnostic rule ([[model-agnostic-rule]])
+paying for itself: no redeploy, no image rebuild, **one secret**.
+
+```bash
+fly secrets set -a s2p S2P_MODEL=openai:gpt-5.4      # what was done
+fly secrets unset -a s2p S2P_MODEL                   # back to the code default (Sonnet)
+```
+
+`OPENAI_API_KEY` was already a Fly secret — `deploy.sh` forwards every key in
+`.env`, and recall's embeddings use OpenAI. There was no `S2P_MODEL` secret at
+all, which is why the app had been falling back to the code default
+`anthropic:claude-sonnet-5`. Setting it triggers a rolling restart; the critic
+follows the actor automatically.
+
+**Verified live 2026-09-08:** `HoversPage.ts` came back **4/4 gates + critic
+pass, no TODOs**, `models: {'actor': 'openai:gpt-5.4', 'critic':
+'openai:gpt-5.4'}`. `/ok` is 200 and `/limits` reports the full 41 runs
+remaining. One `NotFoundError` on the first call immediately after the restart,
+clean on the retry — treat a 404 in the first seconds after a secret flip as the
+machine still coming up, not a bug.
+
+**Two consequences to remember:** demo conversions now bill the OpenAI account
+(the $5/day guard still applies — it counts *runs*, not provider), and the
+playground's "models" line shows `openai:gpt-5.4`, so anyone watching can see it
+is not Claude. Flip it back when Anthropic access returns, because the README's
+headline numbers are Claude's.
 
 The failed Opus baseline spent zero tokens. Its uploaded experiment
 `s2p-11.1b-claude-opus-5-attempts3-f6b74c60` is an **outage record, never a
