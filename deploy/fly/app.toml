@@ -48,7 +48,14 @@ primary_region = "iad"
     path = "/ok"
 
 [[vm]]
-  size = "shared-cpu-1x"
+  # Dedicated, not shared. A suite run is a burst of `tsc` processes — one per
+  # file per attempt, each a cold compiler start — and on shared-cpu-1x that
+  # burst exhausts the CPU credit and drops to the throttled baseline partway
+  # through. The symptom is a run that gets *slower* as it goes: gaps between
+  # model calls grew 68s → 98s → 103s → 140s on a four-file suite, and the page
+  # sat on "0/4" for nine minutes before the run wedged entirely. A dedicated
+  # core has no credit to exhaust, so the last wave costs what the first did.
+  size = "performance-1x"
   # 2 GB, not 1: the gates run tsc and ESLint over the generated project, and a
   # TypeScript compile is the memory-hungriest thing this service does.
   memory = "2gb"
