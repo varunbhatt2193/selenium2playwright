@@ -551,6 +551,40 @@ def owned_findings(assembly) -> tuple[tuple, tuple]:
             tuple(split.get("unconverted", ())))
 
 
+# `Cannot find module 'zod' or its corresponding type declarations.`
+MISSING_MODULE = re.compile(r"""Cannot find module ['"]([^'"]+)['"]""")
+
+
+def _missing_dependency(finding, in_tree: set[str]) -> bool:
+    """Is this TS2307 about a package the sandbox does not have?
+
+    The sandbox installs TypeScript and Playwright and nothing else, so a suite
+    that imports `zod` or `mysql2/promise` reports errors we could not fix by
+    converting better. Naming that as a conversion failure is the same mistake
+    as blaming the tree for unconverted Selenium.
+
+    A specifier that points at a file in this folder is *not* a dependency: a
+    broken relative import, or an alias that resolves to nothing, is a real
+    finding and stays where it is.
+    """
+    if finding.code != "TS2307":
+        return False
+    match = MISSING_MODULE.search(finding.message or "")
+    if not match:
+        return False
+    specifier = match.group(1)
+    if specifier.startswith("."):
+        return False  # relative: it meant a file here, and the file is missing
+    head, _, rest = specifier.partition("/")
+    if head.startswith(("@", "~")) and rest:
+        target = rest if head in ("@", "~") else f"{head.lstrip('@~')}/{rest}"
+        # An alias that names something in the tree is ours to get right.
+        if any(f"{target}{end}" in in_tree
+               for end in ("", ".ts", ".tsx", "/index.ts", "/index.tsx")):
+            return False
+    return True
+
+
 def split_tree_findings(tree, outcomes: list, manifest) -> dict:
     """Sort whole-tree errors by whose fault they can be.
 
@@ -572,13 +606,24 @@ def split_tree_findings(tree, outcomes: list, manifest) -> dict:
                   Not counted against the conversion, never hidden either.
     """
     converted = {o.path for o in outcomes}
+    in_tree = {f.path for f in (manifest.files if manifest else ())}
     selenium_left = {f.path for f in (manifest.files if manifest else ())
                      if f.path not in converted
                      and getattr(f.classification, "automation", "") == "selenium"}
-    buckets: dict[str, list] = {"converted": [], "unconverted": [], "companion": []}
+    buckets: dict[str, list] = {"converted": [], "unconverted": [], "companion": [],
+                                "dependency": []}
     for finding in (tree.findings if tree else ()):
-        where = ("converted" if finding.file in converted
-                 else "unconverted" if finding.file in selenium_left else "companion")
+        # Order matters. For a file this run openly declined to convert, "it is
+        # still Selenium" explains every error it has — the missing
+        # `selenium-webdriver` module included — and explains it better than
+        # "the sandbox lacks a package". Everywhere else, a module that is not
+        # in this folder is a dependency we were never going to have.
+        if finding.file in selenium_left:
+            where = "unconverted"
+        elif _missing_dependency(finding, in_tree):
+            where = "dependency"
+        else:
+            where = "converted" if finding.file in converted else "companion"
         buckets[where].append(finding)
     return buckets
 
@@ -605,6 +650,7 @@ def assemble(root: Path, out_root: Path, manifest, outcomes: list) -> Assembly:
         "tree_errors_converted": len(split["converted"]),
         "tree_errors_unconverted": len(split["unconverted"]),
         "tree_errors_companion": len(split["companion"]),
+        "tree_errors_dependency": len(split["dependency"]),
         "todos": len(todos),
         "api": {verdict: sum(ledger.count(verdict) for ledger in built)
                 for verdict in ("kept", "renamed", "removed")},
@@ -691,6 +737,7 @@ def render(root: Path, out_root: Path, manifest, outcomes: list, assembly: Assem
     # left alone that stopped compiling anyway. Selenium it never converted is
     # counted separately — see `split_tree_findings`.
     mine_findings, stale = owned_findings(assembly)
+    absent = tuple(assembly.split.get("dependency", ()))
     if assembly.tree is None:
         lines += [f"**Unknown** — {assembly.tree_error}. Every other number below still holds; "
                   "this one gate could not be run.", ""]
@@ -724,6 +771,17 @@ def render(root: Path, out_root: Path, manifest, outcomes: list, assembly: Assem
             lines += [f"A further {len(stale)} error(s) are in files carried across "
                       "**unconverted** — still Selenium, so they cannot compile in a Playwright "
                       "project. They are not counted above.", ""]
+
+    if absent:
+        packages = sorted({m.group(1) for m in
+                           (MISSING_MODULE.search(f.message or "") for f in absent) if m})
+        lines += [f"A further {len(absent)} error(s) come from packages this sandbox does not "
+                  "install — it carries TypeScript and Playwright and nothing else, so an import "
+                  "of "
+                  + ", ".join(f"`{p}`" for p in packages[:8])
+                  + (", …" if len(packages) > 8 else "")
+                  + " cannot resolve here and would resolve in your own checkout. Not counted "
+                    "against the conversion.", ""]
 
     lines += ["## 2. Scorecard", ""]
     lines += table(["wave", "file", "result", "laps", "gates", "critic", "TODOs", "secs"],

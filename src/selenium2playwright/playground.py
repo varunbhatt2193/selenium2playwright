@@ -1055,6 +1055,9 @@ class SuiteResult:
     # against Selenium it carried across and never claimed to convert.
     tree_findings_mine: list[str] = field(default_factory=list)
     tree_findings_carried: list[str] = field(default_factory=list)
+    # Errors from packages the sandbox does not install (`zod`, `mysql2`). They
+    # would resolve in the caller's own checkout, so they are shown and not counted.
+    tree_findings_absent: list[str] = field(default_factory=list)
     tree_error: str = ""
     kept: int = 0
     renamed: int = 0
@@ -1137,8 +1140,9 @@ def suite_result(state: dict[str, Any]) -> SuiteResult:
     if split:
         mine = _lines(_get(split, "converted", [])) + _lines(_get(split, "companion", []))
         stale = _lines(_get(split, "unconverted", []))
+        absent = _lines(_get(split, "dependency", []))
     else:
-        mine, stale = findings, []
+        mine, stale, absent = findings, [], []
 
     kept = renamed = removed = unexplained = 0
     losses: list[tuple[str, str, str, str]] = []
@@ -1167,6 +1171,7 @@ def suite_result(state: dict[str, Any]) -> SuiteResult:
         tree_findings=findings,
         tree_findings_mine=mine,
         tree_findings_carried=stale,
+        tree_findings_absent=absent,
         tree_error=str(_get(assembly, "tree_error", "")),
         kept=kept, renamed=renamed, removed=removed, unexplained=unexplained,
         losses=losses,

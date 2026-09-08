@@ -384,6 +384,20 @@ export default function SuiteLab({ limits, onSpent }: Props) {
                   </>
                 )}
 
+                {result.tree_findings_absent.length > 0 && (
+                  <details className="trail-details">
+                    <summary>
+                      {result.tree_findings_absent.length} error(s) from packages this sandbox does not install — not
+                      counted above
+                    </summary>
+                    <p className="muted-copy">
+                      The sandbox carries TypeScript and Playwright and nothing else. Imports like <code>zod</code> or{' '}
+                      <code>mysql2</code> cannot resolve here and would resolve in your own checkout.
+                    </p>
+                    <Code code={result.tree_findings_absent.join('\n')} language="plain" lineNumbers={false} />
+                  </details>
+                )}
+
                 {result.tree_findings_carried.length > 0 && (
                   <details className="trail-details">
                     <summary>

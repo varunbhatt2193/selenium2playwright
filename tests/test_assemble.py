@@ -407,6 +407,30 @@ class TreeVerdictSplitTests(unittest.TestCase):
         self.assertEqual(len(split["companion"]), 1)
         self.assertEqual(len(split["unconverted"]), 0)
 
+    def test_a_package_the_sandbox_lacks_is_not_a_conversion_failure(self):
+        """`Cannot find module 'zod'` cannot be fixed by converting better."""
+        tree = ValidationReport(gate="compile", passed=False, findings=[
+            self.finding("config/env.ts", "TS2307", "Cannot find module 'zod' or its "
+                                                    "corresponding type declarations.")])
+        files = (suite.SuiteFile(path="pages/Done.ts", kind="page-object", action=suite.CONVERT,
+                                 reason="", classification=classify("import x from 'selenium-webdriver';", "a.ts")),
+                 suite.SuiteFile(path="config/env.ts", kind="support", action=suite.COPY,
+                                 reason="", classification=classify("export const a = 1;\n", "b.ts")))
+        split = assemble.split_tree_findings(
+            tree, [outcome("pages/Done.ts")], suite.Manifest(root="r", files=files, waves=()))
+        self.assertEqual(len(split["dependency"]), 1)
+        self.assertEqual(len(split["companion"]), 0)
+
+    def test_a_broken_relative_import_is_still_ours(self):
+        """A dependency is a package; a missing file next door is a real finding."""
+        tree = ValidationReport(gate="compile", passed=False, findings=[
+            self.finding("pages/Done.ts", "TS2307", "Cannot find module './Gone' or its "
+                                                    "corresponding type declarations.")])
+        manifest = self.manifest_of(["pages/Done.ts"], [])
+        split = assemble.split_tree_findings(tree, [outcome("pages/Done.ts")], manifest)
+        self.assertEqual(len(split["converted"]), 1)
+        self.assertEqual(len(split["dependency"]), 0)
+
     def test_a_missing_split_means_every_error_is_ours(self):
         """Fail closed: silence about ownership must never render as a green tree."""
         tree = ValidationReport(gate="compile", passed=False, findings=[
