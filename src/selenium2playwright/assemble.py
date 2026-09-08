@@ -50,6 +50,7 @@ from pathlib import Path
 
 from selenium2playwright.env import SANDBOX
 from selenium2playwright.schemas import ValidationReport
+from selenium2playwright.suite import CAP_INVITATION
 
 MEMBERS = SANDBOX / "members.cjs"
 PARITY = SANDBOX / "parity.cjs"
@@ -653,6 +654,12 @@ def render(root: Path, out_root: Path, manifest, outcomes: list, assembly: Assem
         lines += ["Why a file is not a plain pass:", ""] + table(["file", "result", "reason"], reasons)
 
     lines += ["## 3. What was not converted", ""]
+    # The demo's size cap, if one bit. It belongs at the top of this section
+    # rather than in a footnote: the reader is looking at a table of their own
+    # files marked "copied unchanged" and is owed the reason before the list,
+    # along with the way to convert them anyway.
+    capped = [n for n in (manifest.notes if manifest else ()) if CAP_INVITATION in n]
+    lines += [*(f"> {note}\n" for note in capped)]
     carried = [[f"`{f.path}`", "copied unchanged", f.reason] for f in (manifest.files if manifest else ())
                if f.action == "copy"]
     left = [[f"`{f.path}`", "not converted", f.reason] for f in (manifest.files if manifest else ())

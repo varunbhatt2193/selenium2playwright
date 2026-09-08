@@ -6,11 +6,13 @@ suite or builds a toy one in a temp directory and reads the plan back.
 """
 
 import io
+import os
 import json
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from selenium2playwright import cli, suite
 
@@ -370,6 +372,95 @@ class ScanCommand(unittest.TestCase):
     def test_a_missing_folder_is_a_usage_error(self):
         code, out, err = self.run_cli("scan", "/no/such/suite")
         self.assertEqual(code, 2)
+
+
+# A bigger toy than TOY: five page objects and four specs, so a cap of three of
+# each has something to leave out and the leftovers are unambiguous.
+BIG = {}
+for _n in range(5):
+    BIG[f"pages/Page{_n}.ts"] = (
+        'import { WebDriver } from "selenium-webdriver";\n'
+        f"export class Page{_n} {{ constructor(protected driver: WebDriver) {{}} }}\n")
+for _n in range(4):
+    BIG[f"tests/spec{_n}.spec.ts"] = (
+        'import { Builder } from "selenium-webdriver";\n'
+        f'import {{ Page{_n} }} from "../pages/Page{_n}";\n'
+        f'describe("s{_n}", () => {{ it("works", async () => {{ new Page{_n}(null as any); }}); }});\n')
+
+
+class DemoCapTests(unittest.TestCase):
+    """The hosted demo converts a slice of a big suite, and says so."""
+
+    def scan(self, files=None, **environ):
+        with patch.dict(os.environ, environ, clear=False):
+            return suite.scan_sources(dict(files or BIG))
+
+    def test_no_cap_by_default(self):
+        """A clone has the environment unset, and an unset cap is no cap at all."""
+        with patch.dict(os.environ, {"S2P_SUITE_MAX_TESTS": "", "S2P_SUITE_MAX_PAGE_OBJECTS": ""}):
+            manifest = suite.scan_sources(dict(BIG))
+        self.assertEqual(len(manifest.convertible), 9)
+        self.assertEqual(manifest.notes, ())
+
+    def test_cap_converts_three_of_each_and_copies_the_rest(self):
+        manifest = self.scan(S2P_SUITE_MAX_TESTS="3", S2P_SUITE_MAX_PAGE_OBJECTS="3")
+        kinds = {}
+        for item in manifest.convertible:
+            kinds[item.kind] = kinds.get(item.kind, 0) + 1
+        self.assertEqual(kinds, {"page-object": 3, "test": 3})
+        self.assertEqual(sum(1 for f in manifest.files if f.action == suite.COPY), 3)
+
+    def test_a_capped_file_is_copied_not_skipped(self):
+        """It still belongs in the converted tree — it just arrives unchanged."""
+        manifest = self.scan(S2P_SUITE_MAX_TESTS="3", S2P_SUITE_MAX_PAGE_OBJECTS="3")
+        left = [f for f in manifest.files if f.action == suite.COPY]
+        self.assertTrue(left)
+        for item in left:
+            self.assertIn("past this demo's limit", item.reason)
+            self.assertNotEqual(item.action, suite.SKIP)
+
+    def test_a_kept_test_never_loses_its_page_object(self):
+        """The one failure the cap must not manufacture: a test without its companion."""
+        manifest = self.scan(S2P_SUITE_MAX_TESTS="3", S2P_SUITE_MAX_PAGE_OBJECTS="3")
+        converting = {f.path for f in manifest.convertible}
+        by_path = {f.path: f for f in manifest.files}
+        for path in converting:
+            for dependency in by_path[path].imports:
+                if by_path[dependency].kind in ("page-object", "test"):
+                    self.assertIn(dependency, converting,
+                                  f"{path} converts without {dependency}")
+
+    def test_the_note_says_what_was_left_and_how_to_get_it(self):
+        manifest = self.scan(S2P_SUITE_MAX_TESTS="3", S2P_SUITE_MAX_PAGE_OBJECTS="3")
+        note = " ".join(manifest.notes)
+        self.assertIn("2 page objects", note)
+        self.assertIn("1 test file", note)
+        self.assertIn("own LLM API key", note)
+
+    def test_one_kind_can_be_capped_alone(self):
+        manifest = self.scan(S2P_SUITE_MAX_TESTS="2", S2P_SUITE_MAX_PAGE_OBJECTS="")
+        kinds = [f.kind for f in manifest.convertible]
+        self.assertEqual(kinds.count("test"), 2)
+        self.assertEqual(kinds.count("page-object"), 5)
+
+    def test_the_meter_charges_the_capped_number(self):
+        """`conversions` is what the guard bills; it must see the same plan."""
+        with patch.dict(os.environ, {"S2P_SUITE_MAX_TESTS": "3",
+                                     "S2P_SUITE_MAX_PAGE_OBJECTS": "3"}, clear=False):
+            self.assertEqual(suite.conversions(dict(BIG)), 6)
+        with patch.dict(os.environ, {"S2P_SUITE_MAX_TESTS": "",
+                                     "S2P_SUITE_MAX_PAGE_OBJECTS": ""}, clear=False):
+            self.assertEqual(suite.conversions(dict(BIG)), 9)
+
+    def test_a_suite_under_the_cap_is_untouched(self):
+        manifest = self.scan(TOY, S2P_SUITE_MAX_TESTS="3", S2P_SUITE_MAX_PAGE_OBJECTS="3")
+        self.assertEqual(len(manifest.convertible), 3)
+        self.assertEqual(manifest.notes, ())
+
+    def test_junk_in_the_environment_is_not_a_cap(self):
+        """A typo must not silently convert nothing."""
+        manifest = self.scan(S2P_SUITE_MAX_TESTS="three", S2P_SUITE_MAX_PAGE_OBJECTS="-1")
+        self.assertEqual(len(manifest.convertible), 9)
 
 
 if __name__ == "__main__":

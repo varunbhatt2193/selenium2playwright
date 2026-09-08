@@ -29,6 +29,18 @@ primary_region = "iad"
   # directory a repository is cloned into is not something an image can know.
   S2P_SANDBOX = "/opt/s2p-sandbox"
 
+  # How much of one uploaded suite this deployment will convert. A suite is
+  # metered per file, so one click on a forty-file upload is forty model calls
+  # on the card behind this demo. Three of each is enough to show the wave
+  # ordering and the tree compile working, and the page says what it left out
+  # and how to convert the rest (clone the repo, bring your own key).
+  #
+  # It must be set on BOTH apps: the graph charges and converts by this number,
+  # and the UI quotes it before the run. One without the other is a page that
+  # promises twelve files and a backend that delivers six.
+  S2P_SUITE_MAX_TESTS = "3"
+  S2P_SUITE_MAX_PAGE_OBJECTS = "3"
+
 [http_service]
   internal_port = 8000
   force_https = true

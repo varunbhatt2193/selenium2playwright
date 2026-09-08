@@ -79,6 +79,41 @@ across unchanged**. `suite.decide()` is where those two readings part company.
 Copied and skipped files are in **no wave** — a wave is a conversion schedule,
 and neither of them is converted.
 
+## 3a. The demo's size cap
+
+A suite is metered **per file**: one click on a forty-file upload is forty model
+calls, and on the hosted demo they all land on one card. So a deployment may set
+a ceiling on how much of a suite one run converts:
+
+```bash
+S2P_SUITE_MAX_TESTS=3          # 0 or unset = no limit
+S2P_SUITE_MAX_PAGE_OBJECTS=3
+```
+
+Unset is the default, and **unset means no cap** — which is what a clone gets.
+The limit is about who pays for the tokens, not about what the converter can do,
+and the page says so in as many words: *clone the repo and run it with your own
+LLM API key to convert the whole suite.*
+
+Files past the cap become ordinary **copies**, not skips. They still belong in
+the converted tree; they just arrive unchanged, with the reason on them.
+
+Which files make the cut is not first-come. `apply_caps()` walks the **wave
+order** — page objects before the tests that import them — and keeps a test only
+if every convertible file it imports was kept too. That is why a run can convert
+*fewer* than its own cap: a test whose page object did not fit is left out with
+it, because converting a test against a companion that stayed in Selenium is the
+one failure this project exists to prevent.
+
+All three places that ask "what will this run convert?" read the same capped
+manifest, so they cannot disagree:
+
+| caller | what it does with the answer |
+|---|---|
+| `guard.py` → `suite.conversions()` | charges the meter |
+| `playground._plan_from()` | quotes "costs N of today's conversions" |
+| `suite_graph.plan()` | actually converts |
+
 ## 4. Using it
 
 ```bash

@@ -1269,6 +1269,26 @@ pre.code:not(.numbered) .line {
   color: var(--text);
 }
 
+/* The demo's size cap, said before the run rather than discovered after it.
+   Bordered and tinted because it is the one line on the plan that changes what
+   the visitor is about to get, and the invitation to clone the repo only works
+   if it is read. */
+.plan-limit {
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--accent);
+  border-radius: 6px;
+  padding: 9px 12px;
+  margin: 4px 0 0;
+  background: var(--surface-2, rgba(255, 255, 255, 0.02));
+}
+
+.plan-limit p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+
 .suite-progress {
   border-top: 1px solid var(--line);
   padding: 14px 18px;

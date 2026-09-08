@@ -358,6 +358,32 @@ class ReportTests(unittest.TestCase):
         self.assertEqual(document["scorecard"]["gates"]["compile"], {"passed": 1, "of": 1})
 
 
+class CapNoteInReportTests(unittest.TestCase):
+    """When the demo's cap bites, the report says so where the files are listed."""
+
+    def test_section_three_leads_with_the_cap_and_the_way_around_it(self):
+        root = Path(__file__).resolve().parents[1] / "samples/selenium-hard-suite"
+        with patch.dict(os.environ, {"S2P_SUITE_MAX_TESTS": "3",
+                                     "S2P_SUITE_MAX_PAGE_OBJECTS": "3"}, clear=False):
+            manifest = suite.scan(root)
+        markdown = assemble.render(root, Path("/nowhere"), manifest, [],
+                                   assemble.Assembly(files=0))
+        section = markdown.split("## 3.")[1].split("## 4.")[0]
+        self.assertIn("converts at most 3 page objects and 3 test files", section)
+        self.assertIn("your own LLM API key", section)
+        # And the files it left out are named, not just counted.
+        self.assertIn("past this demo's limit of 3 page objects per run", section)
+
+    def test_no_cap_means_no_paragraph(self):
+        root = Path(__file__).resolve().parents[1] / "samples/selenium-hard-suite"
+        with patch.dict(os.environ, {"S2P_SUITE_MAX_TESTS": "",
+                                     "S2P_SUITE_MAX_PAGE_OBJECTS": ""}, clear=False):
+            manifest = suite.scan(root)
+        markdown = assemble.render(root, Path("/nowhere"), manifest, [],
+                                   assemble.Assembly(files=0))
+        self.assertNotIn("your own LLM API key", markdown)
+
+
 class CommandTests(unittest.TestCase):
     """`s2p suite` end to end, with the per-file graph scripted."""
 

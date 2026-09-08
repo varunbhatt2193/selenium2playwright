@@ -33,6 +33,18 @@ primary_region = "iad"
   # demo key, which is what keeps them metered.
   LANGGRAPH_DEPLOYMENT_URL = "https://s2p.fly.dev"
 
+  # How much of one uploaded suite this deployment will convert. A suite is
+  # metered per file, so one click on a forty-file upload is forty model calls
+  # on the card behind this demo. Three of each is enough to show the wave
+  # ordering and the tree compile working, and the page says what it left out
+  # and how to convert the rest (clone the repo, bring your own key).
+  #
+  # It must be set on BOTH apps: the graph charges and converts by this number,
+  # and the UI quotes it before the run. One without the other is a page that
+  # promises twelve files and a backend that delivers six.
+  S2P_SUITE_MAX_TESTS = "3"
+  S2P_SUITE_MAX_PAGE_OBJECTS = "3"
+
 [http_service]
   internal_port = 8501
   force_https = true

@@ -234,6 +234,13 @@ export default function SuiteLab({ limits, onSpent }: Props) {
                     </ul>
                   </details>
                 )}
+                {p.notes.length > 0 && (
+                  <div className="plan-limit">
+                    {p.notes.map((note, i) => (
+                      <p key={i}>{note}</p>
+                    ))}
+                  </div>
+                )}
                 <p className="plan-cost">
                   Costs <strong>{p.billable}</strong> of today's conversions.
                 </p>

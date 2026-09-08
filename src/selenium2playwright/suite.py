@@ -19,8 +19,13 @@ else in the suite, wave 2 is everything whose in-suite imports are all in wave
 1, and so on. Files inside one wave cannot affect each other, which is the
 property step 9.2 needs to fan them out in parallel with `Send`.
 
-Everything here is a pure function of the bytes on disk: same folder, same
-manifest, every time. That is deliberate — a plan you cannot reproduce is not a
+A deployment can also cap how much of a suite one run converts (`demo_caps`),
+because on the hosted demo every converted file is tokens on one shared card.
+The cap is off unless the environment sets it, which is what a clone gets: the
+ceiling is who is paying, not what the converter can do.
+
+Everything here is a pure function of the bytes on disk and that environment:
+same folder, same manifest, every time. That is deliberate — a plan you cannot reproduce is not a
 plan you can put in a report.
 """
 
@@ -200,6 +205,118 @@ def decide(classification: Classification) -> tuple[str, str, str]:
     return "unsupported", SKIP, classification.reason
 
 
+# --- The public demo's size cap -------------------------------------------
+#
+# A suite is metered per file: one click on a forty-file upload is forty model
+# calls, on one shared card, and the visitor who clicks it has spent everybody
+# else's day. So a deployment may cap how much of a suite one run converts.
+#
+# Unset is the default, and unset means no cap — which is what a clone gets.
+# The limit exists because the hosted demo pays for the tokens, not because the
+# converter cannot do more, and the code should say so by being uncapped until
+# a deployment asks otherwise.
+CAP_ENV = {"test": "S2P_SUITE_MAX_TESTS", "page-object": "S2P_SUITE_MAX_PAGE_OBJECTS"}
+
+# What a person is told, in the report and on the page, when the cap bites.
+# It has to answer the question it provokes — "so how do I convert the rest?" —
+# in the same breath, or it reads as the tool failing rather than the demo
+# being a demo.
+CAP_INVITATION = ("Clone the repo and run it with your own LLM API key to convert "
+                  "the whole suite — the limit is the demo's shared card, not the "
+                  "converter.")
+
+
+def demo_caps() -> dict[str, int]:
+    """How many of each kind one suite run may convert. 0 means no limit.
+
+    Read from the environment on every call rather than once at import, so a
+    test can set it with `patch.dict` and nothing has to be reloaded — reloading
+    a module to change a constant rebinds every object in it, which is its own
+    class of bug.
+    """
+    caps = {}
+    for kind, name in CAP_ENV.items():
+        raw = (os.environ.get(name) or "").strip()
+        caps[kind] = int(raw) if raw.isdigit() else 0
+    return caps
+
+
+def _tally(counts: dict[str, int]) -> str:
+    """{"test": 3, "page-object": 1} -> "1 page object and 3 test files"."""
+    names = {"test": "test file", "page-object": "page object"}
+    parts = [f"{n} {names[kind]}{'' if n == 1 else 's'}"
+             for kind, n in sorted(counts.items()) if n]
+    if len(parts) < 2:
+        return parts[0] if parts else ""
+    return " and ".join((", ".join(parts[:-1]), parts[-1]))
+
+
+def apply_caps(files: dict[str, SuiteFile], waves: tuple[tuple[str, ...], ...],
+               caps: dict[str, int]) -> tuple[dict[str, SuiteFile], list[SuiteFile]]:
+    """Copy across everything past the cap. Returns the new files and what was dropped.
+
+    Which files to keep is not arbitrary. A test converted without the page
+    object it imports is a test compiled against an API that no longer exists —
+    the one failure this whole project is built to avoid — so the walk follows
+    the wave order, page objects before the tests that import them, and a test
+    is kept only if everything convertible it imports was kept too. A test whose
+    companions did not make the cut is passed over for the next one, which is
+    why the kept set can be smaller than the cap even when more files exist.
+
+    Dropped files become ordinary copies, not skips: they still belong in the
+    converted tree, they simply arrive unchanged.
+    """
+    budget = {kind: (limit if limit > 0 else len(files)) for kind, limit in caps.items()}
+    kept: set[str] = set()
+    dropped: list[SuiteFile] = []
+    for wave in waves:
+        for path in wave:
+            item = files[path]
+            if item.kind not in budget:
+                kept.add(path)
+                continue
+            needs = [d for d in item.imports if files[d].action == CONVERT]
+            if budget[item.kind] > 0 and all(d in kept for d in needs):
+                kept.add(path)
+                budget[item.kind] -= 1
+            else:
+                dropped.append(item)
+    for item in dropped:
+        files[item.path] = replace(
+            files[item.path], action=COPY,
+            reason=f"past this demo's limit of {_tally({item.kind: caps[item.kind]})} "
+                   "per run; carried over to the converted suite unchanged")
+    return files, dropped
+
+
+def cap_note(files: dict[str, SuiteFile], dropped: list[SuiteFile],
+             caps: dict[str, int]) -> str:
+    """One paragraph for the report and the page: what was left out, and how to get it.
+
+    It has to say three things, because a visitor who reads only the first will
+    conclude the converter choked on their folder: what the limit is, that the
+    rest of their files still arrived, and that running it themselves has no
+    limit at all. The last one is the point — the ceiling is this demo's card.
+    """
+    left = _tally({kind: sum(1 for f in dropped if f.kind == kind) for kind in caps})
+    limits = _tally({kind: limit for kind, limit in caps.items() if limit})
+    note = (f"This demo converts at most {limits} per suite run, so {left} were "
+            f"carried across unchanged instead.")
+
+    # A run can come in *under* its own cap, and a reader who counts the files
+    # deserves to know why rather than filing it as an off-by-one: a test whose
+    # page object was left out is left out with it, on purpose.
+    kept = {kind: sum(1 for f in files.values()
+                      if f.action == CONVERT and f.kind == kind) for kind in caps}
+    short = _tally({kind: caps[kind] - n for kind, n in kept.items()
+                    if caps[kind] and n < caps[kind]})
+    if short:
+        note += (f" It converted {short} fewer than that: a test file whose page object"
+                 " did not fit is left out with it, because converting one without its"
+                 " companion compiles it against an API that is no longer there.")
+    return f"{note} {CAP_INVITATION}"
+
+
 def plan_waves(files: dict[str, SuiteFile]) -> tuple[tuple[tuple[str, ...], ...], list[str]]:
     """Layer the convertible files so nothing is converted before what it imports.
 
@@ -280,6 +397,14 @@ def scan_sources(sources: dict[str, str], root: str = "uploaded files") -> Manif
             files[target] = _with_dependent(files[target], path)
 
     waves, notes = plan_waves(files)
+    caps = demo_caps()
+    if any(caps.values()):
+        files, dropped = apply_caps(files, waves, caps)
+        if dropped:
+            # The plan changed under us: fewer files convert, so the waves and
+            # any note about them have to be derived again, not patched.
+            waves, notes = plan_waves(files)
+            notes.append(cap_note(files, dropped, caps))
     for number, wave in enumerate(waves, 1):
         for path in wave:
             files[path] = replace(files[path], wave=number)
