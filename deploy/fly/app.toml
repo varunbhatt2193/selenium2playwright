@@ -40,11 +40,16 @@ primary_region = "iad"
   # suite this deployment will convert on the demo's own card: twelve is the
   # sample suite exactly. A folder bigger than this is refused whole rather than
   # converted in part — a half-converted suite is not a result anybody can use.
-  # Bigger repos are for the visitor's own API key.
+  # Bigger repos are for a clone and your own key.
   #
   # It must be set on BOTH apps: the graph charges by this number and the UI
   # quotes it before the run. One without the other is a page that promises a
   # folder the backend will refuse.
+  #
+  # It lives here and NOT in `fly secrets`, which is for things that must not be
+  # read back. A secret of the same name silently outranks this block, so the
+  # repo would say one number while the demo enforced another — which it did,
+  # until 2026-09-09.
   S2P_DAILY_LIMIT = "12"
 
 [http_service]
