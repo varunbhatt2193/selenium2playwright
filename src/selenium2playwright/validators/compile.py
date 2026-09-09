@@ -42,9 +42,33 @@ ALIAS_ENDINGS = ("", ".ts", ".tsx", ".d.ts", "/index.ts", "/index.tsx")
 # `Cannot find module 'zod' or its corresponding type declarations.`
 MISSING_MODULE = re.compile(r"""Cannot find module ['"]([^'"]+)['"]""")
 
+# `Cannot find name 'context'.`
+MISSING_NAME = re.compile(r"""Cannot find name ['"]([^'"]+)['"]""")
+
+# Globals a test runner injects with no import, which exist only if its types
+# are installed. They are not, deliberately, so a suite that still contains its
+# Mocha specs reports them by the dozen.
+#
+# `expect` and `test` are pointedly NOT here. Those come from
+# `@playwright/test`, which *is* installed, so a converted file that reports
+# them undefined has a real bug — forgetting the import is exactly the kind of
+# thing this gate exists to catch, and excusing it would be a hole.
+#
+# Everything listed is Mocha, Jest or Cypress, and the residue gate refuses all
+# of it in converted output. That is what makes excusing it here safe: the
+# question is owned, just by the gate whose question it is.
+RUNNER_GLOBALS = frozenset({
+    "describe", "it", "context", "specify", "suite",
+    "before", "after", "beforeEach", "afterEach", "beforeAll", "afterAll",
+    "jest", "cy", "chai",
+})
+
 
 def missing_dependency(finding, in_tree: set[str]) -> bool:
-    """Is this TS2307 about a package that is simply not installed here?
+    """Is this finding about something the sandbox was never going to have?
+
+    Two shapes: a module that is not installed (TS2307), and a global that a
+    test runner would have injected if its types were (TS2304).
 
     The sandbox carries TypeScript and Playwright and nothing else, deliberately
     — it is how the residue gate can promise there is no Selenium to fall back
@@ -56,9 +80,14 @@ def missing_dependency(finding, in_tree: set[str]) -> bool:
     broken relative import, or an alias that resolves to nothing, is a real
     finding and stays one.
     """
-    if getattr(finding, "code", "") != "TS2307":
+    code = getattr(finding, "code", "")
+    message = getattr(finding, "message", "") or ""
+    if code == "TS2304":
+        name = MISSING_NAME.search(message)
+        return bool(name and name.group(1) in RUNNER_GLOBALS)
+    if code != "TS2307":
         return False
-    match = MISSING_MODULE.search(getattr(finding, "message", "") or "")
+    match = MISSING_MODULE.search(message)
     if not match:
         return False
     specifier = match.group(1)

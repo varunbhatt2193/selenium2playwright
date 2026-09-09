@@ -42,8 +42,10 @@ from __future__ import annotations
 
 import json
 import os
+import queue
 import re
 import sys
+import threading
 import traceback
 from collections.abc import Iterator
 from dataclasses import asdict
@@ -116,16 +118,57 @@ def result_view(result: pg.SuiteResult) -> dict[str, Any]:
             "headline": result.headline}
 
 
+# How often to put a byte on an idle stream. A proxy between this server and
+# the browser will close a connection that goes quiet, and a conversion goes
+# quiet for a long time: a wave of four files converting in parallel emits
+# nothing at all between "wave 1 starting" and the first file landing, which
+# measured 95 seconds on a live run. The browser then reports a network error
+# while both servers log a clean 200, because from their side nothing failed.
+#
+# Fifteen seconds is well inside the usual sixty-second idle limit and cheap:
+# a comment line no client parses as an event.
+HEARTBEAT_SECONDS = 15.0
+
+
 def sse(events: Iterator[dict[str, Any]]) -> StreamingResponse:
     """Server-sent events. One JSON object per line, flushed as it happens.
 
     A sync generator on purpose: the SDK client is synchronous, and Starlette
     runs a sync iterator in a worker thread, so a minute-long stream does not
     block the event loop for every other visitor.
+
+    The upstream iterator blocks, so it cannot be asked "anything yet?" — it is
+    drained on a second thread into a queue, and the queue is what this waits
+    on, with a timeout that turns silence into a heartbeat instead of a dropped
+    connection. The thread is a daemon: if the client goes away mid-run, this
+    generator is closed and nothing is left holding the process open.
     """
     def body() -> Iterator[bytes]:
-        for event in events:
-            yield f"data: {json.dumps(event)}\n\n".encode()
+        pipe: queue.Queue = queue.Queue(maxsize=64)
+        DONE = object()
+
+        def drain() -> None:
+            try:
+                for event in events:
+                    pipe.put(event)
+            except Exception as exc:            # the upstream failed, not us
+                pipe.put(exc)
+            finally:
+                pipe.put(DONE)
+
+        worker = threading.Thread(target=drain, daemon=True, name="sse-drain")
+        worker.start()
+        while True:
+            try:
+                item = pipe.get(timeout=HEARTBEAT_SECONDS)
+            except queue.Empty:
+                yield b": keep-alive\n\n"      # a comment: no event, just a byte
+                continue
+            if item is DONE:
+                return
+            if isinstance(item, Exception):
+                raise item
+            yield f"data: {json.dumps(item)}\n\n".encode()
 
     return StreamingResponse(
         body(),

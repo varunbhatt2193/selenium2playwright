@@ -8,7 +8,9 @@ itself. Most of these tests are pure — only one pays for a real `tsc` run.
 
 import unittest
 
-from selenium2playwright.validators.compile import alias_paths, compile_check
+from selenium2playwright.schemas import Finding
+from selenium2playwright.validators.compile import (alias_paths, compile_check,
+                                                    missing_dependency)
 from selenium2playwright.validators.residue import residue_check
 
 # The shape that failed on the live demo: three aliases, one real npm scope.
@@ -74,6 +76,38 @@ class AliasedTreeCompilesTests(unittest.TestCase):
                         "aliased imports should resolve: "
                         + "; ".join(f"{f.file}:{f.line} {f.code} {f.message}"
                                    for f in report.findings))
+
+
+class RunnerGlobalTests(unittest.TestCase):
+    """`Cannot find name 'context'` is a missing @types/mocha, not a bad conversion."""
+
+    def finding(self, code, message):
+        return Finding(gate="compile", file="tests/a.test.ts", line=1, column=1,
+                       code=code, message=message)
+
+    def test_a_mocha_global_is_an_absent_dependency(self):
+        self.assertTrue(missing_dependency(
+            self.finding("TS2304", "Cannot find name 'context'."), set()))
+
+    def test_a_playwright_name_is_not_excused(self):
+        """`expect` ships with @playwright/test, which IS installed — a missing
+        import there is a real bug and must keep failing the gate."""
+        for name in ("expect", "test"):
+            with self.subTest(name=name):
+                self.assertFalse(missing_dependency(
+                    self.finding("TS2304", f"Cannot find name '{name}'."), set()))
+
+    def test_an_ordinary_undefined_name_is_not_excused(self):
+        self.assertFalse(missing_dependency(
+            self.finding("TS2304", "Cannot find name 'loginPge'."), set()))
+
+    def test_residue_still_refuses_every_global_compile_now_excuses(self):
+        """The safety interlock: compile may only excuse what residue catches."""
+        from selenium2playwright.validators.compile import RUNNER_GLOBALS
+        for name in sorted(RUNNER_GLOBALS - {"jest", "cy", "chai"}):
+            with self.subTest(name=name):
+                report = residue_check({"out.ts": f"{name}('x', () => {{}});\n"})
+                self.assertFalse(report.passed, f"residue lets {name}( through")
 
 
 class SeleniumStillCaughtTests(unittest.TestCase):

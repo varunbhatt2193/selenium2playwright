@@ -27,7 +27,12 @@ RULES: dict[str, list[tuple[str, str, str]]] = {
          "imports a Selenium/Mocha/chai module — output must import only @playwright/test"),
         ("selenium-api", r"""\bdriver\.|\bBy\.\w+\(|\buntil\.\w+\(|new\s+Builder\(|\.findElements?\(|\.sendKeys\(|\.switchTo\(\)|\.executeScript\(|\bWebDriver\b|\bWebElement\b""",
          "Selenium WebDriver API left in output"),
-        ("mocha-api", r"""(?<![.\w])describe\(|(?<![.\w])it\(|(?<![.\w])before\(|(?<![.\w])after\(|(?<![.\w])beforeEach\(|(?<![.\w])afterEach\(|\bthis\.timeout\(""",
+        # `context`, `specify`, `suite`, `beforeAll` and `afterAll` are the same
+        # kind of thing as `describe` and were simply missing. They matter more
+        # than they look: the compile gate excuses `Cannot find name 'context'`
+        # as a runner global the sandbox does not install, and that is only safe
+        # while this gate is the one that catches it in converted output.
+        ("mocha-api", r"""(?<![.\w])describe\(|(?<![.\w])it\(|(?<![.\w])context\(|(?<![.\w])specify\(|(?<![.\w])suite\(|(?<![.\w])before\(|(?<![.\w])after\(|(?<![.\w])beforeEach\(|(?<![.\w])afterEach\(|(?<![.\w])beforeAll\(|(?<![.\w])afterAll\(|\bthis\.timeout\(""",
          "Mocha hook/structure left in output — use test.describe / test / test.beforeEach"),
         ("chai-assertion", r"""\)\s*\.to\.(equal|eql|contain|include|be|have|not|deep|match)\b|\bassert\.\w+\(""",
          "chai-style assertion left in output — use Playwright expect"),

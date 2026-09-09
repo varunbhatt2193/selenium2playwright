@@ -14,8 +14,10 @@ test sees the same `data:` lines a browser does.
 
 from __future__ import annotations
 
+import asyncio
 import io
 import json
+import time
 import sys
 import tempfile
 import unittest
@@ -462,6 +464,52 @@ class WebTests(unittest.TestCase):
                 )
                 self.assertIsNone(server.built_file("assets/never-built.js"))
                 self.assertIsNone(server.built_file(""))
+
+
+class HeartbeatTests(unittest.TestCase):
+    """An idle stream must keep sending bytes, or a proxy will close it.
+
+    A wave of files converting in parallel emits nothing for a minute and a
+    half. Both servers then log a clean 200 while the browser reports a network
+    error, because from their side nothing failed.
+    """
+
+    def drain(self, events, beat=0.05):
+        """Starlette wraps a sync iterator in an async one, so drive it with asyncio."""
+        async def pull():
+            chunks = []
+            async for chunk in server.sse(events).body_iterator:
+                chunks.append(chunk if isinstance(chunk, bytes) else chunk.encode())
+            return chunks
+        with patch.object(server, "HEARTBEAT_SECONDS", beat):
+            return asyncio.run(pull())
+
+    def test_a_silent_stretch_produces_a_keep_alive(self):
+        def slow():
+            time.sleep(0.25)
+            yield {"kind": "done"}
+        chunks = self.drain(slow())
+        self.assertIn(b": keep-alive\n\n", chunks)
+        self.assertIn(b'data: {"kind": "done"}\n\n', chunks)
+
+    def test_a_keep_alive_is_not_an_event(self):
+        """The browser parser only reads `data:` lines; a comment must stay a comment."""
+        for chunk in self.drain((e for e in [{"kind": "start"}])):
+            if chunk.startswith(b":"):
+                self.assertNotIn(b"data:", chunk)
+
+    def test_events_still_arrive_in_order(self):
+        events = [{"n": i} for i in range(5)]
+        data = [c for c in self.drain(iter(events)) if c.startswith(b"data: ")]
+        self.assertEqual([json.loads(c[6:]) for c in data], events)
+
+    def test_an_upstream_failure_still_reaches_the_caller(self):
+        """Swallowing it would hang the page on a stream that is never coming back."""
+        def boom():
+            yield {"kind": "start"}
+            raise RuntimeError("upstream went away")
+        with self.assertRaises(RuntimeError):
+            self.drain(boom())
 
 
 if __name__ == "__main__":
