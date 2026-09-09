@@ -15,6 +15,7 @@ import re
 import shutil
 import subprocess
 import sys
+from collections.abc import Collection
 from pathlib import Path
 from uuid import uuid4
 
@@ -187,8 +188,16 @@ def alias_paths(files: dict[str, str]) -> dict[str, list[str]]:
     return dict(sorted(mapping.items()))
 
 
-def compile_check(files: dict[str, str], keep: bool = False) -> ValidationReport:
-    """files = {relative path: contents}. Relative paths matter: tests import ../pages/X."""
+def compile_check(files: dict[str, str], keep: bool = False,
+                  carried: Collection[str] = ()) -> ValidationReport:
+    """files = {relative path: contents}. Relative paths matter: tests import ../pages/X.
+
+    `carried` names the keys in `files` that are the folder's own untouched
+    source — companions handed to `tsc` so imports resolve, which this run
+    never claimed to have converted. Errors inside them are excused. Left
+    empty, every file here answers for itself, which is what the whole-tree
+    compile in `assemble` wants: nothing is a companion to a final report.
+    """
     if not TSC.exists():
         raise RuntimeError(f"{TSC} missing — run `npm install` inside sandbox/ first")
     run_dir = WORK / uuid4().hex[:8]
@@ -218,15 +227,30 @@ def compile_check(files: dict[str, str], keep: bool = False) -> ValidationReport
             shutil.rmtree(run_dir, ignore_errors=True)
 
     findings = parse_tsc_output(proc.stdout, prefix=str(run_dir.relative_to(SANDBOX)) + "/")
-    # A file is not badly converted because the folder next to it imports a
-    # package this sandbox does not install. Those findings are still reported —
-    # `excused` keeps every line tsc printed — they just do not fail the gate,
-    # because failing it sends the repair loop off to rewrite correct code, and
-    # they are held apart from `findings` because that list is the critic's
-    # to-do list: an excused error there reads as work, and gets "revise".
+    # Two kinds of error this conversion does not answer for. One is a package
+    # the sandbox never installs. The other is an error *inside* a companion the
+    # run carried across untouched: the folder's own Selenium, handed to `tsc`
+    # only so imports resolve, and never claimed as converted.
+    #
+    # Both are still reported — `excused` keeps every line tsc printed — they
+    # just do not fail the gate, and they are held apart from `findings` because
+    # that list is the critic's to-do list: an excused error there reads as work.
+    #
+    # The second kind was measured. A live suite — goenning/typescript-
+    # selenium-example — scored 0 of 4 files, every lap, because its carried
+    # `lib/` Selenium does not compile here, which nobody expected it to. The
+    # critic read the failure exactly right and was helpless: it could see
+    # the errors were not in its file, so every lap it asked us to rerun the
+    # validator "with the intended target scope" instead of changing code.
+    # Three attempts each, four files, nothing to show. This is that scope.
     known = set(files)
-    blocking = [f for f in findings if not missing_dependency(f, known)]
-    excused = [f for f in findings if missing_dependency(f, known)]
+    theirs = set(carried)
+
+    def not_ours(finding) -> bool:
+        return finding.file in theirs or missing_dependency(finding, known)
+
+    blocking = [f for f in findings if not not_ours(f)]
+    excused = [f for f in findings if not_ours(f)]
     return ValidationReport(
         gate="compile",
         passed=not blocking,

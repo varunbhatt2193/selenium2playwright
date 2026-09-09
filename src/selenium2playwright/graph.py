@@ -452,6 +452,12 @@ def validate(state: ConversionState) -> ConversionState:
     relative = target.relative_to(base).as_posix()
     converted = {relative: state["result"].code}
     files = {p.relative_to(base).as_posix(): code for p, code in companions.items()} | converted
+    # Which of those companions are still the folder's own Selenium. They are
+    # here so `tsc` can resolve an import, not because this run converted them,
+    # so an error inside one is not this file's to fix — see `compile_check`.
+    still_theirs = {str(Path(p).resolve()) for p in state.get("carried_paths") or ()}
+    carried = {p.relative_to(base).as_posix() for p in companions
+               if str(p.resolve()) in still_theirs}
     checks = [
         # Only compile is given the companions, and only because `tsc` cannot
         # resolve an import without the file behind it. The other three ask
@@ -460,7 +466,7 @@ def validate(state: ConversionState) -> ConversionState:
         # judging residue over them failed a clean Playwright file for the
         # Selenium still sitting in the file next door — twice, on a live run,
         # burning all three attempts each time.
-        ("compile", lambda: compile_check(files)),
+        ("compile", lambda: compile_check(files, carried=carried)),
         ("residue", lambda: residue_check(converted)),
         ("lint", lambda: lint_check(converted)),
         ("parity", lambda: parity_check({relative: state["source"]}, converted)),

@@ -55,6 +55,43 @@ class GatesJudgeTheConvertedFileTests(unittest.TestCase):
         self.assertTrue(gates["residue"], "a companion's Selenium is not this file's residue")
         self.assertTrue(gates["lint"], "a companion's style is not this file's lint")
 
+    def test_a_carried_companions_compile_error_does_not_fail_this_file(self):
+        """The goenning failure: `tsc` reads the companion, so its errors appear.
+
+        Compile is the one gate that must be given the companions — an import
+        cannot resolve without the file behind it — which is exactly why it is
+        the one gate that needs telling which of them were never converted.
+        """
+        clean = ('import { Page } from "@playwright/test";\n'
+                 "export default class Index {\n"
+                 "  constructor(private readonly page: Page) {}\n"
+                 "}\n")
+        wont_compile = "export const n: number = 'not a number';\n"
+        state = self.state(clean, wont_compile) | {"carried_paths": ["/w/pages/login.page.ts"]}
+        out = graph.validate(state)
+        compile_report = next(r for r in out["validation"] if r.gate == "compile")
+        self.assertTrue(compile_report.passed, compile_report.render())
+        self.assertTrue(compile_report.excused, "the error was dropped rather than excused")
+
+    def test_the_same_error_blocks_when_the_companion_was_converted(self):
+        """Without `carried_paths` nothing changes: a converted file is output."""
+        clean = ('import { Page } from "@playwright/test";\n'
+                 "export default class Index {\n"
+                 "  constructor(private readonly page: Page) {}\n"
+                 "}\n")
+        out = graph.validate(self.state(clean, "export const n: number = 'not a number';\n"))
+        compile_report = next(r for r in out["validation"] if r.gate == "compile")
+        self.assertFalse(compile_report.passed)
+
+    def test_a_carried_companion_never_excuses_the_converted_file(self):
+        broken = "export const n: number = 'text';\n"
+        state = self.state(broken, "export const b = 1;\n") | {
+            "carried_paths": ["/w/pages/login.page.ts"]}
+        out = graph.validate(state)
+        compile_report = next(r for r in out["validation"] if r.gate == "compile")
+        self.assertFalse(compile_report.passed)
+        self.assertEqual(["Index.ts"], [f.file for f in compile_report.findings])
+
     def test_selenium_in_the_converted_file_still_fails(self):
         """The gate must not have been softened into uselessness."""
         left_behind = ('import { By } from "selenium-webdriver";\n'

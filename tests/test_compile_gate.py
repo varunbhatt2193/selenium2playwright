@@ -242,5 +242,68 @@ class ExcusedFindingTests(unittest.TestCase):
         self.assertIn("TS2322", report.render())
 
 
+class CarriedCompanionTests(unittest.TestCase):
+    """An error inside a file the run never converted is not this file's fault.
+
+    A suite hands `tsc` the companions so imports resolve. In a real repository
+    most of those companions are still Selenium — they are copied across
+    untouched, and Selenium does not compile in this sandbox by design. Before
+    this, every one of their errors failed the target's compile gate.
+
+    Measured on goenning/typescript-selenium-example, live: all four converted
+    files scored `needs-review` on every lap. The critic diagnosed it correctly
+    and could do nothing — the errors were in files it had been told not to
+    touch — so it spent three attempts each asking us to rerun the validator
+    "with the intended target scope". This is that scope.
+    """
+
+    # `lib/index.ts` is the shape that did it: a barrel of Selenium the
+    # converted file imports, which cannot type-check without the package.
+    TREE = {
+        "lib/index.ts": ("import { WebDriver } from 'selenium-webdriver';\n"
+                         "export const stale: WebDriver = undefined as never;\n"
+                         "export const n: number = 'not a number';\n"),
+        "pages/Login.ts": ("import { Page } from '@playwright/test';\n"
+                           "export class LoginPage {\n"
+                           "  constructor(private page: Page) {}\n"
+                           "  async open() { await this.page.goto('/login'); }\n"
+                           "}\n"),
+    }
+
+    def test_a_carried_companions_own_error_fails_the_gate_when_nobody_says_it_is_carried(self):
+        """The bug, pinned: without `carried`, the neighbour's error is ours."""
+        report = compile_check(self.TREE)
+        self.assertFalse(report.passed)
+        self.assertTrue(any(f.file == "lib/index.ts" for f in report.findings))
+
+    def test_naming_it_carried_excuses_it(self):
+        report = compile_check(self.TREE, carried={"lib/index.ts"})
+        self.assertTrue(report.passed, report.render())
+        self.assertEqual([], report.findings)
+        self.assertTrue(any(f.file == "lib/index.ts" for f in report.excused))
+
+    def test_the_critic_is_not_shown_work_it_cannot_do(self):
+        rendered = compile_check(self.TREE, carried={"lib/index.ts"}).render()
+        self.assertIn("compile: passed", rendered)
+        self.assertNotIn("lib/index.ts", rendered)
+
+    def test_the_converted_file_is_never_excused_by_its_neighbours(self):
+        """Carrying a companion must not turn the gate off for the target."""
+        broken = self.TREE | {"pages/Login.ts": "export const n: number = 'text';\n"}
+        report = compile_check(broken, carried={"lib/index.ts"})
+        self.assertFalse(report.passed)
+        self.assertEqual(["pages/Login.ts"], [f.file for f in report.findings])
+
+    def test_a_companion_that_was_converted_still_answers_for_itself(self):
+        """Only *carried* companions are excused — a converted one is output."""
+        report = compile_check(self.TREE, carried=set())
+        self.assertFalse(report.passed)
+        self.assertTrue(any(f.file == "lib/index.ts" for f in report.findings))
+
+    def test_the_whole_tree_compile_excuses_nothing_by_default(self):
+        """`assemble` reports on the final tree, where no file is a companion."""
+        self.assertFalse(compile_check(self.TREE).passed)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -261,3 +261,52 @@ interface mismatches, and the only failure was T12 above.
 
 *Gate:* execution reports split `by_kind` and say this in the text, so a
 page-object execution percentage is never read as a converter score.
+
+## Addendum 2026-09-09 — measured live (T14)
+
+### T14 · A gate fails a file for its neighbour's errors, and the critic cannot obey
+`goenning/typescript-selenium-example` scored **0 of 4** converted files on the
+live playground — every file, every lap, `needs-review`. Nothing was wrong with
+the conversions.
+
+Compile is the one gate that must be handed the companion files, because `tsc`
+cannot resolve an import without the file behind it. In a real repository most
+of those companions are the folder's own **unconverted Selenium**: this suite
+copies twelve files across untouched, including the `lib/index.ts` barrel that
+all four converted files import. That Selenium does not compile in the sandbox —
+by design, it is how the residue gate can promise there is no Selenium to fall
+back on — so every one of its errors landed in the target's `findings`.
+
+`excused` already existed for exactly this, and its docstring already named the
+case (*"a module belonging to a file the run never touched"*). But
+`missing_dependency()` only ever answered one question — *is this an absent
+package?* — so excusal was keyed to the **error code**, never to **which file
+the error is in**. A carried file's `TS2322` or `TS2305` is neither TS2307 nor
+TS2304, so it blocked.
+
+What makes this a taxonomy entry rather than a bug report is the critic's
+behaviour. It diagnosed the problem correctly and was helpless:
+
+> "The reported compile findings are all in explicitly unconverted companion
+> Selenium files under `lib/` and `pages/`, which the task says are not
+> conversion targets... Do not change otherwise valid converted code just to
+> hide those external compile failures. **Restore/rerun the validation with the
+> intended target scope.**"
+
+It was asked to review a file and told the tool was wrong, which is the one
+repair it cannot perform. It voted revise because a gate had failed, and the
+repair loop spent every attempt on all four files. So a gate that fails for the
+wrong reason does not merely mis-score — it converts the whole attempt budget
+into nothing, and the more honest the critic is, the more completely it stalls.
+
+*Gate:* `compile_check(files, carried=...)` excuses by **location** as well as
+by code — an error inside a file this run carried across untouched is reported
+and does not block. `validate()` derives the set from `carried_paths`, which
+already existed for the prompt. The converted file is never excused this way,
+and the whole-tree compile in `assemble` passes no `carried` at all: a final
+report has no companions, every file in it answers for itself.
+
+*Measured, same repo, offline against the real tree:* `lib/browser.ts` 2
+blocking findings → **0**, `lib/ensure.ts` 2 → **0**, `tests/test.ts` 39 → 3,
+and those three are `describe`/`it` in the unconverted stand-in used as the
+target, which converted output does not contain.
