@@ -447,10 +447,16 @@ def validate(state: ConversionState) -> ConversionState:
     converted = {relative: state["result"].code}
     files = {p.relative_to(base).as_posix(): code for p, code in companions.items()} | converted
     checks = [
+        # Only compile is given the companions, and only because `tsc` cannot
+        # resolve an import without the file behind it. The other three ask
+        # questions about *this* conversion, and a companion is not it: in a
+        # suite run the companions are the folder's own untouched source, so
+        # judging residue over them failed a clean Playwright file for the
+        # Selenium still sitting in the file next door — twice, on a live run,
+        # burning all three attempts each time.
         ("compile", lambda: compile_check(files)),
-        ("residue", lambda: residue_check(files)),
-        ("lint", lambda: lint_check(files)),
-        # Companions are already converted; only the current file has a source pair.
+        ("residue", lambda: residue_check(converted)),
+        ("lint", lambda: lint_check(converted)),
         ("parity", lambda: parity_check({relative: state["source"]}, converted)),
     ]
     reports = []

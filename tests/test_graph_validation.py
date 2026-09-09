@@ -23,6 +23,47 @@ POM = "pages/LoginPage.ts"
 TEST = "tests/login.spec.ts"
 
 
+class GatesJudgeTheConvertedFileTests(unittest.TestCase):
+    """A companion's contents are not a verdict on this file's conversion.
+
+    In a suite run the companions handed to `validate` are the folder's own
+    untouched source, so they are full of Selenium. Residue and lint used to
+    read them and fail a clean Playwright file for the file next door.
+    """
+
+    def state(self, converted_code, companion_code):
+        return {
+            "output_path": "/w/pages/Index.ts",
+            "source_path": "/w/pages/Index.ts",
+            "source": "import { By } from 'selenium-webdriver';\nexport class I {}\n",
+            "context_files": {"/w/pages/login.page.ts": companion_code},
+            "result": ConversionResult(code=converted_code, notes=(), todos=()),
+        }
+
+    def test_selenium_in_a_companion_does_not_fail_the_converted_file(self):
+        clean = ('import { Page } from "@playwright/test";\n'
+                 "export default class Index {\n"
+                 "  constructor(private readonly page: Page) {}\n"
+                 "}\n")
+        seleniumy = ('import { By, WebDriver } from "selenium-webdriver";\n'
+                     "export class Login {\n"
+                     "  constructor(private driver: WebDriver) {}\n"
+                     "  async go() { await this.driver.findElement(By.css('#a')).click(); }\n"
+                     "}\n")
+        out = graph.validate(self.state(clean, seleniumy))
+        gates = {r.gate: r.passed for r in out["validation"]}
+        self.assertTrue(gates["residue"], "a companion's Selenium is not this file's residue")
+        self.assertTrue(gates["lint"], "a companion's style is not this file's lint")
+
+    def test_selenium_in_the_converted_file_still_fails(self):
+        """The gate must not have been softened into uselessness."""
+        left_behind = ('import { By } from "selenium-webdriver";\n'
+                       "export const a = By.css('#x');\n")
+        out = graph.validate(self.state(left_behind, "export const b = 1;\n"))
+        gates = {r.gate: r.passed for r in out["validation"]}
+        self.assertFalse(gates["residue"])
+
+
 class GraphValidationTests(unittest.TestCase):
     def setUp(self):
         env = patch.dict(os.environ, {"LANGSMITH_TRACING": "false", "LANGCHAIN_TRACING_V2": "false",
