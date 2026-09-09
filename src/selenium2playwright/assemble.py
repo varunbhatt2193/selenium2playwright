@@ -578,18 +578,34 @@ def split_tree_findings(tree, outcomes: list, manifest) -> dict:
 
       converted   errors in a file this run produced. The only number that is
                   a verdict on the conversion, and the only one that goes red.
-      unconverted Selenium the run carried across untouched. Expected: it never
-                  claimed to be Playwright, and the sandbox has no Selenium.
-      companion   everything else carried across — a file with no Selenium left
-                  in it that still does not compile. This is the interesting
-                  bucket: a caller whose companion's API just moved under it.
-                  Not counted against the conversion, never hidden either.
+      unconverted carried across untouched, and importing nothing this run
+                  changed. Its errors are its own: it is being read under our
+                  tsconfig instead of the one its repository ships.
+      companion   carried across, but importing a file this run converted. This
+                  is the interesting bucket: a caller whose companion's API just
+                  moved under it. Not hidden, and it does count.
+
+    What separates the last two is **whether the conversion could have reached
+    the file**, not what the file is made of. Keying it on "does this still look
+    like Selenium" read a whole repository wrong: goenning/typescript-selenium-
+    example wraps WebDriver in its own `lib/`, so twelve carried files classify
+    as `automation=unknown`, landed in `companion`, and turned the tree red for
+    their own decorator and strict-initialisation settings — in files nobody
+    had claimed to convert. An import edge is a causal link. A classification
+    is a guess about the input.
+
+    The edge is direct, not transitive, and that is a deliberate under-reach: a
+    barrel file re-exporting a converted module would otherwise make the whole
+    repository a caller again, which is the bug this replaced. Drift that
+    reaches a file only through a carried barrel therefore reports as
+    `unconverted`. Nothing is hidden by that — every finding is still printed
+    under its own heading — it is only not counted against the conversion.
     """
     converted = {o.path for o in outcomes}
     in_tree = {f.path for f in (manifest.files if manifest else ())}
-    selenium_left = {f.path for f in (manifest.files if manifest else ())
-                     if f.path not in converted
-                     and getattr(f.classification, "automation", "") == "selenium"}
+    reaches_converted = {f.path for f in (manifest.files if manifest else ())
+                         if f.path not in converted
+                         and set(getattr(f, "imports", ()) or ()) & converted}
     buckets: dict[str, list] = {"converted": [], "unconverted": [], "companion": [],
                                 "dependency": []}
     # Both lists: the compile gate keeps the errors it excused (a package the
@@ -598,17 +614,18 @@ def split_tree_findings(tree, outcomes: list, manifest) -> dict:
     # them — sorted into the same buckets, by the same rules, below.
     reported = ([*tree.findings, *tree.excused] if tree else ())
     for finding in reported:
-        # Order matters. For a file this run openly declined to convert, "it is
-        # still Selenium" explains every error it has — the missing
+        # Order matters. For a file this run openly declined to convert, "we
+        # never touched it" explains every error it has — the missing
         # `selenium-webdriver` module included — and explains it better than
-        # "the sandbox lacks a package". Everywhere else, a module that is not
-        # in this folder is a dependency we were never going to have.
-        if finding.file in selenium_left:
-            where = "unconverted"
-        elif missing_dependency(finding, in_tree):
-            where = "dependency"
+        # "the sandbox lacks a package". Where the run *could* have reached the
+        # file, a module that is not in this folder is still a dependency we
+        # were never going to have, and only what is left is drift we caused.
+        if finding.file in converted:
+            where = "converted" if not missing_dependency(finding, in_tree) else "dependency"
+        elif finding.file in reaches_converted:
+            where = "dependency" if missing_dependency(finding, in_tree) else "companion"
         else:
-            where = "converted" if finding.file in converted else "companion"
+            where = "unconverted"
         buckets[where].append(finding)
     return buckets
 

@@ -75,7 +75,9 @@ def missing_dependency(finding, in_tree: set[str]) -> bool:
     """Is this finding about something the sandbox was never going to have?
 
     Two shapes: a module that is not installed (TS2307), and a global that a
-    test runner would have injected if its types were (TS2304).
+    test runner would have injected if its types were (TS2304, or TS2582 —
+    the same error, which tsc renumbers when it can name the `@types` package
+    that would have supplied it: "Try `npm i --save-dev @types/mocha`").
 
     The sandbox carries TypeScript and Playwright and nothing else, deliberately
     — it is how the residue gate can promise there is no Selenium to fall back
@@ -89,7 +91,7 @@ def missing_dependency(finding, in_tree: set[str]) -> bool:
     """
     code = getattr(finding, "code", "")
     message = getattr(finding, "message", "") or ""
-    if code == "TS2304":
+    if code in ("TS2304", "TS2582"):
         name = MISSING_NAME.search(message)
         return bool(name and name.group(1) in RUNNER_GLOBALS)
     if code != "TS2307":

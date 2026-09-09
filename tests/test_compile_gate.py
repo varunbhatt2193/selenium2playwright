@@ -168,6 +168,21 @@ class RunnerGlobalTests(unittest.TestCase):
         self.assertTrue(missing_dependency(
             self.finding("TS2304", "Cannot find name 'context'."), set()))
 
+    def test_the_same_global_is_excused_under_its_other_error_code(self):
+        """tsc renumbers to TS2582 when it can name the @types package."""
+        finding = Finding(gate="compile", file="a.ts", code="TS2582",
+                          message="Cannot find name 'describe'. Do you need to install type "
+                                  "definitions for a test runner? Try `npm i --save-dev "
+                                  "@types/jest` or `npm i --save-dev @types/mocha`.")
+        self.assertTrue(missing_dependency(finding, {"a.ts"}))
+
+    def test_a_playwright_name_is_not_excused_under_either_code(self):
+        for code in ("TS2304", "TS2582"):
+            with self.subTest(code=code):
+                finding = Finding(gate="compile", file="a.ts", code=code,
+                                  message="Cannot find name 'expect'.")
+                self.assertFalse(missing_dependency(finding, {"a.ts"}))
+
     def test_a_playwright_name_is_not_excused(self):
         """`expect` ships with @playwright/test, which IS installed — a missing
         import there is a real bug and must keep failing the gate."""

@@ -420,18 +420,40 @@ class TreeVerdictSplitTests(unittest.TestCase):
         self.assertEqual(len(split["dependency"]), 1)
         self.assertEqual(len(split["converted"]), 0)
 
-    def test_a_carried_file_with_no_selenium_left_is_our_problem(self):
+    def carried_caller(self, imports):
+        """A converted page object and a carried file that may or may not use it."""
+        return (suite.SuiteFile(path="pages/Done.ts", kind="page-object", action=suite.CONVERT,
+                                reason="", classification=classify("import x from 'selenium-webdriver';", "a.ts")),
+                suite.SuiteFile(path="pages/Caller.ts", kind="support", action=suite.COPY,
+                                reason="", imports=imports,
+                                classification=classify("export const a = 1;\n", "b.ts")))
+
+    def test_a_carried_file_that_imports_a_converted_one_is_our_problem(self):
         """The caller whose companion's API moved under it — never quietly excused."""
         tree = ValidationReport(gate="compile", passed=False, findings=[
             self.finding("pages/Caller.ts", "TS2339", "Property 'driver' does not exist.")])
-        files = (suite.SuiteFile(path="pages/Done.ts", kind="page-object", action=suite.CONVERT,
-                                 reason="", classification=classify("import x from 'selenium-webdriver';", "a.ts")),
-                 suite.SuiteFile(path="pages/Caller.ts", kind="support", action=suite.COPY,
-                                 reason="", classification=classify("export const a = 1;\n", "b.ts")))
         split = assemble.split_tree_findings(
-            tree, [outcome("pages/Done.ts")], suite.Manifest(root="r", files=files, waves=()))
+            tree, [outcome("pages/Done.ts")],
+            suite.Manifest(root="r", files=self.carried_caller(("pages/Done.ts",)), waves=()))
         self.assertEqual(len(split["companion"]), 1)
         self.assertEqual(len(split["unconverted"]), 0)
+
+    def test_a_carried_file_the_conversion_never_reached_is_not(self):
+        """Same file, same error, no import edge: the run could not have caused it.
+
+        This is the goenning case. A repository that wraps WebDriver in its own
+        `lib/` leaves every carried file classified `automation=unknown`, and
+        judging by classification put a dozen files' own decorator and strict-
+        initialisation settings on the conversion's bill.
+        """
+        tree = ValidationReport(gate="compile", passed=False, findings=[
+            self.finding("pages/Caller.ts", "TS2564",
+                         "Property 'url' has no initializer.")])
+        split = assemble.split_tree_findings(
+            tree, [outcome("pages/Done.ts")],
+            suite.Manifest(root="r", files=self.carried_caller(()), waves=()))
+        self.assertEqual(len(split["companion"]), 0)
+        self.assertEqual(len(split["unconverted"]), 1)
 
     def test_a_package_the_sandbox_lacks_is_not_a_conversion_failure(self):
         """`Cannot find module 'zod'` cannot be fixed by converting better."""
@@ -444,8 +466,11 @@ class TreeVerdictSplitTests(unittest.TestCase):
                                  reason="", classification=classify("export const a = 1;\n", "b.ts")))
         split = assemble.split_tree_findings(
             tree, [outcome("pages/Done.ts")], suite.Manifest(root="r", files=files, waves=()))
-        self.assertEqual(len(split["dependency"]), 1)
-        self.assertEqual(len(split["companion"]), 0)
+        # Carried and importing nothing this run touched, so "we never converted
+        # it" is the whole answer; the bucket that would have to go red is empty
+        # either way, which is what the name of this test is about.
+        self.assertEqual(len(split["unconverted"]), 1)
+        self.assertEqual(0, sum(len(split[k]) for k in ("converted", "companion")))
 
     def test_a_broken_relative_import_is_still_ours(self):
         """A dependency is a package; a missing file next door is a real finding."""
