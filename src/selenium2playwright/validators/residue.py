@@ -25,7 +25,17 @@ RULES: dict[str, list[tuple[str, str, str]]] = {
     "typescript": [
         ("forbidden-import", r"""from\s+['"](selenium-webdriver|chai|mocha|webdriverio|@wdio/[\w-]+)(/[\w-]+)?['"]|require\(['"](selenium-webdriver|chai|mocha)""",
          "imports a Selenium/Mocha/chai module — output must import only @playwright/test"),
-        ("selenium-api", r"""\bdriver\.|\bBy\.\w+\(|\buntil\.\w+\(|new\s+Builder\(|\.findElements?\(|\.sendKeys\(|\.switchTo\(\)|\.executeScript\(|\bWebDriver\b|\bWebElement\b""",
+        # `driver.` is matched by MEMBER, not on its own. A variable called
+        # `driver` is a name, and a name is not an API: on a live run this rule
+        # failed `driver.page.close()` / `driver.context.close()` inside a
+        # correctly converted Playwright helper whose parameter happened to keep
+        # the old name, and the repair loop spent a lap renaming a variable.
+        # What makes a line Selenium is the member being reached for, so the
+        # members are listed — and listed only where Playwright has nothing of
+        # the same name. `close` is deliberately absent for exactly that reason
+        # (Browser, BrowserContext and Page all have one); `quit` is the
+        # Selenium spelling and is caught on any receiver, not just `driver`.
+        ("selenium-api", r"""\bdriver\.(?:get|quit|manage|navigate|wait|sleep|actions|findElements?|sendKeys|switchTo|executeAsyncScript|executeScript|takeScreenshot|getTitle|getCurrentUrl|getPageSource|getAllWindowHandles|getWindowHandles?)\b|\bBy\.\w+\(|\buntil\.\w+\(|new\s+Builder\(|\.findElements?\(|\.sendKeys\(|\.switchTo\(\)|\.executeScript\(|\.quit\(|\.manage\(\)|\.getCurrentUrl\(|\.getPageSource\(|\.getWindowHandles?\(|\.takeScreenshot\(|\bWebDriver\b|\bWebElement\b""",
          "Selenium WebDriver API left in output"),
         # `context`, `specify`, `suite`, `beforeAll` and `afterAll` are the same
         # kind of thing as `describe` and were simply missing. They matter more

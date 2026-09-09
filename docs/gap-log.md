@@ -89,8 +89,11 @@ import of a type under strict settings. Loud: `tsc` reports line + code.
 *Gate:* compile (4.1). Feeds the critic loop directly (5.1).
 
 ### T3 · Residue — Selenium survives in the output
-`selenium-webdriver` imports, `driver.` calls, `By.`/`until.` left behind,
-`chai` still imported. Loud if the import is missing (tsc), **silent if
+`selenium-webdriver` imports, `driver.quit()`/`driver.get()` and the rest of
+the WebDriver surface, `By.`/`until.` left behind, `chai` still imported. The
+rule matches the *member*, not the receiver: a Playwright session that is still
+called `driver` is a name, not residue, and failing it once cost a correctly
+converted file a repair lap. Loud if the import is missing (tsc), **silent if
 `selenium-webdriver` is still installed** in the sandbox — then it compiles.
 *Seen:* none. *Gate:* residue scan (4.2), independent of the compiler.
 
