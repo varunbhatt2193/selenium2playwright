@@ -1000,6 +1000,22 @@ class UploadTests(unittest.TestCase):
             {"a/A.ts": "a", "a/B.ts": "b", "a/README.md": "#", "a/x.png": "c"}))
         self.assertEqual(sorted(tree), ["A.ts", "B.ts"])
 
+    def test_a_json_fixture_comes_in_and_the_lock_file_does_not(self):
+        """The spec imports `login.json`; without it the tree cannot compile.
+
+        `package-lock.json` is the opposite case in the same suffix: nothing
+        imports it, it is routinely megabytes, and it would be charged against
+        an upload limit measured in kilobytes.
+        """
+        tree = pg.tree_from_zip(zipped({
+            "s/tests/a.spec.ts": SELENIUM,
+            "s/tests/testdata/login.json": '{"username": "u"}',
+            "s/package.json": '{"name": "s"}',
+            "s/package-lock.json": '{"lockfileVersion": 3}',
+            "s/tsconfig.json": "{}",
+        }))
+        self.assertEqual(sorted(tree), ["tests/a.spec.ts", "tests/testdata/login.json"])
+
     def test_loose_files_and_a_zip_are_the_same_gesture(self):
         loose, complaint = pg.tree_from_uploads(
             [upload("LoginPage.ts", SELENIUM), upload("login.spec.ts", SELENIUM)])
@@ -1112,18 +1128,29 @@ class AffordabilityTests(unittest.TestCase):
         self.assertEqual(pg.affordable(self.SNAPSHOT, 8), "")
 
     def test_a_suite_bigger_than_the_per_visitor_cap_can_never_run_here(self):
-        # The advice has to be "convert fewer at a time", not "come back
-        # tomorrow": this one is a shape, not a balance.
+        # The advice has to be "clone it" or "convert fewer at a time", not
+        # "come back tomorrow": this one is a shape, not a balance.
         said = pg.affordable(self.SNAPSHOT, 12)
         self.assertIn("12 conversions", said)
         self.assertIn("10 conversions per visitor", said)
         self.assertIn("Only these files", said)
+        self.assertIn("your own API key", said)
 
     def test_a_suite_bigger_than_what_is_left_today_is_a_different_sentence(self):
         snapshot = {**self.SNAPSHOT, "budget": {"used": 38, "limit": 41, "remaining": 3}}
         said = pg.affordable(snapshot, 8)
         self.assertIn("3 are left", said)
         self.assertIn("midnight UTC", said)
+
+    def test_every_refusal_is_whole_suite_or_nothing(self):
+        """Never an offer to convert part of it — that was the old cap's job."""
+        for files, snapshot in ((12, self.SNAPSHOT),
+                                (8, {**self.SNAPSHOT,
+                                     "budget": {"used": 38, "limit": 41, "remaining": 3}})):
+            with self.subTest(files=files):
+                said = pg.affordable(snapshot, files)
+                self.assertIn("whole or not at all", said)
+                self.assertIn("clone the repo", said)
 
     def test_a_backend_that_did_not_answer_is_not_treated_as_a_refusal(self):
         # `fetch_limits` returns {"error": …} when it cannot reach the meter.

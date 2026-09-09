@@ -11,6 +11,11 @@
     "strict": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
+    // Real suites keep their fixtures in JSON and import them by name
+    // (`import loginData from "tests/testdata/login.json"`). Without this the
+    // compiler refuses the import itself — TS2732, on a file that is perfectly
+    // converted — so the gate failed the tree for the shape of the input.
+    "resolveJsonModule": true,
     "forceConsistentCasingInFileNames": true,
     "noEmit": true
   }

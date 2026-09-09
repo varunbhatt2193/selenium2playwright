@@ -233,6 +233,68 @@ class Imports(unittest.TestCase):
         self.assertIsNone(suite.resolve_import("node:os", "pages/LoginPage.ts", known))
         self.assertIsNone(suite.resolve_import("../../shared/Base", "pages/LoginPage.ts", known))
 
+    def test_a_bare_root_relative_import_resolves_like_baseUrl(self):
+        """`"baseUrl": "."` is how a real repo writes `tests/pages/login.page`."""
+        known = {"tests/pages/login.page.ts", "tests/env/manager.ts",
+                 "tests/types/driver.d.ts"}
+        resolve = suite.resolve_import
+        self.assertEqual(resolve("tests/pages/login.page", "tests/specs/e2e.spec.ts", known),
+                         "tests/pages/login.page.ts")
+        self.assertEqual(resolve("tests/env/manager", "tests/config/browserConfig.ts", known),
+                         "tests/env/manager.ts")
+        # A declaration file answers to its name without the `.d`.
+        self.assertEqual(resolve("tests/types/driver", "tests/env/manager.ts", known),
+                         "tests/types/driver.d.ts")
+        # The double slash this repo actually contains.
+        self.assertEqual(resolve("tests/pages//login.page", "tests/specs/e2e.spec.ts", known),
+                         "tests/pages/login.page.ts")
+
+    def test_a_package_is_not_mistaken_for_a_bare_root_import(self):
+        """Only the tree answering to it makes a bare specifier one of ours."""
+        known = {"tests/pages/login.page.ts"}
+        for specifier in ("chai", "selenium-webdriver/chrome", "node:path",
+                          "tests/pages/typo.page"):
+            with self.subTest(specifier=specifier):
+                self.assertIsNone(suite.resolve_import(specifier, "a.ts", known))
+
+
+class DataFixtures(unittest.TestCase):
+    """JSON the suite imports: carried across, never converted, never a package."""
+
+    def plan(self, tree):
+        return suite.scan_sources(tree)
+
+    def test_an_imported_fixture_becomes_an_asset_and_not_an_external_import(self):
+        manifest = self.plan({
+            "tests/testdata/login.json": '{"username": "u"}\n',
+            "tests/specs/login.spec.ts": (
+                'import { WebDriver } from "selenium-webdriver";\n'
+                'import loginData from "tests/testdata/login.json";\n'
+                "export const u = loginData.username;\n"),
+        })
+        self.assertEqual(manifest.assets, ("tests/testdata/login.json",))
+        spec = next(f for f in manifest.files if f.path.endswith("login.spec.ts"))
+        self.assertEqual(spec.data_imports, ("tests/testdata/login.json",))
+        self.assertNotIn("tests/testdata/login.json", spec.external_imports)
+        # It is data, so it is not a file in the plan and not in any wave.
+        self.assertNotIn("tests/testdata/login.json", [f.path for f in manifest.files])
+
+    def test_a_fixture_nobody_imports_is_not_carried(self):
+        manifest = self.plan({
+            "fixtures/unused.json": "{}\n",
+            "pages/LoginPage.ts": 'import { By } from "selenium-webdriver";\nvoid By;\n',
+        })
+        self.assertEqual(manifest.assets, ())
+
+    def test_configuration_json_is_never_a_fixture(self):
+        manifest = self.plan({
+            "package.json": '{"name": "x"}\n',
+            "tsconfig.json": "{}\n",
+            "a.ts": ('import { By } from "selenium-webdriver";\n'
+                     'import pkg from "package.json";\nvoid By; void pkg;\n'),
+        })
+        self.assertEqual(manifest.assets, ())
+
 
 class Cycles(unittest.TestCase):
     """Two files importing each other have no valid order; say so, convert anyway."""
@@ -312,7 +374,7 @@ class ManifestJson(unittest.TestCase):
         first = payload["files"][0]
         self.assertEqual(set(first) - {"path", "kind", "action", "reason", "wave", "lines",
                                        "language", "automation", "runner", "imports",
-                                       "imported_by", "external_imports"}, set())
+                                       "imported_by", "external_imports", "data_imports"}, set())
         json.dumps(payload)  # no dataclasses left in it
 
 
@@ -374,8 +436,8 @@ class ScanCommand(unittest.TestCase):
         self.assertEqual(code, 2)
 
 
-# A bigger toy than TOY: five page objects and four specs, so a cap of three of
-# each has something to leave out and the leftovers are unambiguous.
+# A bigger toy than TOY: five page objects and four specs, so anything that
+# quietly converted only a slice of it would be visible here.
 BIG = {}
 for _n in range(5):
     BIG[f"pages/Page{_n}.ts"] = (
@@ -388,79 +450,40 @@ for _n in range(4):
         f'describe("s{_n}", () => {{ it("works", async () => {{ new Page{_n}(null as any); }}); }});\n')
 
 
-class DemoCapTests(unittest.TestCase):
-    """The hosted demo converts a slice of a big suite, and says so."""
+class WholeSuiteOnlyTests(unittest.TestCase):
+    """A folder is planned whole. Nothing here converts part of a suite.
 
-    def scan(self, files=None, **environ):
-        with patch.dict(os.environ, environ, clear=False):
-            return suite.scan_sources(dict(files or BIG))
+    There used to be a per-kind cap that converted three page objects and three
+    tests and copied the rest across unchanged. It was a bad trade twice over:
+    the slice it chose was the leaves of the wave plan — on one real repo that
+    was every driver factory and not a single test file — and a half-converted
+    folder is not a result anybody can use. The size decision belongs to the
+    meter instead, which is charged for the whole suite before any model runs
+    and refuses the run outright when it does not fit.
+    """
 
-    def test_no_cap_by_default(self):
-        """A clone has the environment unset, and an unset cap is no cap at all."""
-        with patch.dict(os.environ, {"S2P_SUITE_MAX_TESTS": "", "S2P_SUITE_MAX_PAGE_OBJECTS": ""}):
-            manifest = suite.scan_sources(dict(BIG))
+    def test_a_big_suite_is_planned_whole(self):
+        manifest = suite.scan_sources(dict(BIG))
         self.assertEqual(len(manifest.convertible), 9)
         self.assertEqual(manifest.notes, ())
+        self.assertEqual([f for f in manifest.files if f.action == suite.COPY], [])
 
-    def test_cap_converts_three_of_each_and_copies_the_rest(self):
-        manifest = self.scan(S2P_SUITE_MAX_TESTS="3", S2P_SUITE_MAX_PAGE_OBJECTS="3")
-        kinds = {}
-        for item in manifest.convertible:
-            kinds[item.kind] = kinds.get(item.kind, 0) + 1
-        self.assertEqual(kinds, {"page-object": 3, "test": 3})
-        self.assertEqual(sum(1 for f in manifest.files if f.action == suite.COPY), 3)
-
-    def test_a_capped_file_is_copied_not_skipped(self):
-        """It still belongs in the converted tree — it just arrives unchanged."""
-        manifest = self.scan(S2P_SUITE_MAX_TESTS="3", S2P_SUITE_MAX_PAGE_OBJECTS="3")
-        left = [f for f in manifest.files if f.action == suite.COPY]
-        self.assertTrue(left)
-        for item in left:
-            self.assertIn("past this demo's limit", item.reason)
-            self.assertNotEqual(item.action, suite.SKIP)
-
-    def test_a_kept_test_never_loses_its_page_object(self):
-        """The one failure the cap must not manufacture: a test without its companion."""
-        manifest = self.scan(S2P_SUITE_MAX_TESTS="3", S2P_SUITE_MAX_PAGE_OBJECTS="3")
-        converting = {f.path for f in manifest.convertible}
-        by_path = {f.path: f for f in manifest.files}
-        for path in converting:
-            for dependency in by_path[path].imports:
-                if by_path[dependency].kind in ("page-object", "test"):
-                    self.assertIn(dependency, converting,
-                                  f"{path} converts without {dependency}")
-
-    def test_the_note_says_what_was_left_and_how_to_get_it(self):
-        manifest = self.scan(S2P_SUITE_MAX_TESTS="3", S2P_SUITE_MAX_PAGE_OBJECTS="3")
-        note = " ".join(manifest.notes)
-        self.assertIn("2 page objects", note)
-        self.assertIn("1 test file", note)
-        self.assertIn("own LLM API key", note)
-
-    def test_one_kind_can_be_capped_alone(self):
-        manifest = self.scan(S2P_SUITE_MAX_TESTS="2", S2P_SUITE_MAX_PAGE_OBJECTS="")
-        kinds = [f.kind for f in manifest.convertible]
-        self.assertEqual(kinds.count("test"), 2)
-        self.assertEqual(kinds.count("page-object"), 5)
-
-    def test_the_meter_charges_the_capped_number(self):
-        """`conversions` is what the guard bills; it must see the same plan."""
+    def test_the_retired_cap_variables_no_longer_truncate_anything(self):
+        """A deployment still carrying them must not silently convert a slice."""
         with patch.dict(os.environ, {"S2P_SUITE_MAX_TESTS": "3",
                                      "S2P_SUITE_MAX_PAGE_OBJECTS": "3"}, clear=False):
-            self.assertEqual(suite.conversions(dict(BIG)), 6)
-        with patch.dict(os.environ, {"S2P_SUITE_MAX_TESTS": "",
-                                     "S2P_SUITE_MAX_PAGE_OBJECTS": ""}, clear=False):
-            self.assertEqual(suite.conversions(dict(BIG)), 9)
-
-    def test_a_suite_under_the_cap_is_untouched(self):
-        manifest = self.scan(TOY, S2P_SUITE_MAX_TESTS="3", S2P_SUITE_MAX_PAGE_OBJECTS="3")
-        self.assertEqual(len(manifest.convertible), 3)
-        self.assertEqual(manifest.notes, ())
-
-    def test_junk_in_the_environment_is_not_a_cap(self):
-        """A typo must not silently convert nothing."""
-        manifest = self.scan(S2P_SUITE_MAX_TESTS="three", S2P_SUITE_MAX_PAGE_OBJECTS="-1")
+            manifest = suite.scan_sources(dict(BIG))
         self.assertEqual(len(manifest.convertible), 9)
+
+    def test_the_meter_is_charged_for_every_convertible_file(self):
+        """`conversions` is what the guard bills, and it bills the whole folder."""
+        self.assertEqual(suite.conversions(dict(BIG)), 9)
+        self.assertEqual(suite.conversions(dict(TOY)), 3)
+
+    def test_only_still_narrows_what_a_person_asked_for(self):
+        """An explicit filter is a choice, not the tool deciding for them."""
+        self.assertEqual(suite.conversions(dict(BIG), ["pages/*.ts"]), 5)
+
 
 
 if __name__ == "__main__":

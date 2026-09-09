@@ -10,7 +10,7 @@ import unittest
 
 from selenium2playwright.schemas import Finding
 from selenium2playwright.validators.compile import (alias_paths, compile_check,
-                                                    missing_dependency)
+                                                    missing_dependency, root_imports)
 from selenium2playwright.validators.residue import residue_check
 
 # The shape that failed on the live demo: three aliases, one real npm scope.
@@ -65,6 +65,85 @@ class AliasDerivationTests(unittest.TestCase):
     def test_a_bare_scope_with_no_path_is_not_an_alias(self):
         tree = {"a.ts": 'import x from "@scope";\nvoid x;\n'}
         self.assertEqual(alias_paths(tree), {})
+
+
+# The shape sadabnepal/selenium-javascript-test actually has: `"baseUrl": "."`
+# in its own tsconfig, every import written from the project root, and the
+# fixtures in JSON.
+ROOTED = {
+    "tests/testdata/login.json": '{"username": "standard_user", "password": "secret"}\n',
+    "tests/pages/login.page.ts": (
+        "import { Page } from '@playwright/test';\n"
+        "export class LoginPage {\n"
+        "  constructor(private page: Page) {}\n"
+        "  async login(user: string, pass: string) { void user; void pass; }\n}\n"),
+    "tests/specs/login.spec.ts": (
+        "import { test } from '@playwright/test';\n"
+        "import { LoginPage } from 'tests/pages/login.page';\n"
+        "import loginData from 'tests/testdata/login.json';\n"
+        "test('login', async ({ page }) => {\n"
+        "  await new LoginPage(page).login(loginData.username, loginData.password);\n});\n"),
+}
+
+
+class RootImportTests(unittest.TestCase):
+    """Pure: does this tree resolve anything against its own root?"""
+
+    def test_a_tree_that_imports_itself_by_root_path_is_recognised(self):
+        self.assertTrue(root_imports(ROOTED))
+
+    def test_a_relative_tree_asks_for_nothing(self):
+        plain = {"pages/LoginPage.ts": "export class L {}\n",
+                 "tests/a.spec.ts": 'import { L } from "../pages/LoginPage";\nvoid L;\n'}
+        self.assertFalse(root_imports(plain))
+
+    def test_packages_alone_do_not_turn_baseUrl_on(self):
+        """`chai` and `node:os` resolve to nothing here, so they are packages."""
+        tree = {"a.ts": ('import { expect } from "chai";\n'
+                         'import os from "node:os";\nvoid expect; void os;\n')}
+        self.assertFalse(root_imports(tree))
+
+
+class RootedTreeCompilesTests(unittest.TestCase):
+    """Pays for a real `tsc` run: the baseUrl + JSON shape has to actually pass."""
+
+    def test_root_relative_imports_and_a_json_fixture_compile(self):
+        report = compile_check(ROOTED)
+        self.assertTrue(report.passed, report.render())
+        self.assertEqual(report.findings, [])
+        self.assertEqual(report.excused, [])
+
+    def test_a_misspelt_root_import_is_still_a_real_finding(self):
+        """The whole risk of turning baseUrl on: it must not swallow a typo."""
+        broken = dict(ROOTED)
+        broken["tests/specs/login.spec.ts"] = broken["tests/specs/login.spec.ts"].replace(
+            "tests/pages/login.page", "tests/pages/typo.page")
+        report = compile_check(broken)
+        self.assertFalse(report.passed)
+        self.assertEqual(report.excused, [])
+        self.assertIn("typo.page", report.render())
+
+
+class BareSpecifierExcusalTests(unittest.TestCase):
+    """Which unresolved bare import is this suite's fault, and which is not."""
+
+    tree = {"tests/pages/login.page.ts": "export class L {}\n"}
+
+    def excused(self, specifier):
+        finding = Finding(gate="compile", file="tests/pages/login.page.ts", line=1,
+                          column=1, severity="error", code="TS2307",
+                          message=f"Cannot find module '{specifier}' or its "
+                                  "corresponding type declarations.")
+        return missing_dependency(finding, set(self.tree))
+
+    def test_an_uninstalled_package_is_excused(self):
+        for specifier in ("chai", "zod", "selenium-webdriver/chrome", "dotenv"):
+            with self.subTest(specifier=specifier):
+                self.assertTrue(self.excused(specifier))
+
+    def test_a_broken_import_into_this_tree_is_not(self):
+        """`tests/` is a folder right here, so this is a typo, not a dependency."""
+        self.assertFalse(self.excused("tests/pages/typo.page"))
 
 
 class AliasedTreeCompilesTests(unittest.TestCase):

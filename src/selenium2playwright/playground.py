@@ -873,13 +873,17 @@ def affordable(snapshot: dict[str, Any], files: int) -> str:
     cap = per.get("daily")
     if isinstance(cap, int) and files > cap:
         return (f"This suite needs {files} conversions and the demo allows {cap} "
-                f"conversions per visitor per day. Convert fewer at a time with “Only these "
-                f"files”, or run it against your own machine.")
+                f"conversions per visitor per day. A suite is converted whole or not "
+                f"at all — half a converted folder is not something you could use — "
+                f"so clone the repo and run this one with your own API key, or narrow "
+                f"it here with “Only these files”.")
     budget = snapshot.get("budget") or {}
     remaining = budget.get("remaining")
     if isinstance(remaining, int) and files > remaining:
         return (f"This suite needs {files} conversions and {remaining} are left in "
-                "today's shared budget. It resets at midnight UTC.")
+                "today's shared budget, which resets at midnight UTC. A suite is "
+                "converted whole or not at all, so either come back tomorrow or "
+                "clone the repo and run it with your own API key.")
     return ""
 
 
@@ -1252,7 +1256,7 @@ def tree_from_zip(data: bytes) -> dict[str, str]:
             parts = Path(info.filename).parts
             if any(part in _ZIP_JUNK_DIRS or part.startswith(".") for part in parts):
                 continue
-            if Path(info.filename).suffix.lower() not in suite.SOURCE_SUFFIXES:
+            if not suite.is_input(info.filename):
                 continue
             if info.file_size > suite.MAX_TREE_BYTES:
                 raise ValueError(f"{info.filename} is larger than this accepts on its own.")

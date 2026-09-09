@@ -219,7 +219,7 @@ def build_critic_prompt(conventions: str = "", decisions: str = "",
 
 def format_context(files: list[Path], contents: dict[str, str] | None = None,
                    carried: Collection[str] = ()) -> str:
-    """Companion files (e.g. the POM a test imports), in two honest groups.
+    """Companion files (e.g. the POM a test imports), in three honest groups.
 
     Suite mode (Phase 9) converts page objects first, then tests — the test
     must call the *new* POM API, not guess it. This is that idea in miniature.
@@ -235,14 +235,20 @@ def format_context(files: list[Path], contents: dict[str, str] | None = None,
     Selenium neighbour, found the expected mismatch, and voted revise three
     times out of three. So they are labelled for what they are, and the model
     is told they are not its to match and not its to fix.
+
+    Fixtures are the third group. A `.json` of test data is neither converted
+    nor unconverted — there is nothing in it to convert — so it gets its own
+    label rather than being filed under either lie.
     """
     if not files:
         return ""
     if contents is None:
         contents = {str(f.resolve()): f.read_text(encoding="utf-8") for f in files}
     carried_paths = {str(Path(c).resolve()) for c in carried}
-    done = [f for f in files if str(f.resolve()) not in carried_paths]
-    left = [f for f in files if str(f.resolve()) in carried_paths]
+    data = [f for f in files if f.suffix.lower() == ".json"]
+    code = [f for f in files if f.suffix.lower() != ".json"]
+    done = [f for f in code if str(f.resolve()) not in carried_paths]
+    left = [f for f in code if str(f.resolve()) in carried_paths]
     sections = []
     if done:
         sections.append(
@@ -262,5 +268,14 @@ def format_context(files: list[Path], contents: dict[str, str] | None = None,
             + "\n\n".join(
                 f'<unconverted_file path="{f}">\n{contents[str(f.resolve())]}\n</unconverted_file>'
                 for f in left)
+        )
+    if data:
+        sections.append(
+            "These are the suite's test-data fixtures. They are data, not code: "
+            "they are unchanged and stay unchanged. Read them for the shape of "
+            "the values, and keep importing them exactly as the original did:\n\n"
+            + "\n\n".join(
+                f'<data_file path="{f}">\n{contents[str(f.resolve())]}\n</data_file>'
+                for f in data)
         )
     return "\n\n".join(sections) + "\n\n"

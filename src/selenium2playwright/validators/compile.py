@@ -34,6 +34,12 @@ TSC_LINE = re.compile(r"^(?P<file>.+?)\((?P<line>\d+),(?P<col>\d+)\): error (?P<
 ALIAS_IMPORT = re.compile(
     r"""(?:\bfrom\s*|\bimport\s*|\brequire\s*\(\s*|\bimport\s*\(\s*)['"]((?:@|~)[^'"]*)['"]""")
 
+# Every specifier, whatever its shape. Used to spot the *un*prefixed kind —
+# `tests/pages/login.page` — which means nothing on its own and everything
+# under `"baseUrl": "."`.
+ANY_IMPORT = re.compile(
+    r"""(?:\bfrom\s*|\bimport\s*|\brequire\s*\(\s*|\bimport\s*\(\s*)['"]([^'"]+)['"]""")
+
 # The extensions a specifier may be leaving off, longest first so `/index.ts`
 # is tried before `.ts` turns `pages` into `pages.ts`.
 ALIAS_ENDINGS = ("", ".ts", ".tsx", ".d.ts", "/index.ts", "/index.tsx")
@@ -94,12 +100,54 @@ def missing_dependency(finding, in_tree: set[str]) -> bool:
     if specifier.startswith("."):
         return False
     head, _, rest = specifier.partition("/")
-    if head.startswith(("@", "~")) and rest:
+    if head.startswith(("@", "~")):
+        if not rest:
+            return True
         target = rest if head in ("@", "~") else f"{head.lstrip('@~')}/{rest}"
-        if any(f"{target}{end}" in in_tree
-               for end in ("", ".ts", ".tsx", "/index.ts", "/index.tsx")):
+    else:
+        # No prefix. Under `baseUrl` this spelling names a file from the project
+        # root, so `tests/pages/typo.page` is the tree's own broken import and
+        # has to stay a finding — excusing it would let a misspelt import ship.
+        # What tells the two apart is the first segment: `tests/` is a folder
+        # right here, `zod` and `selenium-webdriver/chrome` are not.
+        if _in_tree(specifier, in_tree):
             return False
-    return True
+        return specifier.split("/")[0] not in _top_dirs(in_tree)
+    return not _in_tree(target, in_tree)
+
+
+def _in_tree(target: str, in_tree: set[str]) -> bool:
+    """Does `target` name a file this compile run was given, extension or not?"""
+    return any(f"{target}{end}" in in_tree for end in ALIAS_ENDINGS)
+
+
+def _top_dirs(in_tree: set[str]) -> set[str]:
+    """The first path segment of every file here, for files that are in a folder."""
+    return {parts[0] for parts in (path.split("/") for path in in_tree) if len(parts) > 1}
+
+
+def root_imports(files: dict[str, str]) -> bool:
+    """Does this tree import its own files by bare, root-relative path?
+
+    `"baseUrl": "."` is how a repository writes `tests/pages/login.page` instead
+    of `../pages/login.page`, and like a path alias it lives in the project's own
+    tsconfig, which never reaches us. Without it every such import is TS2307 on
+    a file that is correct — eight of them in one real suite — and the repair
+    loop spends its attempts rewriting imports that were already right.
+
+    Setting `baseUrl` cannot hide a genuinely broken import: TypeScript still
+    falls back to node_modules, and an import that names nothing still fails.
+    It is only turned on when the tree answers to at least one bare specifier,
+    so a suite that imports by relative path compiles under the config it always did.
+    """
+    known = set(files)
+    for source in files.values():
+        for specifier in ANY_IMPORT.findall(source):
+            if specifier.startswith((".", "@", "~")) or specifier.startswith("node:"):
+                continue
+            if _in_tree(specifier, known):
+                return True
+    return False
 
 
 def alias_paths(files: dict[str, str]) -> dict[str, list[str]]:
@@ -149,14 +197,16 @@ def compile_check(files: dict[str, str], keep: bool = False) -> ValidationReport
             target = run_dir / rel
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content, encoding="utf-8")
-        # Both keys are written only when this tree actually uses aliases, so a
-        # suite that imports by relative path compiles under exactly the config
-        # it did before. `baseUrl` alone would quietly start resolving bare
-        # specifiers against the folder, which would hide real broken imports.
+        # `baseUrl` is written only when this tree actually resolves something
+        # against its root — an alias or a bare specifier — so a suite that
+        # imports by relative path compiles under exactly the config it did
+        # before, and nothing new starts resolving behind a reader's back.
         config: dict = {"extends": "../../tsconfig.base.json", "include": ["**/*.ts"]}
         aliases = alias_paths(files)
-        if aliases:
-            config["compilerOptions"] = {"baseUrl": ".", "paths": aliases}
+        if aliases or root_imports(files):
+            config["compilerOptions"] = {"baseUrl": "."}
+            if aliases:
+                config["compilerOptions"]["paths"] = aliases
         (run_dir / "tsconfig.json").write_text(json.dumps(config, indent=2) + "\n",
                                                encoding="utf-8")
         proc = subprocess.run(

@@ -79,34 +79,42 @@ across unchanged**. `suite.decide()` is where those two readings part company.
 Copied and skipped files are in **no wave** — a wave is a conversion schedule,
 and neither of them is converted.
 
-## 3a. The demo's size cap
+## 3a. Whole suite or nothing
 
 A suite is metered **per file**: one click on a forty-file upload is forty model
-calls, and on the hosted demo they all land on one card. So a deployment may set
-a ceiling on how much of a suite one run converts:
+calls, and on the hosted demo they all land on one card. There used to be a
+per-kind ceiling here (`S2P_SUITE_MAX_TESTS`, `S2P_SUITE_MAX_PAGE_OBJECTS`) that
+converted a slice of a big folder and copied the rest across. It is gone, for
+two reasons that showed up the moment it met real repositories:
+
+* **The slice it chose was the wrong end.** It walked the wave order, and wave 1
+  is the *leaves* — driver factories, config readers, wrapper libraries. On
+  `imranwijaya/selenium-typescript-example` it converted six files and not one
+  of them was a test.
+* **A half-converted folder is not a result.** Half the suite calls the new API
+  and half still calls Selenium, and the person who downloaded it has to finish
+  the job by hand without being told which half is which.
+
+So the size decision moved to the meter, which already knew how to make it. The
+guard plans the tree and charges for **every** convertible file *before any model
+runs*; a folder that does not fit the day's budget or the visitor's daily
+allowance is refused whole, with its price named. Nothing is ever converted in
+part.
 
 ```bash
-S2P_SUITE_MAX_TESTS=3          # 0 or unset = no limit
-S2P_SUITE_MAX_PAGE_OBJECTS=3
+S2P_DAILY_LIMIT=12             # conversions per visitor per day
+S2P_DAILY_BUDGET_USD=5.40      # the shared card: 45 conversions a day
 ```
 
-Unset is the default, and **unset means no cap** — which is what a clone gets.
-The limit is about who pays for the tokens, not about what the converter can do,
-and the page says so in as many words: *clone the repo and run it with your own
-LLM API key to convert the whole suite.*
+`S2P_DAILY_LIMIT` is therefore also the largest suite this deployment will
+convert on its own card. Unset, it defaults to 10. Bigger repositories are for
+the visitor's own API key, which has no ceiling at all.
 
-Files past the cap become ordinary **copies**, not skips. They still belong in
-the converted tree; they just arrive unchanged, with the reason on them.
+`--only` still narrows a run, because that is a person choosing which files they
+want rather than the tool deciding for them.
 
-Which files make the cut is not first-come. `apply_caps()` walks the **wave
-order** — page objects before the tests that import them — and keeps a test only
-if every convertible file it imports was kept too. That is why a run can convert
-*fewer* than its own cap: a test whose page object did not fit is left out with
-it, because converting a test against a companion that stayed in Selenium is the
-one failure this project exists to prevent.
-
-All three places that ask "what will this run convert?" read the same capped
-manifest, so they cannot disagree:
+All three places that ask "what will this run convert?" read the same manifest,
+so they cannot disagree:
 
 | caller | what it does with the answer |
 |---|---|

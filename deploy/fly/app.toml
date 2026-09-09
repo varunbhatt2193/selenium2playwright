@@ -35,17 +35,17 @@ primary_region = "iad"
   # saying something the meter no longer means.
   S2P_DAILY_BUDGET_USD = "5.40"
 
-  # How much of one uploaded suite this deployment will convert. A suite is
-  # metered per file, so one click on a forty-file upload is forty model calls
-  # on the card behind this demo. Three of each is enough to show the wave
-  # ordering and the tree compile working, and the page says what it left out
-  # and how to convert the rest (clone the repo, bring your own key).
+  # How many conversions one visitor may spend in a day. A suite is metered per
+  # file and charged in full before any model runs, so this is also the largest
+  # suite this deployment will convert on the demo's own card: twelve is the
+  # sample suite exactly. A folder bigger than this is refused whole rather than
+  # converted in part — a half-converted suite is not a result anybody can use.
+  # Bigger repos are for the visitor's own API key.
   #
-  # It must be set on BOTH apps: the graph charges and converts by this number,
-  # and the UI quotes it before the run. One without the other is a page that
-  # promises twelve files and a backend that delivers six.
-  S2P_SUITE_MAX_TESTS = "3"
-  S2P_SUITE_MAX_PAGE_OBJECTS = "3"
+  # It must be set on BOTH apps: the graph charges by this number and the UI
+  # quotes it before the run. One without the other is a page that promises a
+  # folder the backend will refuse.
+  S2P_DAILY_LIMIT = "12"
 
 [http_service]
   internal_port = 8000

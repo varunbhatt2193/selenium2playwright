@@ -263,6 +263,15 @@ def plan(state: SuiteState) -> SuiteState:
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(root / item.path, target)
             copied.append(item.path)
+    # The fixtures travel with them. Nothing converts a JSON file, but a suite
+    # that reads `tests/testdata/login.json` needs it in the output tree twice
+    # over: the converted spec imports it, so the compile gate cannot resolve
+    # that import without it, and the tree a visitor downloads has to run.
+    for asset in manifest.assets:
+        target = out_root / asset
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(root / asset, target)
+        copied.append(asset)
 
     waves = [[p for p in wave if selected(p, patterns)] for wave in manifest.waves]
     return {"manifest": manifest, "waves": [w for w in waves if w], "copied": copied,
@@ -314,6 +323,23 @@ def needed_by(path: str, by_path: dict) -> list[str]:
     return ordered
 
 
+def data_needed_by(path: str, by_path: dict) -> list[str]:
+    """The JSON fixtures this file's compile needs — its own and its imports'.
+
+    Transitive for the same reason `needed_by` is: a spec may never name
+    `login.json` itself and still fail to compile without it, because the page
+    object it imports reads it.
+    """
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for owner in [path, *needed_by(path, by_path)]:
+        for asset in getattr(by_path.get(owner), "data_imports", ()) or ():
+            if asset not in seen:
+                seen.add(asset)
+                ordered.append(asset)
+    return ordered
+
+
 def dispatch(state: SuiteState) -> list[Send] | str:
     """The fan-out itself: one Send per file in this wave, or "finish" when done.
 
@@ -334,13 +360,17 @@ def dispatch(state: SuiteState) -> list[Send] | str:
     jobs = []
     for path in waves[number - 1]:
         deps = needed_by(path, by_path)
+        # Fixtures ride along as companions but never as `carried`: a JSON file
+        # is not unconverted Selenium, it is data, and the prompt says so.
         companions = [out_root / dep for dep in deps]
-        # Not everything in the output tree is a conversion. A suite past the
-        # demo's cap has its remaining files copied across untouched, so the
-        # path this reads is the original Selenium — true of anything the
-        # manifest did not mark `convert`. It still goes in `context_paths`,
-        # because `tsc` cannot resolve an import to a file it was not given;
-        # it goes in `carried_paths` too, so the prompt says which is which.
+        companions += [out_root / asset for asset in data_needed_by(path, by_path)]
+        # Not everything in the output tree is a conversion. A helper with no
+        # automation in it is copied across untouched — true of anything the
+        # manifest did not mark `convert` — so the path this reads holds the
+        # folder's original source. It still goes in `context_paths`, because
+        # `tsc` cannot resolve an import to a file it was not given; it goes in
+        # `carried_paths` too, so the prompt says which is which instead of
+        # introducing raw Selenium as the API to match.
         carried = {str(out_root / dep) for dep in deps
                    if getattr(by_path.get(dep), "action", suite.CONVERT) != suite.CONVERT}
         jobs.append(Send("convert_file", FileJob(

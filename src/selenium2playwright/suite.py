@@ -19,10 +19,16 @@ else in the suite, wave 2 is everything whose in-suite imports are all in wave
 1, and so on. Files inside one wave cannot affect each other, which is the
 property step 9.2 needs to fan them out in parallel with `Send`.
 
-A deployment can also cap how much of a suite one run converts (`demo_caps`),
-because on the hosted demo every converted file is tokens on one shared card.
-The cap is off unless the environment sets it, which is what a clone gets: the
-ceiling is who is paying, not what the converter can do.
+A suite is converted whole or not at all. There used to be a per-kind cap here
+that converted a slice of a big folder and copied the rest across, and it was a
+bad trade twice over: the slice it chose was the leaves of the wave plan — the
+driver factories and wrapper libraries, on one real repo not a single test file
+— and a half-converted folder is not a result anybody can use. What replaced it
+is a decision made before any model runs: the meter is charged for the whole
+suite up front (`conversions`), so a folder that does not fit the day's budget
+is refused entire, and the way to convert it is to clone the repo and run it
+with your own key. Nobody should be asked to type a provider key into somebody
+else's website, so the hosted demo does not offer that and never will.
 
 Everything here is a pure function of the bytes on disk and that environment:
 same folder, same manifest, every time. That is deliberate — a plan you cannot reproduce is not a
@@ -44,6 +50,32 @@ from selenium2playwright.classify import Classification, classify
 # screenshots) is not source we convert, so it is not in the manifest at all.
 SOURCE_SUFFIXES = (".ts", ".tsx", ".js", ".mjs", ".cjs")
 
+# Not source, but not ignorable either: a suite keeps its fixtures in JSON and
+# imports them by name (`import loginData from "tests/testdata/login.json"`).
+# Nothing converts them — they travel across untouched — but they have to
+# travel, or the converted tree imports a file that is not there and the
+# compile gate fails a file whose only sin was reading its own test data.
+DATA_SUFFIXES = (".json",)
+
+# JSON that is configuration rather than fixture: never imported by test code,
+# sometimes megabytes (`package-lock.json`), and not the suite's to carry.
+CONFIG_JSON = frozenset({
+    "package.json", "package-lock.json", "tsconfig.json", "tsconfig.base.json",
+    "jsconfig.json", ".eslintrc.json", "playwright.config.json",
+})
+
+def is_input(name: str) -> bool:
+    """Is this file worth reading at all — source to convert, or a fixture to carry?
+
+    One predicate, because there are four doors into this project (the folder
+    walk, a dropped zip, loose files, the sample reader) and a suite that came
+    in through one of them missing its `login.json` would compile differently
+    from the same suite that came in through another.
+    """
+    return (Path(name).suffix.lower() in SOURCE_SUFFIXES + DATA_SUFFIXES
+            and Path(name).name not in CONFIG_JSON)
+
+
 # Directories that are never input: dependencies, build output, our own output.
 # Walking node_modules would take minutes and classify tens of thousands of
 # files nobody asked about.
@@ -60,7 +92,7 @@ IMPORT_PATTERN = re.compile(
 
 # The extensions TypeScript will try when a specifier has none of its own.
 # "../pages/LoginPage" on disk is LoginPage.ts; a folder import is its index.
-RESOLUTION_ORDER = (".ts", ".tsx", ".js", ".mjs", ".cjs", "/index.ts", "/index.js")
+RESOLUTION_ORDER = (".ts", ".tsx", ".d.ts", ".js", ".mjs", ".cjs", "/index.ts", "/index.js")
 
 # One test case, in Mocha and in Jest alike: `it("…")` or `test("…")`, with any
 # modifier chain in between — `it.only`, `it.skip`, `test.each`, which is why
@@ -104,6 +136,7 @@ class SuiteFile:
     imports: tuple[str, ...] = ()  # in-suite files this one imports, by path
     imported_by: tuple[str, ...] = ()  # the reverse edge; who needs this converted first
     external_imports: tuple[str, ...] = ()  # packages: selenium-webdriver, chai, node:os …
+    data_imports: tuple[str, ...] = ()  # JSON fixtures it reads; copied across, never converted
     lines: int = 0
     cases: int = 0  # test cases inside it; 0 for a page object, which has none
     wave: int = 0  # 1-based; 0 means "not converted, so not in any wave"
@@ -117,6 +150,7 @@ class Manifest:
     files: tuple[SuiteFile, ...]
     waves: tuple[tuple[str, ...], ...]  # wave 1 first; each is a set of paths
     notes: tuple[str, ...] = ()  # anything the reader should know
+    assets: tuple[str, ...] = ()  # JSON fixtures some file imports; copied across as-is
 
     @property
     def convertible(self) -> tuple[SuiteFile, ...]:
@@ -128,7 +162,7 @@ class Manifest:
 
 
 def discover(root: Path) -> list[Path]:
-    """Every source file under `root`, sorted, minus the directories we never read.
+    """Every source file and fixture under `root`, sorted, minus the skipped dirs.
 
     The skipped directories are pruned from the walk rather than filtered out of
     its results: `node_modules` in a real suite holds tens of thousands of files,
@@ -138,7 +172,7 @@ def discover(root: Path) -> list[Path]:
     for folder, subfolders, filenames in os.walk(root):
         subfolders[:] = sorted(d for d in subfolders if d not in SKIP_DIRS)
         for name in sorted(filenames):
-            if Path(name).suffix.lower() in SOURCE_SUFFIXES:
+            if is_input(name):
                 found.append(Path(folder) / name)
     return sorted(found)
 
@@ -177,6 +211,14 @@ def resolve_import(specifier: str, source_path: str, known: set[str]) -> str | N
     An alias is followed only when the tree contains what it points at, which is
     what keeps a real npm scope out: `@lib/x` resolves because `lib/x.ts` is
     right there, `@playwright/test` does not because nothing here answers to it.
+
+    The third spelling has no prefix at all: `tests/pages/login.page`, which is
+    what `"baseUrl": "."` means — resolve a bare specifier against the project
+    root before falling back to node_modules. It is exactly how TypeScript
+    itself reads one, and it is common enough that missing it cost a real repo
+    eight unresolved imports and a test file that scored 3 of 4 gates. The same
+    "only if the tree answers to it" rule keeps `chai` and `selenium-webdriver`
+    out: they resolve to nothing here, so they stay packages.
     """
     if specifier.startswith("."):
         base = _normalise((Path(source_path).parent / specifier).as_posix())
@@ -185,8 +227,10 @@ def resolve_import(specifier: str, source_path: str, known: set[str]) -> str | N
         if not rest:
             return None
         base = rest if head in ("@", "~") else f"{head.lstrip('@~')}/{rest}"
+    elif specifier.startswith("node:"):
+        return None  # a builtin can never be a file here, whatever the tree holds
     else:
-        return None
+        base = _normalise(specifier)
     if base in known:
         return base
     for ending in RESOLUTION_ORDER:
@@ -226,118 +270,6 @@ def decide(classification: Classification) -> tuple[str, str, str]:
         return ("support", COPY,
                 "no automation library in it; carried over to the converted suite unchanged")
     return "unsupported", SKIP, classification.reason
-
-
-# --- The public demo's size cap -------------------------------------------
-#
-# A suite is metered per file: one click on a forty-file upload is forty model
-# calls, on one shared card, and the visitor who clicks it has spent everybody
-# else's day. So a deployment may cap how much of a suite one run converts.
-#
-# Unset is the default, and unset means no cap — which is what a clone gets.
-# The limit exists because the hosted demo pays for the tokens, not because the
-# converter cannot do more, and the code should say so by being uncapped until
-# a deployment asks otherwise.
-CAP_ENV = {"test": "S2P_SUITE_MAX_TESTS", "page-object": "S2P_SUITE_MAX_PAGE_OBJECTS"}
-
-# What a person is told, in the report and on the page, when the cap bites.
-# It has to answer the question it provokes — "so how do I convert the rest?" —
-# in the same breath, or it reads as the tool failing rather than the demo
-# being a demo.
-CAP_INVITATION = ("Clone the repo and run it with your own LLM API key to convert "
-                  "the whole suite — the limit is the demo's shared card, not the "
-                  "converter.")
-
-
-def demo_caps() -> dict[str, int]:
-    """How many of each kind one suite run may convert. 0 means no limit.
-
-    Read from the environment on every call rather than once at import, so a
-    test can set it with `patch.dict` and nothing has to be reloaded — reloading
-    a module to change a constant rebinds every object in it, which is its own
-    class of bug.
-    """
-    caps = {}
-    for kind, name in CAP_ENV.items():
-        raw = (os.environ.get(name) or "").strip()
-        caps[kind] = int(raw) if raw.isdigit() else 0
-    return caps
-
-
-def _tally(counts: dict[str, int]) -> str:
-    """{"test": 3, "page-object": 1} -> "1 page object and 3 test files"."""
-    names = {"test": "test file", "page-object": "page object"}
-    parts = [f"{n} {names[kind]}{'' if n == 1 else 's'}"
-             for kind, n in sorted(counts.items()) if n]
-    if len(parts) < 2:
-        return parts[0] if parts else ""
-    return " and ".join((", ".join(parts[:-1]), parts[-1]))
-
-
-def apply_caps(files: dict[str, SuiteFile], waves: tuple[tuple[str, ...], ...],
-               caps: dict[str, int]) -> tuple[dict[str, SuiteFile], list[SuiteFile]]:
-    """Copy across everything past the cap. Returns the new files and what was dropped.
-
-    Which files to keep is not arbitrary. A test converted without the page
-    object it imports is a test compiled against an API that no longer exists —
-    the one failure this whole project is built to avoid — so the walk follows
-    the wave order, page objects before the tests that import them, and a test
-    is kept only if everything convertible it imports was kept too. A test whose
-    companions did not make the cut is passed over for the next one, which is
-    why the kept set can be smaller than the cap even when more files exist.
-
-    Dropped files become ordinary copies, not skips: they still belong in the
-    converted tree, they simply arrive unchanged.
-    """
-    budget = {kind: (limit if limit > 0 else len(files)) for kind, limit in caps.items()}
-    kept: set[str] = set()
-    dropped: list[SuiteFile] = []
-    for wave in waves:
-        for path in wave:
-            item = files[path]
-            if item.kind not in budget:
-                kept.add(path)
-                continue
-            needs = [d for d in item.imports if files[d].action == CONVERT]
-            if budget[item.kind] > 0 and all(d in kept for d in needs):
-                kept.add(path)
-                budget[item.kind] -= 1
-            else:
-                dropped.append(item)
-    for item in dropped:
-        files[item.path] = replace(
-            files[item.path], action=COPY,
-            reason=f"past this demo's limit of {_tally({item.kind: caps[item.kind]})} "
-                   "per run; carried over to the converted suite unchanged")
-    return files, dropped
-
-
-def cap_note(files: dict[str, SuiteFile], dropped: list[SuiteFile],
-             caps: dict[str, int]) -> str:
-    """One paragraph for the report and the page: what was left out, and how to get it.
-
-    It has to say three things, because a visitor who reads only the first will
-    conclude the converter choked on their folder: what the limit is, that the
-    rest of their files still arrived, and that running it themselves has no
-    limit at all. The last one is the point — the ceiling is this demo's card.
-    """
-    left = _tally({kind: sum(1 for f in dropped if f.kind == kind) for kind in caps})
-    limits = _tally({kind: limit for kind, limit in caps.items() if limit})
-    note = (f"This demo converts at most {limits} per suite run, so {left} were "
-            f"carried across unchanged instead.")
-
-    # A run can come in *under* its own cap, and a reader who counts the files
-    # deserves to know why rather than filing it as an off-by-one: a test whose
-    # page object was left out is left out with it, on purpose.
-    kept = {kind: sum(1 for f in files.values()
-                      if f.action == CONVERT and f.kind == kind) for kind in caps}
-    short = _tally({kind: caps[kind] - n for kind, n in kept.items()
-                    if caps[kind] and n < caps[kind]})
-    if short:
-        note += (f" It converted {short} fewer than that: a test file whose page object"
-                 " did not fit is left out with it, because converting one without its"
-                 " companion compiles it against an API that is no longer there.")
-    return f"{note} {CAP_INVITATION}"
 
 
 def plan_waves(files: dict[str, SuiteFile]) -> tuple[tuple[tuple[str, ...], ...], list[str]]:
@@ -392,12 +324,26 @@ def scan_sources(sources: dict[str, str], root: str = "uploaded files") -> Manif
     charge for the files that will be converted rather than for every file sent.
 
     `discover`'s two rules are applied to the keys so a text tree and the same
-    tree on disk give the same answer: files in a `SKIP_DIRS` directory and files
-    without a source suffix are not part of the plan.
+    tree on disk give the same answer: files in a `SKIP_DIRS` directory are not
+    part of the plan, and neither is anything `is_input` would not have read.
+
+    JSON fixtures come in through the same door and are then held apart, because
+    they are input without being *plan*: nothing classifies them, nothing
+    converts them, and nothing waits on them — but a spec that reads one does
+    not compile without it, so they have to be resolvable and they have to
+    travel.
     """
-    sources = {path: text for path, text in sources.items()
-               if Path(path).suffix.lower() in SOURCE_SUFFIXES
-               and not (set(Path(path).parts[:-1]) & SKIP_DIRS)}
+    here = {path: text for path, text in sources.items()
+            if not (set(Path(path).parts[:-1]) & SKIP_DIRS)}
+    sources = {path: text for path, text in here.items()
+               if Path(path).suffix.lower() in SOURCE_SUFFIXES}
+    # Fixtures are held apart from `sources` on purpose. They are not classified,
+    # not converted and not in any wave — putting them in the import graph would
+    # ask the planner to order a file it has no opinion about — but they must
+    # still be resolvable, or `tests/testdata/login.json` reads as an npm package.
+    assets = {path for path in here
+              if Path(path).suffix.lower() in DATA_SUFFIXES
+              and Path(path).name not in CONFIG_JSON}
     known = set(sources)
 
     files: dict[str, SuiteFile] = {}
@@ -406,12 +352,14 @@ def scan_sources(sources: dict[str, str], root: str = "uploaded files") -> Manif
         kind, action, reason = decide(classification)
         specifiers = import_specifiers(source)
         inside = [r for r in (resolve_import(s, path, known) for s in specifiers) if r]
+        data = [r for r in (resolve_import(s, path, assets) for s in specifiers) if r]
         files[path] = SuiteFile(
             path=path, kind=kind, action=action, reason=reason, classification=classification,
             imports=tuple(dict.fromkeys(inside)),
+            data_imports=tuple(dict.fromkeys(data)),
             external_imports=tuple(s for s in specifiers
                                    if not s.startswith(".")
-                                   and resolve_import(s, path, known) is None),
+                                   and resolve_import(s, path, known | assets) is None),
             lines=source.count("\n") + (0 if source.endswith("\n") or not source else 1),
             cases=count_cases(source) if kind == "test" else 0,
         )
@@ -422,21 +370,14 @@ def scan_sources(sources: dict[str, str], root: str = "uploaded files") -> Manif
             files[target] = _with_dependent(files[target], path)
 
     waves, notes = plan_waves(files)
-    caps = demo_caps()
-    if any(caps.values()):
-        files, dropped = apply_caps(files, waves, caps)
-        if dropped:
-            # The plan changed under us: fewer files convert, so the waves and
-            # any note about them have to be derived again, not patched.
-            waves, notes = plan_waves(files)
-            notes.append(cap_note(files, dropped, caps))
     for number, wave in enumerate(waves, 1):
         for path in wave:
             files[path] = replace(files[path], wave=number)
     if not files:
         notes.append(f"no TypeScript or JavaScript source files under {root}")
     return Manifest(root=root, files=tuple(files[p] for p in sorted(files)),
-                    waves=waves, notes=tuple(notes))
+                    waves=waves, notes=tuple(notes),
+                    assets=tuple(sorted({a for f in files.values() for a in f.data_imports})))
 
 
 def selected(path: str, patterns: list[str]) -> bool:
@@ -495,6 +436,7 @@ def manifest_json(manifest: Manifest) -> dict:
         "counts": manifest.counts(),
         "waves": [list(wave) for wave in manifest.waves],
         "notes": list(manifest.notes),
+        "assets": list(manifest.assets),
         "files": [{
             "path": f.path, "kind": f.kind, "action": f.action, "reason": f.reason,
             "wave": f.wave, "lines": f.lines,
@@ -503,6 +445,7 @@ def manifest_json(manifest: Manifest) -> dict:
             "runner": f.classification.runner,
             "imports": list(f.imports), "imported_by": list(f.imported_by),
             "external_imports": list(f.external_imports),
+            "data_imports": list(f.data_imports),
         } for f in manifest.files],
     }
 

@@ -58,7 +58,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from selenium2playwright import playground as pg
-from selenium2playwright.suite import SOURCE_SUFFIXES as SUFFIXES
+from selenium2playwright.suite import is_input
 
 # The built page. Vite writes `index.html` plus hashed files under `assets/`;
 # the Dockerfile builds it in a Node stage and copies only this directory across.
@@ -380,7 +380,7 @@ def suite_sample(only: str = "",
     tree = {
         path.relative_to(root).as_posix(): path.read_text(encoding="utf-8")
         for path in sorted(root.rglob("*"))
-        if path.is_file() and path.suffix.lower() in SUFFIXES
+        if path.is_file() and is_input(path.name)
     }
     return planned(tree, only, visitor_of(x_s2p_visitor))
 

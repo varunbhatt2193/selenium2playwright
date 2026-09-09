@@ -590,6 +590,61 @@ class CarriedCompanionDispatchTests(unittest.TestCase):
             self.assertEqual([], sends[0].arg["carried_paths"])
 
 
+class DataFixtureDispatchTests(unittest.TestCase):
+    """The JSON a suite reads has to be in the output tree and in the gate.
+
+    Nothing converts it, so nothing would put it there — and then the converted
+    spec imports a file that is not on disk, the compile gate reports it, and
+    the repair loop rewrites a correct import three times.
+    """
+
+    def test_the_plan_copies_every_imported_fixture_across(self):
+        with TemporaryDirectory() as tmp:
+            root, out = Path(tmp) / "src", Path(tmp) / "out"
+            (root / "tests/testdata").mkdir(parents=True)
+            (root / "tests/testdata/login.json").write_text('{"username": "u"}\n')
+            (root / "tests/specs").mkdir(parents=True)
+            (root / "tests/specs/login.spec.ts").write_text(
+                'import { WebDriver } from "selenium-webdriver";\n'
+                'import loginData from "tests/testdata/login.json";\n'
+                "export const u = loginData.username;\n")
+            state = suite_graph.plan({"root": str(root), "out_root": str(out)})
+            self.assertIn("tests/testdata/login.json", state["copied"])
+            self.assertTrue((out / "tests/testdata/login.json").exists())
+
+    def test_a_fixture_reaches_the_file_that_reads_it_without_being_called_carried(self):
+        with TemporaryDirectory() as tmp:
+            out = Path(tmp) / "out"
+            (out / "tests/testdata").mkdir(parents=True)
+            (out / "tests/testdata/login.json").write_text("{}\n")
+            spec = SimpleNamespace(path="tests/a.spec.ts", action="convert", imports=(),
+                                   data_imports=("tests/testdata/login.json",))
+            sends = suite_graph.dispatch({
+                "waves": [["tests/a.spec.ts"]], "wave": 1, "root": tmp,
+                "out_root": str(out), "manifest": SimpleNamespace(files=[spec])})
+            job = sends[0].arg
+            self.assertEqual([Path(p).name for p in job["context_paths"]], ["login.json"])
+            self.assertEqual([], job["carried_paths"])
+
+    def test_a_fixture_a_page_object_reads_still_reaches_the_spec(self):
+        """Transitive, for the same reason companions are: the spec never names it."""
+        with TemporaryDirectory() as tmp:
+            out = Path(tmp) / "out"
+            (out / "pages").mkdir(parents=True)
+            (out / "pages/Login.ts").write_text("x")
+            (out / "data").mkdir(parents=True)
+            (out / "data/users.json").write_text("{}\n")
+            page = SimpleNamespace(path="pages/Login.ts", action="convert", imports=(),
+                                   data_imports=("data/users.json",))
+            spec = SimpleNamespace(path="tests/a.spec.ts", action="convert",
+                                   imports=("pages/Login.ts",), data_imports=())
+            sends = suite_graph.dispatch({
+                "waves": [["tests/a.spec.ts"]], "wave": 1, "root": tmp,
+                "out_root": str(out), "manifest": SimpleNamespace(files=[page, spec])})
+            self.assertEqual(sorted(Path(p).name for p in sends[0].arg["context_paths"]),
+                             ["Login.ts", "users.json"])
+
+
 if __name__ == "__main__":
     unittest.main()
 

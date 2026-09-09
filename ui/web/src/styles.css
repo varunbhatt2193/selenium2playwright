@@ -1269,10 +1269,10 @@ pre.code:not(.numbered) .line {
   color: var(--text);
 }
 
-/* The demo's size cap, said before the run rather than discovered after it.
-   Bordered and tinted because it is the one line on the plan that changes what
-   the visitor is about to get, and the invitation to clone the repo only works
-   if it is read. */
+/* Anything the scan wants said before the run rather than discovered after it —
+   an import cycle it could not order, a folder it read differently than you
+   would expect. Bordered and tinted because it is the one part of the plan that
+   changes what the visitor is about to get, and only works if it is read. */
 .plan-limit {
   border: 1px solid var(--line);
   border-left: 2px solid var(--accent);

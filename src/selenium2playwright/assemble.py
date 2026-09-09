@@ -51,7 +51,7 @@ from pathlib import Path
 from selenium2playwright.env import SANDBOX
 from selenium2playwright.schemas import ValidationReport
 from selenium2playwright.validators.compile import MISSING_MODULE, missing_dependency
-from selenium2playwright.suite import CAP_INVITATION
+from selenium2playwright.suite import CONFIG_JSON
 
 MEMBERS = SANDBOX / "members.cjs"
 PARITY = SANDBOX / "parity.cjs"
@@ -163,16 +163,23 @@ class Assembly:
 
 
 def read_tree(root: Path) -> dict[str, str]:
-    """Every TypeScript file under a folder, keyed by its relative path.
+    """Every TypeScript file and JSON fixture under a folder, by relative path.
 
     Relative paths are the keys everywhere in this project — the compile gate
     needs them to resolve `../pages/LoginPage`, and the ledger needs them to put
     a source file next to its converted counterpart.
+
+    The fixtures are here because the whole-tree compile is a compile: a spec
+    that reads `tests/testdata/login.json` does not type-check without the file
+    behind that import, and failing the tree for a fixture the run deliberately
+    carried across would be a verdict on nothing.
     """
     files = {}
-    for path in sorted(root.rglob("*.ts")):
+    for path in sorted([*root.rglob("*.ts"), *root.rglob("*.json")]):
         parts = path.relative_to(root).parts
         if "node_modules" in parts or any(part.startswith(".") for part in parts):
+            continue
+        if path.name in CONFIG_JSON:
             continue
         files[path.relative_to(root).as_posix()] = path.read_text(encoding="utf-8")
     return files
@@ -775,12 +782,11 @@ def render(root: Path, out_root: Path, manifest, outcomes: list, assembly: Assem
         lines += ["Why a file is not a plain pass:", ""] + table(["file", "result", "reason"], reasons)
 
     lines += ["## 3. What was not converted", ""]
-    # The demo's size cap, if one bit. It belongs at the top of this section
-    # rather than in a footnote: the reader is looking at a table of their own
-    # files marked "copied unchanged" and is owed the reason before the list,
-    # along with the way to convert them anyway.
-    capped = [n for n in (manifest.notes if manifest else ()) if CAP_INVITATION in n]
-    lines += [*(f"> {note}\n" for note in capped)]
+    # Everything here is a file the *scan* set aside — a helper with no
+    # automation in it, or something outside the MVP. Nothing lands in this
+    # section for being past a limit any more: a suite is converted whole or
+    # refused whole, so there is no such thing as a file this run could have
+    # converted and chose not to.
     carried = [[f"`{f.path}`", "copied unchanged", f.reason] for f in (manifest.files if manifest else ())
                if f.action == "copy"]
     left = [[f"`{f.path}`", "not converted", f.reason] for f in (manifest.files if manifest else ())

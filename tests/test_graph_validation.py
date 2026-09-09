@@ -235,5 +235,43 @@ class CarriedCompanionTests(unittest.TestCase):
         self.assertEqual(state["context"], format_context([self.done]))
 
 
+class DataFixtureContextTests(unittest.TestCase):
+    """A JSON fixture is neither converted nor unconverted, and is labelled so.
+
+    It has to be in the prompt at all because the compile gate needs the file
+    behind `import loginData from "tests/testdata/login.json"`, and because the
+    conversion needs the shape of the values. Filing it under "ALREADY
+    converted to Playwright" would be the same species of lie as calling a
+    carried Selenium file converted.
+    """
+
+    def setUp(self):
+        self.folder = TemporaryDirectory()
+        base = Path(self.folder.name)
+        self.page = base / "LoginPage.ts"
+        self.page.write_text("export class LoginPage {}\n")
+        self.fixture = base / "login.json"
+        self.fixture.write_text('{"username": "standard_user"}\n')
+        self.addCleanup(self.folder.cleanup)
+
+    def test_a_fixture_gets_its_own_honest_section(self):
+        text = format_context([self.page, self.fixture])
+        self.assertIn(f'<data_file path="{self.fixture}"', text)
+        self.assertIn("standard_user", text)
+        self.assertIn("data, not code", text)
+
+    def test_a_fixture_is_never_offered_as_the_converted_api(self):
+        text = format_context([self.page, self.fixture])
+        converted_block = text.split("test-data fixtures")[0]
+        self.assertIn("LoginPage.ts", converted_block)
+        self.assertNotIn("login.json", converted_block)
+
+    def test_a_fixture_alone_produces_no_companion_code_sections(self):
+        text = format_context([self.fixture])
+        self.assertNotIn("ALREADY converted", text)
+        self.assertNotIn("<unconverted_file", text)
+        self.assertIn("<data_file", text)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -61,6 +61,11 @@ def make_model(model_name: str | None = None, *, for_critic: bool = False) -> Ba
     Precedence: argument > S2P_MODEL env > default. With for_critic=True the
     env fallback is S2P_CRITIC_MODEL, which itself falls back to S2P_MODEL, so
     the critic can be a different (stronger) model than the actor.
+
+    The key always comes from the environment, and there is deliberately no way
+    to pass one per call. Bringing your own key means cloning the repo and
+    putting it in your own `.env`; nobody should be asked to type a provider key
+    into somebody else's website, so the hosted demo never offers the field.
     """
     name = resolve_name(model_name, for_critic=for_critic)
     provider = name.split(":", 1)[0]

@@ -466,30 +466,24 @@ class TreeVerdictSplitTests(unittest.TestCase):
         self.assertEqual(carried, ())
 
 
-class CapNoteInReportTests(unittest.TestCase):
-    """When the demo's cap bites, the report says so where the files are listed."""
+class NothingIsLeftOutForBeingTooBigTests(unittest.TestCase):
+    """Section 3 lists what the scan set aside, and nothing else.
 
-    def test_section_three_leads_with_the_cap_and_the_way_around_it(self):
+    It used to lead with the demo's size cap, because a reader looking at a
+    table of their own files marked "copied unchanged" was owed the reason. A
+    suite is converted whole or refused whole now, so there is no such file and
+    no such paragraph.
+    """
+
+    def test_the_report_never_offers_a_way_around_a_size_limit(self):
         root = Path(__file__).resolve().parents[1] / "samples/selenium-hard-suite"
         with patch.dict(os.environ, {"S2P_SUITE_MAX_TESTS": "3",
                                      "S2P_SUITE_MAX_PAGE_OBJECTS": "3"}, clear=False):
             manifest = suite.scan(root)
         markdown = assemble.render(root, Path("/nowhere"), manifest, [],
                                    assemble.Assembly(files=0))
-        section = markdown.split("## 3.")[1].split("## 4.")[0]
-        self.assertIn("converts at most 3 page objects and 3 test files", section)
-        self.assertIn("your own LLM API key", section)
-        # And the files it left out are named, not just counted.
-        self.assertIn("past this demo's limit of 3 page objects per run", section)
-
-    def test_no_cap_means_no_paragraph(self):
-        root = Path(__file__).resolve().parents[1] / "samples/selenium-hard-suite"
-        with patch.dict(os.environ, {"S2P_SUITE_MAX_TESTS": "",
-                                     "S2P_SUITE_MAX_PAGE_OBJECTS": ""}, clear=False):
-            manifest = suite.scan(root)
-        markdown = assemble.render(root, Path("/nowhere"), manifest, [],
-                                   assemble.Assembly(files=0))
         self.assertNotIn("your own LLM API key", markdown)
+        self.assertNotIn("past this demo's limit", markdown)
 
 
 class CommandTests(unittest.TestCase):
