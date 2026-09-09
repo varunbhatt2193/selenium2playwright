@@ -119,6 +119,11 @@ class ConversionState(TypedDict, total=False):
     # inputs — set by the caller
     source_path: str  # where to read the file, OR just its name when source_text is given
     context_paths: list[str]
+    # Which of those companions are *not* converted — the suite carries files
+    # across untouched once past the demo's cap, and they are still Selenium.
+    # They are sent anyway so imports resolve; this is what stops the prompt
+    # and the critic from treating raw Selenium as the API to match.
+    carried_paths: list[str]
     # step 10.2 — the same two inputs, sent as text instead of as paths. A
     # deployed server has none of the caller's files, so a path is a promise it
     # cannot keep; these are how a paste box, an HTTP client or Studio hands the
@@ -263,7 +268,8 @@ def intake(state: ConversionState, runtime: Runtime[RunSettings] | None = None) 
     run = settings(runtime)
     cap = run.max_attempts if run.max_attempts is not None else state.get("max_attempts")
     source, name, paths, context_files = read_inputs(state)
-    context = format_context(paths, contents=context_files)
+    context = format_context(paths, contents=context_files,
+                             carried=state.get("carried_paths") or ())
     previous = state.get("report")
     conventions = list(state.get("conventions", []))
     refinement = (state.get("refinement") or "").strip()

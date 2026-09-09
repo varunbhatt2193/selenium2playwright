@@ -512,5 +512,33 @@ class HeartbeatTests(unittest.TestCase):
             self.drain(boom())
 
 
+class FinalRowsCarryTheGatesColumnTests(unittest.TestCase):
+    """`gates_line` is a property, and `asdict` copies fields.
+
+    So the rows in the final `done` payload reached the page without it, and
+    the table's GATES column — filled in all through the run by the live `file`
+    events, which send it explicitly — went blank the moment the run finished.
+    """
+
+    def result(self):
+        row = pg.FileRow(path="pages/LoginPage.ts", wave=1, status="passed", attempts=1,
+                         gates=[("compile", True), ("residue", True),
+                                ("lint", True), ("parity", True)])
+        return pg.SuiteResult(rows=[row], elapsed=1.0, compiles=True, tree_files=1)
+
+    def test_the_final_payload_has_a_gates_line_on_every_row(self):
+        view = server.result_view(self.result())
+        self.assertEqual(["4/4"], [r["gates_line"] for r in view["rows"]])
+
+    def test_it_says_the_same_thing_the_live_event_said(self):
+        row = self.result().rows[0]
+        view = server.result_view(self.result())
+        self.assertEqual(row.gates_line, view["rows"][0]["gates_line"])
+
+    def test_a_row_with_no_gates_still_renders_a_dash(self):
+        result = pg.SuiteResult(rows=[pg.FileRow(path="a.ts", wave=1, status="refused", attempts=0)])
+        self.assertEqual(["\u2014"], [r["gates_line"] for r in server.result_view(result)["rows"]])
+
+
 if __name__ == "__main__":
     unittest.main()

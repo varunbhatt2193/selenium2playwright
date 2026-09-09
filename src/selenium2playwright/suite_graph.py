@@ -149,6 +149,7 @@ class FileJob(TypedDict, total=False):
     source_path: str
     output_path: str
     context_paths: list[str]
+    carried_paths: list[str]  # the subset of context_paths that is still Selenium
 
 
 class SuiteState(TypedDict, total=False):
@@ -332,7 +333,16 @@ def dispatch(state: SuiteState) -> list[Send] | str:
     by_path = {f.path: f for f in state["manifest"].files}
     jobs = []
     for path in waves[number - 1]:
-        companions = [out_root / dep for dep in needed_by(path, by_path)]
+        deps = needed_by(path, by_path)
+        companions = [out_root / dep for dep in deps]
+        # Not everything in the output tree is a conversion. A suite past the
+        # demo's cap has its remaining files copied across untouched, so the
+        # path this reads is the original Selenium — true of anything the
+        # manifest did not mark `convert`. It still goes in `context_paths`,
+        # because `tsc` cannot resolve an import to a file it was not given;
+        # it goes in `carried_paths` too, so the prompt says which is which.
+        carried = {str(out_root / dep) for dep in deps
+                   if getattr(by_path.get(dep), "action", suite.CONVERT) != suite.CONVERT}
         jobs.append(Send("convert_file", FileJob(
             path=path, wave=number, source_path=str(root / path),
             output_path=str(out_root / path),
@@ -340,6 +350,7 @@ def dispatch(state: SuiteState) -> list[Send] | str:
             # Sending a path that is not there would crash intake; leaving it out
             # converts this file without it, which 9.3's report will say out loud.
             context_paths=[str(p) for p in companions if p.exists()],
+            carried_paths=[str(p) for p in companions if p.exists() and str(p) in carried],
         )))
     return jobs
 
@@ -364,7 +375,8 @@ def convert_file(job: FileJob, runtime: Runtime[SuiteSettings] | None = None, *,
     child_run = single.RunSettings(model=run.model, critic_model=run.critic_model,
                                    max_attempts=run.max_attempts)
     inputs = {"source_path": job["source_path"], "output_path": job["output_path"],
-              "context_paths": list(job.get("context_paths", [])), "ask_risks": False}
+              "context_paths": list(job.get("context_paths", [])),
+              "carried_paths": list(job.get("carried_paths", [])), "ask_risks": False}
     if run.user_id:
         inputs["user_id"] = run.user_id
     try:

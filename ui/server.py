@@ -114,8 +114,13 @@ def plan_view(plan: pg.SuitePlan) -> dict[str, Any]:
 
 
 def result_view(result: pg.SuiteResult) -> dict[str, Any]:
+    # `gates_line` is a property, and `asdict` only copies fields — so the rows
+    # in this final payload arrived at the page without the one the table's
+    # GATES column reads, and the column went blank the moment a run finished.
+    # The live `file` events send it explicitly; this is the same courtesy.
     return {**asdict(result), "totals": result.totals, "passed": result.passed,
-            "headline": result.headline}
+            "headline": result.headline,
+            "rows": [{**asdict(row), "gates_line": row.gates_line} for row in result.rows]}
 
 
 # How often to put a byte on an idle stream. A proxy between this server and

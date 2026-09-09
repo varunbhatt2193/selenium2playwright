@@ -210,6 +210,12 @@ def show_findings(report: ConversionReport) -> None:
     for check in report.validation:
         for finding in check.findings:
             say(f"  {check.gate}: {finding.render()}", style=FAIL_STYLE if not check.passed else "")
+        # What the gate saw and did not count — a package this sandbox does not
+        # install, a module in a file the run never touched. Kept out of the
+        # model's feedback, because it cannot fix them; kept in front of the
+        # person, because they are still true.
+        for finding in check.excused:
+            say(f"  {check.gate}: {finding.render()} (not this file's to fix)")
         if not check.passed and not check.findings and check.tool_output:
             say(check.tool_output)
     if report.critique is not None:
@@ -780,7 +786,10 @@ def show_assembly(built: assemble.Assembly) -> None:
     if built.tree is None:
         say(f"Whole tree: not compiled — {built.tree_error}", style=FAIL_STYLE)
     elif built.tree.passed:
-        say(f"Whole tree: {built.files} file(s) compile together, no errors", style=PASS_STYLE)
+        excused = len(built.tree.excused)
+        aside = f", {excused} error(s) in absent packages or carried files" if excused else ""
+        say(f"Whole tree: {built.files} file(s) compile together, no errors{aside}",
+            style=PASS_STYLE)
     else:
         findings = built.tree.findings
         say(f"Whole tree: {len(findings)} error(s) compiling {built.files} file(s) together",

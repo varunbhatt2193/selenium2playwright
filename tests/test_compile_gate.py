@@ -128,5 +128,40 @@ class SeleniumStillCaughtTests(unittest.TestCase):
                         [f.message for f in report.findings])
 
 
+class ExcusedFindingTests(unittest.TestCase):
+    """A passing report must not read like a failing one.
+
+    The gate stopped counting absent packages against the file, but it kept
+    listing them under `PASS compile: passed` — and the critic, told a failed
+    gate requires revise, quoted the contradiction back and voted revise on
+    three of three clean files in a live run. What the gate excused now lives
+    in `excused`, which `render()` does not print.
+    """
+
+    LEFTOVER = {"pages/Half.ts": ('import { By } from "selenium-webdriver";\n'
+                                  "export const locator = By.css('#a');\n")}
+
+    def setUp(self):
+        self.report = compile_check(self.LEFTOVER)
+
+    def test_the_absent_package_is_excused_not_blocking(self):
+        self.assertTrue(self.report.passed)
+        self.assertEqual([], self.report.findings, [f.render() for f in self.report.findings])
+        self.assertTrue(self.report.excused, "the error tsc printed was thrown away")
+        self.assertTrue(any("selenium-webdriver" in f.message for f in self.report.excused))
+
+    def test_render_gives_the_critic_nothing_it_cannot_fix(self):
+        rendered = self.report.render()
+        self.assertIn("compile: passed", rendered)
+        self.assertNotIn("selenium-webdriver", rendered)
+        self.assertNotIn("TS2307", rendered)
+
+    def test_a_real_error_is_still_blocking_and_still_rendered(self):
+        report = compile_check({"pages/Broken.ts": "export const n: number = 'text';\n"})
+        self.assertFalse(report.passed)
+        self.assertTrue(report.findings)
+        self.assertIn("TS2322", report.render())
+
+
 if __name__ == "__main__":
     unittest.main()

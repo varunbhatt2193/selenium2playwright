@@ -394,6 +394,32 @@ class TreeVerdictSplitTests(unittest.TestCase):
         split = assemble.split_tree_findings(tree, [outcome("pages/Done.ts")], manifest)
         self.assertEqual(len(split["converted"]), 1)
 
+    def test_what_the_gate_excused_is_still_sorted_and_still_shown(self):
+        """The compile gate keeps absent-package errors out of `findings` now.
+
+        They are the reason the critic kept voting revise on clean files. But
+        they are still true, and this report still has to show them, so the
+        split reads both lists.
+        """
+        tree = ValidationReport(gate="compile", passed=True, findings=[], excused=[
+            self.finding("pages/Left.ts"),
+            self.finding("config/env.ts", message="Cannot find module 'zod'.")])
+        manifest = self.manifest_of(["pages/Done.ts"], ["pages/Left.ts", "config/env.ts"])
+        split = assemble.split_tree_findings(tree, [outcome("pages/Done.ts")], manifest)
+        self.assertEqual(len(split["converted"]), 0)
+        self.assertEqual(len(split["unconverted"]), 2)
+        self.assertEqual(0, sum(len(split[k]) for k in ("companion", "dependency")))
+
+    def test_an_absent_package_in_a_converted_file_is_a_dependency_not_a_fault(self):
+        tree = ValidationReport(gate="compile", passed=True, findings=[], excused=[
+            self.finding("pages/Done.ts", message="Cannot find module 'mysql2/promise'.")])
+        files = (suite.SuiteFile(path="pages/Done.ts", kind="page-object", action=suite.CONVERT,
+                                 reason="", classification=classify("export const a = 1;\n", "a.ts")),)
+        split = assemble.split_tree_findings(
+            tree, [outcome("pages/Done.ts")], suite.Manifest(root="r", files=files, waves=()))
+        self.assertEqual(len(split["dependency"]), 1)
+        self.assertEqual(len(split["converted"]), 0)
+
     def test_a_carried_file_with_no_selenium_left_is_our_problem(self):
         """The caller whose companion's API moved under it — never quietly excused."""
         tree = ValidationReport(gate="compile", passed=False, findings=[

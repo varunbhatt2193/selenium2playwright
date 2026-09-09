@@ -547,6 +547,49 @@ class RealGraphTests(unittest.TestCase):
         self.assertIn("relative path", str(caught.exception))
 
 
+class CarriedCompanionDispatchTests(unittest.TestCase):
+    """A copied file is in the output tree, but it was never converted.
+
+    The compile gate needs it, so it stays in `context_paths`. The prompt must
+    not call it converted, so its path also travels in `carried_paths`.
+    """
+
+    @staticmethod
+    def tree(tmp, actions: dict) -> tuple:
+        out = Path(tmp) / "out"
+        files = []
+        for path, action in actions.items():
+            (out / path).parent.mkdir(parents=True, exist_ok=True)
+            (out / path).write_text("whatever")
+            files.append(SimpleNamespace(path=path, action=action, imports=()))
+        return out, files
+
+    def test_only_the_copied_companion_is_named_as_carried(self):
+        with TemporaryDirectory() as tmp:
+            out, files = self.tree(tmp, {"pages/Base.ts": "copy",
+                                         "pages/Login.ts": "convert"})
+            files.append(SimpleNamespace(path="tests/a.spec.ts", action="convert",
+                                         imports=("pages/Base.ts", "pages/Login.ts")))
+            sends = suite_graph.dispatch({
+                "waves": [["tests/a.spec.ts"]], "wave": 1, "root": tmp,
+                "out_root": str(out), "manifest": SimpleNamespace(files=files)})
+            job = sends[0].arg
+            self.assertEqual(sorted(Path(p).name for p in job["context_paths"]),
+                             ["Base.ts", "Login.ts"])
+            self.assertEqual([Path(p).name for p in job["carried_paths"]],
+                             ["Base.ts"])
+
+    def test_a_fully_converted_wave_carries_nothing(self):
+        with TemporaryDirectory() as tmp:
+            out, files = self.tree(tmp, {"pages/Login.ts": "convert"})
+            files.append(SimpleNamespace(path="tests/a.spec.ts", action="convert",
+                                         imports=("pages/Login.ts",)))
+            sends = suite_graph.dispatch({
+                "waves": [["tests/a.spec.ts"]], "wave": 1, "root": tmp,
+                "out_root": str(out), "manifest": SimpleNamespace(files=files)})
+            self.assertEqual([], sends[0].arg["carried_paths"])
+
+
 if __name__ == "__main__":
     unittest.main()
 

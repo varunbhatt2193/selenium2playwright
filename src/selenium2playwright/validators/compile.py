@@ -170,13 +170,18 @@ def compile_check(files: dict[str, str], keep: bool = False) -> ValidationReport
     findings = parse_tsc_output(proc.stdout, prefix=str(run_dir.relative_to(SANDBOX)) + "/")
     # A file is not badly converted because the folder next to it imports a
     # package this sandbox does not install. Those findings are still reported —
-    # the caller sees every line tsc printed — they just do not fail the gate,
-    # because failing it sends the repair loop off to rewrite correct code.
-    blocking = [f for f in findings if not missing_dependency(f, set(files))]
+    # `excused` keeps every line tsc printed — they just do not fail the gate,
+    # because failing it sends the repair loop off to rewrite correct code, and
+    # they are held apart from `findings` because that list is the critic's
+    # to-do list: an excused error there reads as work, and gets "revise".
+    known = set(files)
+    blocking = [f for f in findings if not missing_dependency(f, known)]
+    excused = [f for f in findings if missing_dependency(f, known)]
     return ValidationReport(
         gate="compile",
         passed=not blocking,
-        findings=findings,
+        findings=blocking,
+        excused=excused,
         tool_output=proc.stdout + proc.stderr,
     )
 

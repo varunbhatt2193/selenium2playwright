@@ -9,6 +9,7 @@ so this file is pure LangChain and knows nothing about vendors.
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from pathlib import Path
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -216,26 +217,50 @@ def build_critic_prompt(conventions: str = "", decisions: str = "",
     return ChatPromptTemplate.from_messages(messages)
 
 
-def format_context(files: list[Path], contents: dict[str, str] | None = None) -> str:
-    """Already-converted companion files (e.g. the POM a test imports).
+def format_context(files: list[Path], contents: dict[str, str] | None = None,
+                   carried: Collection[str] = ()) -> str:
+    """Companion files (e.g. the POM a test imports), in two honest groups.
 
     Suite mode (Phase 9) converts page objects first, then tests — the test
     must call the *new* POM API, not guess it. This is that idea in miniature.
     Returns "" when there is nothing to add, so the human turn stays clean.
     Optional contents is an intake snapshot keyed by absolute path, so validation
     and the prompt can use identical bytes even if a file changes on disk later.
+
+    `carried` names the companions that were **not** converted — a suite past
+    the demo's cap copies files across untouched, and they are still Selenium.
+    They have to be here, because `tsc` cannot resolve an import to a file it
+    was not given, but calling them "ALREADY converted" is a lie the reader
+    acts on: on a live run the critic compared each file against its raw
+    Selenium neighbour, found the expected mismatch, and voted revise three
+    times out of three. So they are labelled for what they are, and the model
+    is told they are not its to match and not its to fix.
     """
     if not files:
         return ""
     if contents is None:
         contents = {str(f.resolve()): f.read_text(encoding="utf-8") for f in files}
-    blocks = [
-        f'<converted_file path="{f}">\n{contents[str(f.resolve())]}\n</converted_file>'
-        for f in files
-    ]
-    return (
-        "These companion files are ALREADY converted to Playwright. Import from "
-        "them and use their exported API exactly as written:\n\n"
-        + "\n\n".join(blocks)
-        + "\n\n"
-    )
+    carried_paths = {str(Path(c).resolve()) for c in carried}
+    done = [f for f in files if str(f.resolve()) not in carried_paths]
+    left = [f for f in files if str(f.resolve()) in carried_paths]
+    sections = []
+    if done:
+        sections.append(
+            "These companion files are ALREADY converted to Playwright. Import from "
+            "them and use their exported API exactly as written:\n\n"
+            + "\n\n".join(
+                f'<converted_file path="{f}">\n{contents[str(f.resolve())]}\n</converted_file>'
+                for f in done)
+        )
+    if left:
+        sections.append(
+            "These companion files were NOT converted — they are the original "
+            "Selenium, included only so that imports resolve. They are not the "
+            "target API, they are not part of this task, and Selenium code or "
+            "compile errors inside them are expected and must not be reported "
+            "as defects or repaired:\n\n"
+            + "\n\n".join(
+                f'<unconverted_file path="{f}">\n{contents[str(f.resolve())]}\n</unconverted_file>'
+                for f in left)
+        )
+    return "\n\n".join(sections) + "\n\n"

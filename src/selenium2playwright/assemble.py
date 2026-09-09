@@ -146,7 +146,13 @@ class Assembly:
 
     @property
     def tree_findings(self) -> list:
-        return list(self.tree.findings) if self.tree else []
+        """Every error `tsc` printed, including the ones the gate excused.
+
+        The gate holds absent-package errors apart so the critic is not sent
+        after work it cannot do; a report shown to a person hides nothing, and
+        `split` says which bucket each one landed in.
+        """
+        return [*self.tree.findings, *self.tree.excused] if self.tree else []
 
     @property
     def unexplained(self) -> int:
@@ -579,7 +585,12 @@ def split_tree_findings(tree, outcomes: list, manifest) -> dict:
                      and getattr(f.classification, "automation", "") == "selenium"}
     buckets: dict[str, list] = {"converted": [], "unconverted": [], "companion": [],
                                 "dependency": []}
-    for finding in (tree.findings if tree else ()):
+    # Both lists: the compile gate keeps the errors it excused (a package the
+    # sandbox never installed) out of `findings` so the critic is not handed
+    # work it cannot do, but they are still true and this report still shows
+    # them — sorted into the same buckets, by the same rules, below.
+    reported = ([*tree.findings, *tree.excused] if tree else ())
+    for finding in reported:
         # Order matters. For a file this run openly declined to convert, "it is
         # still Selenium" explains every error it has — the missing
         # `selenium-webdriver` module included — and explains it better than
@@ -613,7 +624,7 @@ def assemble(root: Path, out_root: Path, manifest, outcomes: list) -> Assembly:
         # carried across untouched are reported in their own right below, and
         # are not a verdict on a conversion that never happened.
         "tree_compiles": tree is not None and not split["converted"] and not split["companion"],
-        "tree_errors": len(tree.findings) if tree else 0,
+        "tree_errors": len(tree.findings) + len(tree.excused) if tree else 0,
         "tree_errors_converted": len(split["converted"]),
         "tree_errors_unconverted": len(split["unconverted"]),
         "tree_errors_companion": len(split["companion"]),

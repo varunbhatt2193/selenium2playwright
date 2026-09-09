@@ -1130,7 +1130,10 @@ def suite_result(state: dict[str, Any]) -> SuiteResult:
                 + f" {_get(f, 'code', '')} {_get(f, 'message', '')}"
                 for f in (items or [])]
 
-    findings = _lines(_get(tree, "findings", [])) if tree else []
+    # Both lists, so the page's "everything tsc printed" stays everything: the
+    # compile gate keeps absent-package errors in `excused` rather than
+    # `findings`, to stop the critic revising files it cannot fix.
+    findings = (_lines(_get(tree, "findings", [])) + _lines(_get(tree, "excused", []))) if tree else []
     # The same errors, sorted by whose fault they can be. `assemble` did the
     # sorting; the page must not re-derive it and drift.
     # Fails closed, like `assemble.owned_findings`: an assembly that did not say

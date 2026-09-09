@@ -178,5 +178,62 @@ class GraphValidationTests(unittest.TestCase):
             validate.assert_not_called()
 
 
+class CarriedCompanionTests(unittest.TestCase):
+    """Companions the run never converted must not be introduced as converted.
+
+    Past the demo's cap a suite copies files across untouched, so the "already
+    converted" companion a file was handed was raw Selenium. On a live run the
+    critic did exactly what that prompt asked: it compared the conversion
+    against its Selenium neighbour, found the mismatch, and voted revise on
+    three files out of three, every lap. The files still have to be sent —
+    `tsc` cannot resolve an import to a file it was not given — so the prompt
+    says which are which instead.
+    """
+
+    def setUp(self):
+        self.folder = TemporaryDirectory()
+        base = Path(self.folder.name)
+        self.done = base / "LoginPage.ts"
+        self.done.write_text("export class LoginPage { constructor(public page: Page) {} }\n")
+        self.left = base / "BasePage.ts"
+        self.left.write_text('import { WebDriver } from "selenium-webdriver";\n')
+        self.addCleanup(self.folder.cleanup)
+
+    def test_a_converted_companion_is_still_offered_as_the_api_to_match(self):
+        text = format_context([self.done])
+        self.assertIn("ALREADY converted", text)
+        self.assertIn("<converted_file", text)
+        self.assertNotIn("<unconverted_file", text)
+
+    def test_a_carried_companion_is_labelled_and_fenced_off(self):
+        text = format_context([self.done, self.left], carried=[str(self.left)])
+        self.assertIn(f'<converted_file path="{self.done}"', text)
+        self.assertIn(f'<unconverted_file path="{self.left}"', text)
+        self.assertIn("were NOT converted", text)
+        self.assertIn("must not be reported", text)
+        # The one that matters: the Selenium file is never inside a block the
+        # model is told to treat as the target API.
+        converted_block = text.split("NOT converted")[0]
+        self.assertNotIn("BasePage.ts", converted_block)
+
+    def test_all_carried_means_no_converted_section_at_all(self):
+        text = format_context([self.left], carried=[str(self.left)])
+        self.assertNotIn("ALREADY converted", text)
+        self.assertIn("<unconverted_file", text)
+
+    def test_intake_passes_the_carried_list_through_to_the_prompt(self):
+        state = graph.intake({"source_path": str(SOURCE / POM),
+                              "context_paths": [str(self.done), str(self.left)],
+                              "carried_paths": [str(self.left)]})
+        self.assertIn("<unconverted_file", state["context"])
+        self.assertEqual(state["context"],
+                         format_context([self.done, self.left], carried=[str(self.left)]))
+
+    def test_no_carried_list_leaves_every_earlier_caller_unchanged(self):
+        state = graph.intake({"source_path": str(SOURCE / POM),
+                              "context_paths": [str(self.done)]})
+        self.assertEqual(state["context"], format_context([self.done]))
+
+
 if __name__ == "__main__":
     unittest.main()

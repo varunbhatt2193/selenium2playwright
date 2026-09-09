@@ -115,6 +115,14 @@ class ValidationReport(BaseModel):
     gate: Gate
     passed: bool
     findings: list[Finding] = Field(default_factory=list)
+    # Problems the tool reported that this conversion is not answerable for: a
+    # package the sandbox never installed, a module belonging to a file the run
+    # never touched. They are kept because they are true and worth showing a
+    # human, and held apart because `passed` did not count them — and because
+    # the critic, shown "PASS compile" over a list of TS2307 errors, reads the
+    # contradiction and votes revise on a file that is fine. Measured: three of
+    # three files on a live suite, every lap, for errors in their neighbours.
+    excused: list[Finding] = Field(default_factory=list)
     tool_output: str = ""  # raw stdout/stderr, kept for the trace and for debugging the parser
 
     @property
@@ -123,7 +131,11 @@ class ValidationReport(BaseModel):
         return f"{self.gate}: {'passed' if self.passed else f'{n} finding' + ('s' if n != 1 else '')}"
 
     def render(self) -> str:
-        """Human/critic-readable block: summary line then one line per finding."""
+        """Human/critic-readable block: summary line then one line per finding.
+
+        Excused findings are deliberately absent: this is the text the critic
+        is asked to act on, and nothing here is something this file can fix.
+        """
         return "\n".join([self.summary, *(f.render() for f in self.findings)])
 
 
