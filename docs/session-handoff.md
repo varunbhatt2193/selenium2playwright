@@ -1,4 +1,4 @@
-# Restart here — 2026-09-08 (Phase 11: 11.1a/11.1b/11.2/11.3a done; ⛔ Anthropic API is limit-blocked until 2026-10-01)
+# Restart here — 2026-09-09 (Phase 11: 11.1a/11.1b/11.2/11.3a done; ⛔ Anthropic API is limit-blocked until 2026-10-01)
 
 ## Current position
 
@@ -15,6 +15,117 @@
 page. **Four apps now** (`s2p`, `s2p-postgres`, `s2p-redis`, `varun-s2p`) ≈
 **$23/month**, flat and traffic-independent — a public link does not move it.
 Model spend is the only cost that responds to traffic, capped at ~$5/day.
+
+### Four layers under one symptom (2026-09-08 → 09), commits `a376904`..`a2e61f5`
+
+Every layer was found by reading data, not by reasoning about the code, and each
+one was hiding the next. The symptom the whole way down was the same: **files
+come back `needs-review` and the tree does not compile.**
+
+1. **The tree verdict blamed the run for its input.** 43 of 43 errors were in
+   files the run never converted. `split_tree_findings` sorts them four ways —
+   `converted` / `companion` / `unconverted` / `dependency` — and only the first
+   two go red. `owned_findings()` **fails closed**: a missing split means every
+   error is ours. (An existing test caught me shipping the fail-open version.)
+2. **Path aliases were invisible to the compile gate.** It wrote a `tsconfig`
+   with no `paths`, so `@lib/x` could not resolve. `alias_paths()` derives them
+   from the tree. On the real repo: **101 errors → 32**.
+3. **Path aliases were invisible to the import graph too.** `resolve_import`
+   returned `None` for anything not starting with `.`, so the wave plan and the
+   companion list were empty and every file compiled alone. Fixed: zero edges →
+   14 files with real ones, per-file compile **0/3 → 3/3**.
+4. **The gates were judging the neighbours.** `residue_check(files)` saw
+   unconverted Selenium companions and failed clean Playwright output. Residue
+   and lint are now scoped to the converted file; compile still gets the
+   companions, because `tsc` needs them. All four gates then passed 3/3.
+
+**Then the critic was still voting revise on all three.** Its own words, pulled
+from LangSmith: *"the compile report is marked PASS compile: passed but lists
+TypeScript errors in companion files."* Two lies in the evidence, both fixed in
+`a2e61f5`:
+
+- `ValidationReport.excused` — errors the gate saw but did not count (absent
+  package, another file's module) no longer render under a `PASS`. `render()`
+  is the critic's to-do list and the repair prompt's; an unfixable item there
+  reads as work. The report, the CLI and `split_tree_findings` still show all of
+  them.
+- `carried_paths` — past the demo's cap a suite copies files across untouched,
+  and those raw Selenium files were handed to the model under *"These companion
+  files are ALREADY converted to Playwright."* They now arrive as
+  `<unconverted_file>`, labelled not-the-target-API and not-yours-to-fix. They
+  stay in the compile set regardless.
+
+Measured on prod, same repo, same three files: **0/3 passed, 3+3+3 laps → 1/3
+passed, 1+1+3 laps, tree compiles, `tree_findings_mine: 0`, 105s → 88s.** The
+two remaining `needs-review` are honest: one leaves a TODO about an unconverted
+companion, one is a `WebDriver`-returning factory with a real API break.
+
+Also fixed: `gates_line` is a property and `asdict` copies fields, so the final
+`done` payload reached the page without it and the **GATES column went blank the
+moment a run finished**. The live `file` events had always sent it.
+
+### The demo cap (2026-09-08, commit `a376904`)
+
+`S2P_SUITE_MAX_TESTS=3` / `S2P_SUITE_MAX_PAGE_OBJECTS=3`, set on **both** Fly
+apps (they must agree — the UI plans, the graph converts). Applied in
+`scan_sources` so guard, playground and graph give the same answer. A file past
+the cap is switched from `convert` to `copy` and carried across; a test whose
+page object did not fit is dropped with it, because converting one without its
+companion compiles it against an API that is no longer there. The note on the
+page says so and invites cloning the repo with your own key.
+
+**Known design flaw, not yet fixed.** The cap takes the first wave, and the
+first wave is always the *leaves* — `webdriver.factory.ts`, `lib/browser.ts`,
+`DriverSetup.ts`. Those are the hardest files in any suite and the least
+interesting to a reader. On `imranwijaya` it converted **zero test files**. A
+visitor wants to see a spec become a Playwright spec. Selecting a representative
+slice (one test plus the page objects it needs) would make every repo demo
+better; see "Try-it-out repos" below.
+
+### Try-it-out repos — screened 2026-09-09, none yet perfect
+
+Eight repos screened with the **free** `/api/suite/plan` endpoint (costs no
+conversions). Best three, and what actually happened:
+
+| repo | licence | verified |
+|---|---|---|
+| `sadabnepal/selenium-javascript-test` | ISC (package.json) | ran live: **2 passed, 3 needs-review**, tree does not compile |
+| `biswajitsundara/selenium-mocha-typescript-starter` | ISC (package.json) | plan only — 3 waves, whole suite converts |
+| `imranwijaya/selenium-typescript-example` | MIT | ran live: 1 passed, 2 needs-review, **0 test files** |
+
+Ruled out: `goenning` (decorator DSL — the hard case), `cdap-ui` (too large),
+`MochaTypescriptTest-101` (one file), `EzequielCaballero` (no tests converted).
+
+**Three fixes stand between these and a green demo. None needs model spend to
+find, only to verify:**
+
+1. **Bare `baseUrl` imports are not resolved.** `sadabnepal` writes
+   `import { LoginPage } from 'tests/pages/login.page'`. `alias_paths` and
+   `resolve_import` handle `@x/*` and `~/*` but not un-prefixed baseUrl paths,
+   so 8 imports went unresolved and `e2e.spec.ts` came back 3/4 gates. Same bug
+   as the alias one, one step further out.
+2. **`resolveJsonModule` is off** in `sandbox/tsconfig.base.json`. Any suite
+   importing test data (`login.json`) fails the tree compile. It was the *only*
+   error attributed to the conversion in that entire run. One line.
+3. **Cap selection** — see the flaw above.
+
+### Working rules learned the hard way (2026-09-08)
+
+- **Never deploy while a run is in flight.** A machine restart makes
+  `sweep_abandoned` re-claim in-flight runs; my deploy stranded two of Varun's
+  suites. `deploy/fly/deploy.sh` now has `refuse_if_busy()` (heredoc piped to
+  `fly ssh console -C "python -"`; `S2P_FORCE_DEPLOY=1` overrides). The first
+  version of that guard returned empty through nested quoting, which the script
+  read as "carry on" — a guard that could not fire. Check a guard can fail.
+- **Deploy both apps or neither.** Shipping the graph without the UI left the
+  plan endpoint serving stale code that disagreed with the backend.
+- **Cancel a wedged run through Postgres,** not the SDK: `runs.cancel` timed out;
+  `UPDATE run SET status='interrupted' WHERE status='running'` worked.
+- **I predicted "this will go green" three times and was wrong three times,**
+  costing 9 conversions. Verify with a live run before saying it works.
+- SSE needs a **15s heartbeat** (`ui/server.py`), or a proxy closes a quiet
+  connection and the browser shows "network error" while both servers log 200.
+  A wave of parallel files went silent for 95.1s on a live run.
 
 ### What 11.3a added (2026-09-08)
 
