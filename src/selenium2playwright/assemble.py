@@ -50,6 +50,7 @@ from pathlib import Path
 
 from selenium2playwright.env import SANDBOX
 from selenium2playwright.schemas import ValidationReport
+from selenium2playwright.validators.compile import MISSING_MODULE, missing_dependency
 from selenium2playwright.suite import CAP_INVITATION
 
 MEMBERS = SANDBOX / "members.cjs"
@@ -551,40 +552,6 @@ def owned_findings(assembly) -> tuple[tuple, tuple]:
             tuple(split.get("unconverted", ())))
 
 
-# `Cannot find module 'zod' or its corresponding type declarations.`
-MISSING_MODULE = re.compile(r"""Cannot find module ['"]([^'"]+)['"]""")
-
-
-def _missing_dependency(finding, in_tree: set[str]) -> bool:
-    """Is this TS2307 about a package the sandbox does not have?
-
-    The sandbox installs TypeScript and Playwright and nothing else, so a suite
-    that imports `zod` or `mysql2/promise` reports errors we could not fix by
-    converting better. Naming that as a conversion failure is the same mistake
-    as blaming the tree for unconverted Selenium.
-
-    A specifier that points at a file in this folder is *not* a dependency: a
-    broken relative import, or an alias that resolves to nothing, is a real
-    finding and stays where it is.
-    """
-    if finding.code != "TS2307":
-        return False
-    match = MISSING_MODULE.search(finding.message or "")
-    if not match:
-        return False
-    specifier = match.group(1)
-    if specifier.startswith("."):
-        return False  # relative: it meant a file here, and the file is missing
-    head, _, rest = specifier.partition("/")
-    if head.startswith(("@", "~")) and rest:
-        target = rest if head in ("@", "~") else f"{head.lstrip('@~')}/{rest}"
-        # An alias that names something in the tree is ours to get right.
-        if any(f"{target}{end}" in in_tree
-               for end in ("", ".ts", ".tsx", "/index.ts", "/index.tsx")):
-            return False
-    return True
-
-
 def split_tree_findings(tree, outcomes: list, manifest) -> dict:
     """Sort whole-tree errors by whose fault they can be.
 
@@ -620,7 +587,7 @@ def split_tree_findings(tree, outcomes: list, manifest) -> dict:
         # in this folder is a dependency we were never going to have.
         if finding.file in selenium_left:
             where = "unconverted"
-        elif _missing_dependency(finding, in_tree):
+        elif missing_dependency(finding, in_tree):
             where = "dependency"
         else:
             where = "converted" if finding.file in converted else "companion"

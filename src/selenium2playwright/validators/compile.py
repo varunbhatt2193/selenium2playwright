@@ -39,6 +39,40 @@ ALIAS_IMPORT = re.compile(
 ALIAS_ENDINGS = ("", ".ts", ".tsx", ".d.ts", "/index.ts", "/index.tsx")
 
 
+# `Cannot find module 'zod' or its corresponding type declarations.`
+MISSING_MODULE = re.compile(r"""Cannot find module ['"]([^'"]+)['"]""")
+
+
+def missing_dependency(finding, in_tree: set[str]) -> bool:
+    """Is this TS2307 about a package that is simply not installed here?
+
+    The sandbox carries TypeScript and Playwright and nothing else, deliberately
+    — it is how the residue gate can promise there is no Selenium to fall back
+    on. The cost is that a suite importing `zod` or `mysql2` reports errors that
+    no amount of converting better would fix, and they are as often in a
+    companion file as in the converted one.
+
+    A specifier that points at a file in this folder is never a dependency: a
+    broken relative import, or an alias that resolves to nothing, is a real
+    finding and stays one.
+    """
+    if getattr(finding, "code", "") != "TS2307":
+        return False
+    match = MISSING_MODULE.search(getattr(finding, "message", "") or "")
+    if not match:
+        return False
+    specifier = match.group(1)
+    if specifier.startswith("."):
+        return False
+    head, _, rest = specifier.partition("/")
+    if head.startswith(("@", "~")) and rest:
+        target = rest if head in ("@", "~") else f"{head.lstrip('@~')}/{rest}"
+        if any(f"{target}{end}" in in_tree
+               for end in ("", ".ts", ".tsx", "/index.ts", "/index.tsx")):
+            return False
+    return True
+
+
 def alias_paths(files: dict[str, str]) -> dict[str, list[str]]:
     """The `paths` a tsconfig needs so this tree's own aliases resolve.
 
@@ -105,9 +139,14 @@ def compile_check(files: dict[str, str], keep: bool = False) -> ValidationReport
             shutil.rmtree(run_dir, ignore_errors=True)
 
     findings = parse_tsc_output(proc.stdout, prefix=str(run_dir.relative_to(SANDBOX)) + "/")
+    # A file is not badly converted because the folder next to it imports a
+    # package this sandbox does not install. Those findings are still reported —
+    # the caller sees every line tsc printed — they just do not fail the gate,
+    # because failing it sends the repair loop off to rewrite correct code.
+    blocking = [f for f in findings if not missing_dependency(f, set(files))]
     return ValidationReport(
         gate="compile",
-        passed=proc.returncode == 0 and not findings,
+        passed=not blocking,
         findings=findings,
         tool_output=proc.stdout + proc.stderr,
     )

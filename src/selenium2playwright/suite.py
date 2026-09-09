@@ -155,15 +155,38 @@ def import_specifiers(source: str) -> list[str]:
 
 
 def resolve_import(specifier: str, source_path: str, known: set[str]) -> str | None:
-    """A relative specifier turned into a path in this suite, or None.
+    """A specifier turned into a path in this suite, or None.
 
     None means "not a file in this folder" — either a package (`chai`,
-    `selenium-webdriver`, `node:os`) or a relative path that points outside the
-    suite. Both are useful to know and neither is an error.
+    `selenium-webdriver`, `node:os`) or a path that points outside the suite.
+    Both are useful to know and neither is an error.
+
+    Two spellings reach a file here. The relative one (`../pages/LoginPage`) is
+    the obvious one. The other is a **path alias** — `@lib/test.metadata`,
+    `@/pages/index`, `~/config/env` — which a real repository defines in its own
+    tsconfig and uses everywhere in place of relative paths.
+
+    Reading only the relative spelling made an alias-based suite look like a
+    folder of files that import nothing from each other, and everything
+    downstream believed it: the wave plan put mutually dependent files in one
+    wave, the per-file gates compiled each file with no companions beside it, so
+    every aliased import failed TS2307 and the reflection loop spent all three
+    attempts on imports that were already correct. One live suite scored 0 of 3
+    that way with every file marked needs-review.
+
+    An alias is followed only when the tree contains what it points at, which is
+    what keeps a real npm scope out: `@lib/x` resolves because `lib/x.ts` is
+    right there, `@playwright/test` does not because nothing here answers to it.
     """
-    if not specifier.startswith("."):
+    if specifier.startswith("."):
+        base = _normalise((Path(source_path).parent / specifier).as_posix())
+    elif specifier.startswith(("@", "~")):
+        head, _, rest = specifier.partition("/")
+        if not rest:
+            return None
+        base = rest if head in ("@", "~") else f"{head.lstrip('@~')}/{rest}"
+    else:
         return None
-    base = _normalise((Path(source_path).parent / specifier).as_posix())
     if base in known:
         return base
     for ending in RESOLUTION_ORDER:
@@ -386,7 +409,9 @@ def scan_sources(sources: dict[str, str], root: str = "uploaded files") -> Manif
         files[path] = SuiteFile(
             path=path, kind=kind, action=action, reason=reason, classification=classification,
             imports=tuple(dict.fromkeys(inside)),
-            external_imports=tuple(s for s in specifiers if not s.startswith(".")),
+            external_imports=tuple(s for s in specifiers
+                                   if not s.startswith(".")
+                                   and resolve_import(s, path, known) is None),
             lines=source.count("\n") + (0 if source.endswith("\n") or not source else 1),
             cases=count_cases(source) if kind == "test" else 0,
         )

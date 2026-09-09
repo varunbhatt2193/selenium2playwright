@@ -9,6 +9,7 @@ itself. Most of these tests are pure — only one pays for a real `tsc` run.
 import unittest
 
 from selenium2playwright.validators.compile import alias_paths, compile_check
+from selenium2playwright.validators.residue import residue_check
 
 # The shape that failed on the live demo: three aliases, one real npm scope.
 ALIASED = {
@@ -73,6 +74,24 @@ class AliasedTreeCompilesTests(unittest.TestCase):
                         "aliased imports should resolve: "
                         + "; ".join(f"{f.file}:{f.line} {f.code} {f.message}"
                                    for f in report.findings))
+
+
+class SeleniumStillCaughtTests(unittest.TestCase):
+    """The compile gate now tolerates absent packages. Selenium is one of them."""
+
+    LEFTOVER = {"pages/Half.ts": ('import { By } from "selenium-webdriver";\n'
+                                  "export const locator = By.css('#a');\n")}
+
+    def test_compile_no_longer_fails_on_the_missing_selenium_package(self):
+        """Stated so the next reader knows it is deliberate, not a regression."""
+        self.assertTrue(compile_check(self.LEFTOVER).passed)
+
+    def test_but_the_residue_gate_still_refuses_it(self):
+        """Which is the gate that was always meant to own this, and still does."""
+        report = residue_check(self.LEFTOVER)
+        self.assertFalse(report.passed)
+        self.assertTrue(any("selenium" in (f.message or "").lower() for f in report.findings),
+                        [f.message for f in report.findings])
 
 
 if __name__ == "__main__":
