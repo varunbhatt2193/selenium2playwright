@@ -23,6 +23,43 @@ REDIS_APP="${APP}-redis"
 say() { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
 
 command -v fly >/dev/null || { echo "flyctl is not installed: brew install flyctl"; exit 1; }
+# A deploy restarts the machine, and a restart takes every in-flight run with
+# it: the caller's stream dies, so their page waits forever for an event that
+# will never come, while the abandoned-run sweeper re-claims the run and spends
+# the rest of its tokens for nobody. That happened on 2026-09-08 to two suites
+# a visitor had started twenty minutes earlier. So ask first. S2P_FORCE_DEPLOY=1
+# is the way past it, for the case where the runs are the thing being fixed.
+refuse_if_busy() {
+  # The script goes in on stdin rather than inside -C "...": nesting python
+  # quotes inside a shell string inside flyctl's own argument parsing produced
+  # an empty answer, and an empty answer here reads as "carry on".
+  local running
+  running="$(fly ssh console -a "$APP" -C "python -" <<'PYQUERY' 2>/dev/null | tr -dc '0-9'
+import asyncio, os, psycopg
+async def main():
+    uri = os.environ.get("POSTGRES_URI") or os.environ.get("DATABASE_URI")
+    async with await psycopg.AsyncConnection.connect(uri, autocommit=True) as conn:
+        cur = await conn.execute("SELECT count(*) FROM run WHERE status = 'running'")
+        print((await cur.fetchone())[0])
+asyncio.run(main())
+PYQUERY
+)"
+  if [ -z "$running" ]; then
+    echo "Could not ask $APP how many runs are in flight (new app, or it is down)."
+    echo "Continuing — but if a visitor is mid-conversion, this will strand them."
+    return 0
+  fi
+  [ "$running" = "0" ] && return 0
+  echo
+  echo "REFUSING TO DEPLOY: $running run(s) are in flight on $APP."
+  echo "Restarting now would strand their streams and burn their tokens for nobody."
+  echo "Wait for them, or cancel them, or re-run with S2P_FORCE_DEPLOY=1."
+  exit 1
+}
+
+[ "${S2P_FORCE_DEPLOY:-}" = "1" ] || refuse_if_busy
+
+
 fly auth whoami >/dev/null 2>&1 || { echo "Not logged in. Run: fly auth login"; exit 1; }
 
 # The database password is generated once and kept in Fly's secret store, never

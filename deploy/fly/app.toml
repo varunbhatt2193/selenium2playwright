@@ -29,6 +29,12 @@ primary_region = "iad"
   # directory a repository is cloned into is not something an image can know.
   S2P_SANDBOX = "/opt/s2p-sandbox"
 
+  # The day's ceiling, in dollars, because dollars are what the card is billed
+  # in and the run count is derived from them ($5.40 / $0.12 per run = 45).
+  # Setting the runs directly would leave every "$5/day" string on the page
+  # saying something the meter no longer means.
+  S2P_DAILY_BUDGET_USD = "5.40"
+
   # How much of one uploaded suite this deployment will convert. A suite is
   # metered per file, so one click on a forty-file upload is forty model calls
   # on the card behind this demo. Three of each is enough to show the wave
