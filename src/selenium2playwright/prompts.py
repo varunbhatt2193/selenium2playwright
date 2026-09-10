@@ -305,13 +305,16 @@ def bound(contents: dict[str, str], budget: int | None = None,
 
 CALLERS_HEADER = (
     "These files IMPORT the file being converted. They are still the original "
-    "Selenium and will be converted LATER in this run, against the file you "
-    "produce. Read them for which exported names, members and signatures are "
-    "relied on, and keep those names stable wherever the playbook allows. Where "
-    "the playbook requires a signature to change — a WebDriver parameter becoming "
-    "a Page, a decorated field becoming a Locator getter — make the change and "
-    "record it in notes, so the caller's conversion can follow. Do not convert "
-    "them, do not report their Selenium as a defect, and do not invent members "
+    "Selenium, and they will be REWRITTEN later in this run against the file you "
+    "produce — so they are not an API to stay compatible with. Read them only to "
+    "learn which exported names and members are relied on, and keep those names "
+    "where the playbook allows. Convert this file fully to Playwright idioms: a "
+    "member a caller reads for an assertion becomes a Locator the caller can "
+    "assert on, not a string-returning getter kept for the caller's sake. Do not "
+    "add transitional members, compatibility shims, or TODO(review) items whose "
+    "only reason is a caller that is still Selenium; the caller's conversion will "
+    "adapt to your API, and a note in notes tells it how. Do not convert the "
+    "callers, do not report their Selenium as a defect, and do not invent members "
     "for them:\n\n"
 )
 
@@ -320,7 +323,8 @@ SUITE_HEADER = (
     "naming conventions, and how files already converted in this run were done. "
     "Each is tagged. converted: Playwright produced earlier in this run — match "
     "its conventions, and import from it rather than re-implementing it. pending: "
-    "original Selenium, converted later in this run. unconverted: original source "
+    "original Selenium, rewritten later in this run — not an API to stay "
+    "compatible with. unconverted: original source "
     "carried across unchanged, not the target API. Nothing here is the task, and "
     "nothing inside these files is a defect to report or repair:\n\n"
 )
