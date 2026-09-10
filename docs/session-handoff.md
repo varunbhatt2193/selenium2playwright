@@ -16,6 +16,124 @@ page. **Four apps now** (`s2p`, `s2p-postgres`, `s2p-redis`, `varun-s2p`) ≈
 **$23/month**, flat and traffic-independent — a public link does not move it.
 Model spend is the only cost that responds to traffic, capped at ~$5/day.
 
+### 2026-09-09 session — commits `16574f8`, `1c86ab4`, `7f9d614`, `598980c`, `b442cdc`
+
+Deployed: graph app **s2p v25**. UI unchanged (nothing in this session touches it).
+
+**Rules Varun set this session, both binding:**
+
+- **No partial repo conversion, ever.** Either one file with the site's key, or
+  the whole suite. A suite that does not fit the budget is **refused**, never
+  trimmed. The demo-cap machinery (`CAP_ENV`, `demo_caps()`, `apply_caps()`,
+  `cap_note()`, `_tally()`) is **deleted**, not disabled. The single-file cap
+  stays: 45 conversions/day globally.
+- **BYOK means cloning the repo.** There is no way to pass a key per call and
+  there must not be — *"no one will trust this website with their key."* An
+  in-progress web-BYOK feature was reverted to a zero diff; the only surviving
+  trace is a paragraph in `llm.make_model`'s docstring saying why.
+
+**Landmine:** a Fly **secret** silently outranks `[env]` in the toml. A stale
+`S2P_DAILY_LIMIT=15` secret shadowed the versioned `12` for an unknown period.
+It is unset now, and both tomls carry a comment saying so. Check
+`fly secrets list -a s2p` before trusting any `[env]` value.
+
+**Also fixed:** the residue gate judged by the *receiver's name* — `\bdriver\.`
+— so a correctly converted Playwright helper whose parameter kept the name
+`driver` failed the gate and burned a repair lap. It now matches the **member**
+reached for, and catches the unambiguous ones (`.quit(`, `.getCurrentUrl(`, …)
+on *any* receiver, which is strictly more than before. `close` is deliberately
+absent: Browser, BrowserContext and Page all have one. `tests/test_residue_gate.py`
+pins both halves. Live: `driverFactory.ts` went 3 laps/revise → **1 lap/pass**.
+
+#### T14 — a gate that fails for the wrong reason destroys the whole attempt budget
+
+`goenning/typescript-selenium-example` scored **0 of 4 on every lap**. Nothing
+was wrong with the conversions. Two layers, same defect, both now fixed:
+
+1. **The compile gate** excused by *error code* only (absent package). Compile
+   is the one gate that must be handed the companions — `tsc` cannot resolve an
+   import without the file behind it — so it is the one gate that needs telling
+   which of them were never converted. `compile_check(files, carried=…)` now
+   excuses by **location** too; `validate()` derives the set from
+   `carried_paths`, which already existed for the prompt.
+2. **`split_tree_findings`** decided ownership by *classification* — "does this
+   carried file still look like Selenium". goenning wraps WebDriver in its own
+   `lib/`, so all twelve carried files classify `automation=unknown`, matched
+   nothing, and fell through to `companion`, which counts. Now keyed on an
+   **import edge**: a carried file that imports something this run converted can
+   have been broken by it; one that does not, cannot. Direct, not transitive, on
+   purpose — a barrel re-exporting a converted module would make the whole repo
+   a caller again, which is the bug being replaced.
+
+Also: `tsc` reports `Cannot find name 'describe'` as **TS2582**, not TS2304,
+whenever it can name the `@types` package. Same error, now the same answer.
+
+**What made this a taxonomy entry** (`docs/gap-log.md` T14) rather than a bug
+report is the critic's behaviour. It diagnosed the problem perfectly and was
+helpless — *"the reported compile findings are all in explicitly unconverted
+companion Selenium files… restore/rerun the validation with the intended target
+scope"* — which is the one repair a reviewer cannot perform. It voted revise
+because a gate had failed, and spent every attempt on all four files. **A gate
+that fails for the wrong reason does not merely mis-score; it converts the
+entire attempt budget into nothing, and the more honest the critic is, the more
+completely it stalls.**
+
+Measured live, same repo, s2p v25: tree errors blamed on the conversion
+**49 → 1**, correctly attributed to carried files **0 → 43**, compile gate from
+failing all four files to passing three. The one remaining is real and the gate
+is right to fail it: `lib/ensure.ts:10 TS18047 'text' is possibly 'null'` —
+`textContent()` returns `string | null`.
+
+#### The root cause underneath all of it, and the next thing to fix
+
+**`classify()` is per-file text matching for `selenium-webdriver` imports.** A
+repository that wraps WebDriver in its own abstraction layer has page objects
+that import `lib/index`, never Selenium — so they read as "no recognised
+automation library", get **copied**, and sit in the output tree as Selenium
+forever. Everything above was making the tool honest about a tree that should
+never have had twelve Selenium files in it.
+
+Measured on goenning: **4 of 16** files are directly Selenium; **13 of 16**
+reach Selenium transitively through imports. Nine would flip from `copy` to
+`convert` — every page object, `specs/spec.ts`, and the `lib/index.ts` barrel
+that caused the whole mess. Script: `scratchpad/transitive.py`.
+
+**Varun's decision: give the model the entire repo**, so this class of problem
+cannot arise. My recommendation was classification-first (bounded, testable,
+cheaper), and it was heard and overruled — build the whole-repo path. The
+honest trade-offs to carry forward:
+
+- Whole-repo **context** is cheap and strictly more information. Whole-repo
+  **output** is where the risk is: structured output for an entire tree is T9
+  territory, per-file attribution and the scorecard disappear, the repair loop
+  rewrites everything each lap (so a `browserConfig`-style regression happens
+  repo-wide, not in one file), and per-file metering stops working.
+- The suite architecture already delivers most of what whole-repo promises. T13
+  says a single-file conversion cannot guess its callers — but converted in
+  waves, callers get the *converted* page object as their companion, and the
+  Phase 9.3 run did twelve files with **zero interface mismatches**.
+- So the shape worth building first: **separate context from output** — give the
+  model the whole repo as read-only evidence, keep emitting one file per call.
+
+#### Two live runs worth keeping
+
+`sadabnepal/selenium-javascript-test`, s2p v23: **5 passed · 2 needs-review ·
+tree compiles · 122.5s**, `unexplained: 0`, fixture `login.json` present in the
+output. The two needs-review are honest — `driverFactory.ts` passes all four
+gates *and* the critic and is flagged only for its `TODO(review)` items, which
+is the system working as designed.
+
+`browserConfig.ts` is the one file that failed for a reason worth fixing, and it
+is **not** a gate defect. The critic raised a **different objection each lap**:
+lap 1 an invented `remoteServerURL` field and a silently changed export
+contract; lap 2 — after that was fixed — dropped Firefox `dom.webnotifications`
+/ `dom.push` prefs from the non-docker branch, a *new* regression introduced by
+the repair. Lap 3 ran out. **The regression shipped**: `getFirefoxConfig()`
+returns bare `{ browserName: 'firefox' }` locally while the docker branch keeps
+`firefoxUserPrefs`. Three attempts is one budget shared between fixing findings
+and absorbing new ones, and the critic re-reviews from scratch with no memory of
+what it already accepted.
+
 ### Four layers under one symptom (2026-09-08 → 09), commits `a376904`..`a2e61f5`
 
 Every layer was found by reading data, not by reasoning about the code, and each
@@ -1220,11 +1338,11 @@ remote `https://github.com/varunbhatt2193/selenium2playwright.git`. `.env`,
 a key value; never re-add `roadmap.md` / `plan-review.md` to the repo (Varun's
 call — not recruiter-friendly; the public face is README.md + plan.md).
 
-**`src/selenium2playwright/bbb.py` is Varun's Streamlit scratch file and is
-staged-but-uncommitted (`AM`) in the index. Leave it alone, and commit with the
-pathspec form `git commit -- <paths>`, NEVER `git add … && git commit`** — it is
-already in the index, so a bare commit sweeps it in whatever you added (that
-happened on 2026-09-07 and had to be undone with `git reset --soft HEAD~1`).
+**Read `git diff --cached` before every commit.** Varun stages work in progress
+while Claude works, and a bare `git add -A && git commit` once swept his staged
+deletions into a commit and broke main. `src/selenium2playwright/bbb.py` — the
+Streamlit scratch file this warning used to name — no longer exists, but the
+habit stands: check the index first, then commit with an explicit pathspec.
 `S2P_MODEL` = actor, `S2P_CRITIC_MODEL` = critic (optional),
 `S2P_EMBEDDINGS` = recall (default `openai:text-embedding-3-small`, `off`
 supported); eval CLIs default to Opus. Use the existing `.venv` and Node toolchains. Chrome
