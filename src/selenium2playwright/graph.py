@@ -146,6 +146,10 @@ class ConversionState(TypedDict, total=False):
     # were dispatched as conversions and refused at intake before this. "" is
     # the normal case and changes nothing.
     via: str
+    # The suite's source and output trees, so every file in the prompt can be
+    # named by its path inside the suite instead of by an absolute path in one
+    # of two temp directories (`prompts.shown`). Empty in single-file mode.
+    suite_roots: list[str]
     # step 10.2 — the same two inputs, sent as text instead of as paths. A
     # deployed server has none of the caller's files, so a path is a promise it
     # cannot keep; these are how a paste box, an HTTP client or Studio hands the
@@ -165,7 +169,14 @@ class ConversionState(TypedDict, total=False):
     baseline: ConversionResult | None  # the previous turn's accepted output, this turn's start
     # filled by intake
     source: str  # the Selenium file contents
-    context: str  # already-converted companions, formatted for the prompt ("" if none)
+    context: str  # companions and suite evidence, formatted for the actor ("" if none)
+    # The same companions without the suite evidence, for the critic. Shown
+    # the callers, the reviewer argued about them instead of the file: on a
+    # live run it asked for a getter to go (rule 28), then for it to come back
+    # ("callers rely on it"), then to go again — three laps, every gate green.
+    # The evidence informs the writer; the reviewer judges the file against
+    # its source, its companions and the playbook, exactly as it did before.
+    review_context: str
     context_files: dict[str, str]  # absolute companion path -> contents captured at intake
     repo_files: dict[str, str]  # the suite evidence actually shown, path -> contents; {} if none
     repo_omitted: list[tuple[str, int]]  # evidence the budget left out, with sizes
@@ -330,14 +341,18 @@ def intake(state: ConversionState, runtime: Runtime[RunSettings] | None = None) 
     cap = run.max_attempts if run.max_attempts is not None else state.get("max_attempts")
     source, name, paths, context_files = read_inputs(state)
     repo = read_repo(state)
+    roots = list(state.get("suite_roots") or ())
     context = format_context(paths, contents=context_files,
-                             carried=state.get("carried_paths") or (), repo=repo)
+                             carried=state.get("carried_paths") or (), repo=repo, roots=roots)
+    review_context = context if repo is None else format_context(
+        paths, contents=context_files, carried=state.get("carried_paths") or (), roots=roots)
     previous = state.get("report")
     conventions = list(state.get("conventions", []))
     refinement = (state.get("refinement") or "").strip()
     if refinement and refinement not in conventions:
         conventions.append(refinement)
-    return {"source": source, "context": context, "context_files": context_files,
+    return {"source": source, "context": context, "review_context": review_context,
+            "context_files": context_files,
             "repo_files": repo.contents if repo else {},
             "repo_omitted": list(repo.omitted) if repo else [],
             # source_path is written back because a paste may not have carried
@@ -516,12 +531,12 @@ def validate(state: ConversionState) -> ConversionState:
     relative = target.relative_to(base).as_posix()
     converted = {relative: state["result"].code}
     files = {p.relative_to(base).as_posix(): code for p, code in companions.items()} | converted
-    # Which of those companions are still the folder's own Selenium. They are
-    # here so `tsc` can resolve an import, not because this run converted them,
-    # so an error inside one is not this file's to fix — see `compile_check`.
-    still_theirs = {str(Path(p).resolve()) for p in state.get("carried_paths") or ()}
-    carried = {p.relative_to(base).as_posix() for p in companions
-               if str(p.resolve()) in still_theirs}
+    # Every companion is here so `tsc` can resolve an import, not because this
+    # conversion produced it, so an error *inside* one is not this file's to
+    # fix — whether it is the folder's own Selenium or a file converted in an
+    # earlier wave. Only the converted file answers for its own lines; what a
+    # companion breaks in *this* file still lands here. See `compile_check`.
+    others = set(files) - {relative}
     checks = [
         # Only compile is given the companions, and only because `tsc` cannot
         # resolve an import without the file behind it. The other three ask
@@ -530,7 +545,7 @@ def validate(state: ConversionState) -> ConversionState:
         # judging residue over them failed a clean Playwright file for the
         # Selenium still sitting in the file next door — twice, on a live run,
         # burning all three attempts each time.
-        ("compile", lambda: compile_check(files, carried=carried)),
+        ("compile", lambda: compile_check(files, others=others)),
         ("residue", lambda: residue_check(converted)),
         ("lint", lambda: lint_check(converted)),
         ("parity", lambda: parity_check({relative: state["source"]}, converted)),
@@ -567,7 +582,7 @@ def critic(state: ConversionState) -> ConversionState:
         )
         response = chain.invoke({
             "file_path": state["source_path"], "source": state["source"],
-            "context": state.get("context", ""),
+            "context": state.get("review_context", state.get("context", "")),
             "conversion": state["result"].model_dump_json(indent=2), "validation": evidence,
         })
         usage = response["raw"].usage_metadata

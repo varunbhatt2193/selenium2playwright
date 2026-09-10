@@ -191,14 +191,25 @@ def alias_paths(files: dict[str, str]) -> dict[str, list[str]]:
 
 
 def compile_check(files: dict[str, str], keep: bool = False,
-                  carried: Collection[str] = ()) -> ValidationReport:
+                  others: Collection[str] = ()) -> ValidationReport:
     """files = {relative path: contents}. Relative paths matter: tests import ../pages/X.
 
-    `carried` names the keys in `files` that are the folder's own untouched
-    source — companions handed to `tsc` so imports resolve, which this run
-    never claimed to have converted. Errors inside them are excused. Left
-    empty, every file here answers for itself, which is what the whole-tree
-    compile in `assemble` wants: nothing is a companion to a final report.
+    `others` names the keys in `files` that are not this conversion: the
+    companions handed to `tsc` so imports resolve. Errors *inside* one are
+    excused, whichever kind it is — the folder's own untouched Selenium, or a
+    file this run converted in an earlier wave. The first version excused
+    only the untouched kind, and a live run showed why that is not enough: a
+    cycle of five wrapper files converted blind, three of them with type
+    errors of their own, and every spec that imported the barrel then failed
+    its compile gate for nine findings in files it could not edit. The critic
+    read them exactly right and asked the spec to "restore green compilation
+    for the provided converted companion files", three laps in a row, the
+    one repair a single file's conversion cannot make. An error a companion
+    causes *in this file* — a missing export, a changed signature — still
+    lands in this file and still blocks. Left empty, every file here answers
+    for itself, which is what the whole-tree compile in `assemble` wants:
+    nothing is a companion to a final report, and that is where a converted
+    companion's own errors are counted.
     """
     if not TSC.exists():
         raise RuntimeError(f"{TSC} missing — run `npm install` inside sandbox/ first")
@@ -246,7 +257,7 @@ def compile_check(files: dict[str, str], keep: bool = False,
     # validator "with the intended target scope" instead of changing code.
     # Three attempts each, four files, nothing to show. This is that scope.
     known = set(files)
-    theirs = set(carried)
+    theirs = set(others)
 
     def not_ours(finding) -> bool:
         return finding.file in theirs or missing_dependency(finding, known)

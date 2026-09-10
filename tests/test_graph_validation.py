@@ -73,15 +73,34 @@ class GatesJudgeTheConvertedFileTests(unittest.TestCase):
         self.assertTrue(compile_report.passed, compile_report.render())
         self.assertTrue(compile_report.excused, "the error was dropped rather than excused")
 
-    def test_the_same_error_blocks_when_the_companion_was_converted(self):
-        """Without `carried_paths` nothing changes: a converted file is output."""
+    def test_an_error_inside_a_converted_companion_is_excused_too(self):
+        """A companion converted in an earlier wave is not this file's to fix either.
+
+        This used to assert the opposite. A live run on a wrapper repo showed
+        why that was wrong: a cycle of five files converted blind, three with
+        type errors of their own, and every spec importing the barrel failed
+        compile for nine findings in files it could not edit — three laps,
+        the critic asking the spec to repair `lib/conditions.ts`. The error is
+        still reported (excused, and counted by the whole-tree compile); it
+        just does not fail a file that did not write it.
+        """
         clean = ('import { Page } from "@playwright/test";\n'
                  "export default class Index {\n"
                  "  constructor(private readonly page: Page) {}\n"
                  "}\n")
         out = graph.validate(self.state(clean, "export const n: number = 'not a number';\n"))
         compile_report = next(r for r in out["validation"] if r.gate == "compile")
+        self.assertTrue(compile_report.passed, compile_report.render())
+        self.assertEqual([f.file for f in compile_report.excused], ["login.page.ts"])
+
+    def test_what_a_companion_breaks_in_this_file_still_blocks(self):
+        """Excusal is by location: the companion's missing export lands in Index.ts."""
+        uses_missing = ('import { Gone } from "./login.page";\n'
+                        "export default class Index { constructor(readonly g: Gone) {} }\n")
+        out = graph.validate(self.state(uses_missing, "export class Login {}\n"))
+        compile_report = next(r for r in out["validation"] if r.gate == "compile")
         self.assertFalse(compile_report.passed)
+        self.assertEqual({f.file for f in compile_report.findings}, {"Index.ts"})
 
     def test_a_carried_companion_never_excuses_the_converted_file(self):
         broken = "export const n: number = 'text';\n"

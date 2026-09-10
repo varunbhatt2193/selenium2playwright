@@ -241,7 +241,7 @@ class GatesNeverSeeEvidenceTests(unittest.TestCase):
     def test_the_compile_gate_is_handed_the_companions_and_nothing_else(self):
         seen = {}
 
-        def fake_compile(files, carried=()):
+        def fake_compile(files, others=()):
             seen["files"] = dict(files)
             from selenium2playwright.schemas import ValidationReport
             return ValidationReport(gate="compile", passed=True)
@@ -356,3 +356,102 @@ class ScannerVerdictTests(unittest.TestCase):
                 "waves": [["a.ts"]], "wave": 1, "root": str(Path(tmp) / "src"),
                 "out_root": str(Path(tmp) / "out"), "manifest": SimpleNamespace(files=files)})
             self.assertEqual(sends[0].arg["via"], "")
+
+
+class SuiteRelativeLabelTests(unittest.TestCase):
+    """Every file the prompt shows is named by its path inside the suite.
+
+    Shown two absolute paths — the source under one temp directory, the
+    converted companions under another — the model computed the relative path
+    between them and wrote `import … from '../../out/lib'` on a live run.
+    """
+
+    def setUp(self):
+        self.tmp = TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        base = Path(self.tmp.name)
+        self.root, self.out = base / "src", base / "out"
+        build(self.root, {"pages/Home.ts": "import { B } from '../lib';\n", "specs/a.spec.ts": "x", "lib/index.ts": "y"})
+        build(self.out, {"lib/index.ts": "export const converted = 1;\n", "support/h.ts": "h"})
+
+    def test_labels_are_suite_relative_and_the_prompt_says_so(self):
+        state = graph.intake({
+            "source_path": str(self.root / "pages/Home.ts"),
+            "output_path": str(self.out / "pages/Home.ts"),
+            "context_paths": [str(self.out / "lib/index.ts")],
+            "repo_paths": [str(self.root / "specs/a.spec.ts"), str(self.out / "support/h.ts")],
+            "caller_paths": [str(self.root / "specs/a.spec.ts")],
+            "pending_paths": [str(self.root / "specs/a.spec.ts")],
+            "carried_paths": [str(self.out / "support/h.ts")],
+            "suite_roots": [str(self.root), str(self.out)],
+            "via": "lib/index.ts"})
+        text = state["context"]
+        self.assertIn('<converted_file path="lib/index.ts">', text)
+        self.assertIn('<caller_file path="specs/a.spec.ts" status="pending">', text)
+        self.assertIn('<suite_file path="support/h.ts" status="unconverted">', text)
+        self.assertNotIn(self.tmp.name, text)
+        self.assertTrue(text.startswith("Paths below are relative to the suite root."))
+
+    def test_without_roots_labels_are_the_absolute_paths_they_always_were(self):
+        companion = self.out / "lib/index.ts"
+        state = graph.intake({"source_path": str(self.root / "pages/Home.ts"),
+                              "context_paths": [str(companion)]})
+        self.assertEqual(state["context"], format_context([companion]))
+        self.assertIn(f'<converted_file path="{companion}">', state["context"])
+        self.assertNotIn("relative to the suite root", state["context"])
+
+    def test_dispatch_sends_both_roots(self):
+        files = [SimpleNamespace(path="pages/Home.ts", action="convert", imports=())]
+        sends = suite_graph.dispatch({
+            "waves": [["pages/Home.ts"]], "wave": 1, "root": str(self.root),
+            "out_root": str(self.out), "manifest": SimpleNamespace(files=files)})
+        self.assertEqual(sends[0].arg["suite_roots"], [str(self.root), str(self.out)])
+
+
+class CriticSeesNoEvidenceTests(unittest.TestCase):
+    """The evidence informs the writer; the reviewer judges the file as before."""
+
+    def test_intake_keeps_a_review_context_without_the_suite_evidence(self):
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            build(base, {"src/pages/Home.ts": "x", "src/specs/a.spec.ts": "caller", "out/lib/i.ts": "done"})
+            state = graph.intake({
+                "source_path": str(base / "src/pages/Home.ts"),
+                "context_paths": [str(base / "out/lib/i.ts")],
+                "repo_paths": [str(base / "src/specs/a.spec.ts")],
+                "caller_paths": [str(base / "src/specs/a.spec.ts")],
+                "pending_paths": [str(base / "src/specs/a.spec.ts")],
+                "suite_roots": [str(base / "src"), str(base / "out")]})
+            self.assertIn("<caller_file", state["context"])
+            self.assertNotIn("<caller_file", state["review_context"])
+            self.assertIn('<converted_file path="lib/i.ts">', state["review_context"])
+            alone = graph.intake({"source_path": str(base / "src/pages/Home.ts"),
+                                  "context_paths": [str(base / "out/lib/i.ts")]})
+            self.assertEqual(alone["review_context"], alone["context"])
+
+    def test_the_critic_is_handed_the_review_context(self):
+        from unittest.mock import Mock
+        from langchain_core.messages import AIMessage
+        from langchain_core.runnables import RunnableLambda
+        from selenium2playwright.schemas import Critique
+        seen: list = []
+
+        def structured(schema, **kwargs):
+            def reply(prompt):
+                seen.append(prompt)
+                return {"parsed": Critique(verdict="pass", fixes=[]), "raw": AIMessage(content=""),
+                        "parsing_error": None}
+            return RunnableLambda(reply)
+
+        model = Mock()
+        model.with_structured_output.side_effect = structured
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-ant-offline-test"}), \
+                patch.object(graph, "make_model", return_value=model):
+            out = graph.critic({"source_path": "a.ts", "source": "s", "context": "ACTOR-ONLY-TEXT",
+                                "review_context": "REVIEW-ONLY-TEXT",
+                                "result": ConversionResult(code="export {};\n"), "validation": [],
+                                "models": {}})
+        self.assertEqual(out.get("critique_error"), "")
+        text = "\n".join(str(getattr(m, "content", m)) for m in seen[0])
+        self.assertIn("REVIEW-ONLY-TEXT", text)
+        self.assertNotIn("ACTOR-ONLY-TEXT", text)

@@ -330,30 +330,62 @@ SUITE_HEADER = (
 )
 
 
-def format_repo(repo: RepoEvidence) -> list[str]:
+def shown(path: str | Path, roots: Collection[str] = ()) -> str:
+    """The name a file is given in the prompt: its path inside the suite, when known.
+
+    A suite run holds two trees — the source it was given and the output it
+    is writing — and every file shown to the model lives in one of them. Shown
+    by absolute path, `/…/src/specs/spec.ts` next to `/…/out/lib/index.ts`,
+    the model did the arithmetic and wrote `import … from '../../out/lib'`:
+    a spec that could never compile, on a live run, three laps in a row.
+    Named by the path both trees share — `lib/index.ts` — there is nothing
+    to compute. With no roots (single-file mode) the absolute path is shown,
+    exactly as it always was.
+    """
+    text = str(path)
+    resolved = str(Path(text).resolve())
+    for root in roots:
+        base = str(Path(root).resolve())
+        for candidate in (text, resolved):
+            if candidate.startswith(base + os.sep):
+                return candidate[len(base) + 1:].replace(os.sep, "/")
+    return text
+
+
+PATHS_NOTE = (
+    "Paths below are relative to the suite root. Import other files exactly "
+    "the way the original file does — the same specifiers, never a path "
+    "computed from these labels.\n\n"
+)
+
+
+def format_repo(repo: RepoEvidence, roots: Collection[str] = ()) -> list[str]:
     """The evidence sections: callers, the rest of the suite, what was left out."""
     sections = []
     callers = [p for p in repo.contents if p in repo.callers]
     others = [p for p in repo.contents if p not in repo.callers]
     if callers:
         sections.append(CALLERS_HEADER + "\n\n".join(
-            f'<caller_file path="{p}" status="{repo.status(p)}">\n{repo.contents[p]}\n</caller_file>'
+            f'<caller_file path="{shown(p, roots)}" status="{repo.status(p)}">\n'
+            f'{repo.contents[p]}\n</caller_file>'
             for p in callers))
     if others:
         sections.append(SUITE_HEADER + "\n\n".join(
-            f'<suite_file path="{p}" status="{repo.status(p)}">\n{repo.contents[p]}\n</suite_file>'
+            f'<suite_file path="{shown(p, roots)}" status="{repo.status(p)}">\n'
+            f'{repo.contents[p]}\n</suite_file>'
             for p in others))
     if repo.omitted:
         n = len(repo.omitted)
         sections.append(
             f"{n} further file{'s' if n != 1 else ''} in the suite "
             f"{'were' if n != 1 else 'was'} left out for size: "
-            + ", ".join(f"{p} ({-(-size // 1024)} KB)" for p, size in repo.omitted) + ".")
+            + ", ".join(f"{shown(p, roots)} ({-(-size // 1024)} KB)" for p, size in repo.omitted) + ".")
     return sections
 
 
 def format_context(files: list[Path], contents: dict[str, str] | None = None,
-                   carried: Collection[str] = (), repo: RepoEvidence | None = None) -> str:
+                   carried: Collection[str] = (), repo: RepoEvidence | None = None,
+                   roots: Collection[str] = ()) -> str:
     """Companion files (e.g. the POM a test imports), in three honest groups.
 
     Suite mode (Phase 9) converts page objects first, then tests — the test
@@ -377,7 +409,9 @@ def format_context(files: list[Path], contents: dict[str, str] | None = None,
 
     `repo` is the rest of the suite (see `RepoEvidence`), rendered after the
     companions. None — every single-file run, every eval row — leaves the text
-    byte-identical to what it was before the suite could send it.
+    byte-identical to what it was before the suite could send it. `roots` are
+    the suite's source and output trees; given, every file is labelled by its
+    path inside the suite (`shown`) and a note says so.
     """
     if not files and repo is None:
         return ""
@@ -389,12 +423,14 @@ def format_context(files: list[Path], contents: dict[str, str] | None = None,
     done = [f for f in code if str(f.resolve()) not in carried_paths]
     left = [f for f in code if str(f.resolve()) in carried_paths]
     sections = []
+    if roots and (files or (repo is not None and (repo.contents or repo.omitted))):
+        sections.append(PATHS_NOTE.rstrip("\n"))
     if done:
         sections.append(
             "These companion files are ALREADY converted to Playwright. Import from "
             "them and use their exported API exactly as written:\n\n"
             + "\n\n".join(
-                f'<converted_file path="{f}">\n{contents[str(f.resolve())]}\n</converted_file>'
+                f'<converted_file path="{shown(f, roots)}">\n{contents[str(f.resolve())]}\n</converted_file>'
                 for f in done)
         )
     if left:
@@ -405,7 +441,7 @@ def format_context(files: list[Path], contents: dict[str, str] | None = None,
             "compile errors inside them are expected and must not be reported "
             "as defects or repaired:\n\n"
             + "\n\n".join(
-                f'<unconverted_file path="{f}">\n{contents[str(f.resolve())]}\n</unconverted_file>'
+                f'<unconverted_file path="{shown(f, roots)}">\n{contents[str(f.resolve())]}\n</unconverted_file>'
                 for f in left)
         )
     if data:
@@ -414,11 +450,11 @@ def format_context(files: list[Path], contents: dict[str, str] | None = None,
             "they are unchanged and stay unchanged. Read them for the shape of "
             "the values, and keep importing them exactly as the original did:\n\n"
             + "\n\n".join(
-                f'<data_file path="{f}">\n{contents[str(f.resolve())]}\n</data_file>'
+                f'<data_file path="{shown(f, roots)}">\n{contents[str(f.resolve())]}\n</data_file>'
                 for f in data)
         )
     if repo is not None:
-        sections += format_repo(repo)
+        sections += format_repo(repo, roots)
     if not sections:
         return ""
     return "\n\n".join(sections) + "\n\n"

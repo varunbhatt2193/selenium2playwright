@@ -292,26 +292,26 @@ class CarriedCompanionTests(unittest.TestCase):
         self.assertTrue(any(f.file == "lib/index.ts" for f in report.findings))
 
     def test_naming_it_carried_excuses_it(self):
-        report = compile_check(self.TREE, carried={"lib/index.ts"})
+        report = compile_check(self.TREE, others={"lib/index.ts"})
         self.assertTrue(report.passed, report.render())
         self.assertEqual([], report.findings)
         self.assertTrue(any(f.file == "lib/index.ts" for f in report.excused))
 
     def test_the_critic_is_not_shown_work_it_cannot_do(self):
-        rendered = compile_check(self.TREE, carried={"lib/index.ts"}).render()
+        rendered = compile_check(self.TREE, others={"lib/index.ts"}).render()
         self.assertIn("compile: passed", rendered)
         self.assertNotIn("lib/index.ts", rendered)
 
     def test_the_converted_file_is_never_excused_by_its_neighbours(self):
         """Carrying a companion must not turn the gate off for the target."""
         broken = self.TREE | {"pages/Login.ts": "export const n: number = 'text';\n"}
-        report = compile_check(broken, carried={"lib/index.ts"})
+        report = compile_check(broken, others={"lib/index.ts"})
         self.assertFalse(report.passed)
         self.assertEqual(["pages/Login.ts"], [f.file for f in report.findings])
 
     def test_a_companion_that_was_converted_still_answers_for_itself(self):
         """Only *carried* companions are excused — a converted one is output."""
-        report = compile_check(self.TREE, carried=set())
+        report = compile_check(self.TREE, others=set())
         self.assertFalse(report.passed)
         self.assertTrue(any(f.file == "lib/index.ts" for f in report.findings))
 
