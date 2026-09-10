@@ -155,8 +155,9 @@ class ServerFilesystemTests(unittest.TestCase):
         self.assertTrue(run(guard.guard_run(VISITOR, body)))
 
     def test_every_path_shaped_input_is_refused(self):
-        for field in ("context_paths", "output_path", "root", "out_root"):
-            value = ["/etc"] if field == "context_paths" else "/etc"
+        lists = ("context_paths", "repo_paths", "caller_paths", "pending_paths")
+        for field in (*lists, "output_path", "root", "out_root"):
+            value = ["/etc"] if field in lists else "/etc"
             with self.assertRaises(Auth.exceptions.HTTPException) as caught:
                 run(guard.guard_run(VISITOR, run_body(source_text="x", **{field: value})))
             self.assertEqual(caught.exception.status_code, 403, field)

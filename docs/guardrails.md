@@ -81,6 +81,7 @@ Refused, by field, each with the reason in the 403 body:
 | field | why |
 | --- | --- |
 | `context_paths` | reads files on the server |
+| `repo_paths`, `caller_paths`, `pending_paths` | read files on the server; the suite graph builds them itself from a `source_tree` |
 | `output_path` | writes a file on the server |
 | `remember` | writes to shared long-term memory |
 | `root`, `out_root` | the suite graph's server-side directories |

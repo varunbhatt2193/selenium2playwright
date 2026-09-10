@@ -203,6 +203,31 @@ limit: **a wave is only as fast as its slowest file.**
 * **Long-term memory is shared, not per file.** One store, opened once, passed
   to every branch. Preferences you taught it apply across the suite.
 
+### The rest of the suite travels too — as evidence, never as a gate input
+
+Since 11.3b a job carries three more lists beside `context_paths`:
+`repo_paths`, `caller_paths` and `pending_paths` (`repo_evidence` in
+`suite_graph.py`). They are every other file the output tree will hold — read
+from the output tree when it is already there, from the source tree when it is
+still to be converted — ordered by how much they can tell this conversion:
+the files that **import** the target first (T13: a page object cannot guess
+the name its caller will use, so show it the caller), then the siblings
+converted earlier in this run (the tenth page object should be converted the
+way the first nine were), then the files still pending, then the copied
+helpers. A file the plan skips is in neither tree and is not sent.
+
+The single-file graph reads them at `intake` into `repo_files`, cuts them to
+`S2P_REPO_CONTEXT_BYTES` (128 KB by default, 32 KB per file, `0` switches the
+evidence off without a deploy), and `format_context` renders them after the
+companions under `<caller_file>` and `<suite_file status="…">`, each section
+telling the model that nothing inside is its task or its defect to report.
+What it never does is hand one to a validator: `validate` reads
+`context_files` only, so the compile gate sees exactly what it saw before and
+every T14 fix stands. `tests/test_repo_context.py` pins both halves — what
+each job is handed, and that a repo file which cannot compile does not reach
+the gate. With no evidence sent, the prompt is byte-identical to before, which
+is what keeps single-file mode and every eval row where they were.
+
 ## 8. What this step is *not*
 
 The output tree is written and each file is validated **on its own**. Not here:

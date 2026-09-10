@@ -79,6 +79,12 @@ DEMO = "demo"
 # careful.
 FORBIDDEN_INPUTS = {
     "context_paths": "reads files on the server; send them as context_text instead",
+    # The suite graph's evidence lists (11.3b) are paths too. A visitor's suite
+    # arrives as `source_tree`, and `dispatch` builds these from the workspace
+    # it wrote; there is no honest reason for a request to carry them.
+    "repo_paths": "reads files on the server; a suite is sent as source_tree instead",
+    "caller_paths": "reads files on the server; a suite is sent as source_tree instead",
+    "pending_paths": "reads files on the server; a suite is sent as source_tree instead",
     "output_path": "writes a file on the server",
     "remember": "writes to shared long-term memory",
     "root": "belongs to the suite graph, which reads server-side directories",

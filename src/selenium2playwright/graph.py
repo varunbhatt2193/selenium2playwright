@@ -62,8 +62,9 @@ from selenium2playwright import env, risk
 from selenium2playwright import store as memory_store
 from selenium2playwright.classify import Classification, classify
 from selenium2playwright.llm import make_model, prepare_messages, structured_kwargs
-from selenium2playwright.prompts import (build_critic_prompt, build_prompt, format_context,
-                                         format_conventions, format_decisions, format_remembered)
+from selenium2playwright.prompts import (RepoEvidence, bound, build_critic_prompt, build_prompt,
+                                         format_context, format_conventions, format_decisions,
+                                         format_remembered, repo_budget)
 from selenium2playwright.reflection import (MAX_ATTEMPTS, collect_todos, refinement_feedback,
                                             resolve_attempt_cap, revision_feedback, sum_usage)
 from selenium2playwright.schemas import ConversionReport, ConversionResult, Critique, Finding, ValidationReport
@@ -124,6 +125,18 @@ class ConversionState(TypedDict, total=False):
     # They are sent anyway so imports resolve; this is what stops the prompt
     # and the critic from treating raw Selenium as the API to match.
     carried_paths: list[str]
+    # 11.3b — the rest of the suite, as reading material and nothing else. A
+    # suite run sends every other file in its output tree here, most relevant
+    # first; `intake` reads them into `repo_files` and the prompt shows them.
+    # No gate is ever handed one: `validate` reads `context_files` only, so a
+    # file nobody converted cannot fail a file somebody did. `caller_paths` are
+    # the ones that import the target (T13); `pending_paths` are scheduled for
+    # conversion later in this run and still the original Selenium; anything
+    # in `carried_paths` was copied across unconverted. All optional, all empty
+    # in single-file mode, where the prompt is then byte-identical to before.
+    repo_paths: list[str]
+    caller_paths: list[str]
+    pending_paths: list[str]
     # step 10.2 — the same two inputs, sent as text instead of as paths. A
     # deployed server has none of the caller's files, so a path is a promise it
     # cannot keep; these are how a paste box, an HTTP client or Studio hands the
@@ -145,6 +158,8 @@ class ConversionState(TypedDict, total=False):
     source: str  # the Selenium file contents
     context: str  # already-converted companions, formatted for the prompt ("" if none)
     context_files: dict[str, str]  # absolute companion path -> contents captured at intake
+    repo_files: dict[str, str]  # the suite evidence actually shown, path -> contents; {} if none
+    repo_omitted: list[tuple[str, int]]  # evidence the budget left out, with sizes
     classification: Classification  # what the file is, and whether we can convert it
     models: dict[str, str]  # the actor and critic this turn resolved to (step 8.2)
     risks: list[risk.Risk]  # patterns with more than one correct conversion (step 7.2)
@@ -221,6 +236,28 @@ def read_inputs(state: ConversionState) -> tuple[str, str, list[Path], dict[str,
     return source, name, paths, contents
 
 
+def read_repo(state: ConversionState) -> RepoEvidence | None:
+    """The rest of the suite, read off disk and cut to budget; None when none was sent.
+
+    Read here, at intake, for the same reason the companions are: the prompt
+    and the trace must show the bytes this run actually saw, even if the file
+    on disk changes while the run is in flight. Keyed by resolved path like
+    `context_files`, so the two dictionaries can never disagree about a file.
+
+    A budget of 0 (`S2P_REPO_CONTEXT_BYTES=0`) is "off": nothing is read and
+    the prompt is what it was before the suite could send evidence at all.
+    """
+    paths = [Path(p) for p in state.get("repo_paths") or []]
+    if not paths or repo_budget() <= 0:
+        return None
+    contents = {str(p.resolve()): p.read_text(encoding="utf-8", errors="replace") for p in paths}
+    kept, omitted = bound(contents)
+    resolved = lambda key: frozenset(str(Path(p).resolve()) for p in state.get(key) or ())  # noqa: E731
+    return RepoEvidence(contents=kept, callers=resolved("caller_paths"),
+                        pending=resolved("pending_paths"), carried=resolved("carried_paths"),
+                        omitted=omitted)
+
+
 def oversized(source: str) -> Classification | None:
     """A refusal for a file too big to be one request, or None to carry on.
 
@@ -268,14 +305,17 @@ def intake(state: ConversionState, runtime: Runtime[RunSettings] | None = None) 
     run = settings(runtime)
     cap = run.max_attempts if run.max_attempts is not None else state.get("max_attempts")
     source, name, paths, context_files = read_inputs(state)
+    repo = read_repo(state)
     context = format_context(paths, contents=context_files,
-                             carried=state.get("carried_paths") or ())
+                             carried=state.get("carried_paths") or (), repo=repo)
     previous = state.get("report")
     conventions = list(state.get("conventions", []))
     refinement = (state.get("refinement") or "").strip()
     if refinement and refinement not in conventions:
         conventions.append(refinement)
     return {"source": source, "context": context, "context_files": context_files,
+            "repo_files": repo.contents if repo else {},
+            "repo_omitted": list(repo.omitted) if repo else [],
             # source_path is written back because a paste may not have carried
             # one, and everything downstream — the scorecard title, the recall
             # query, the report — asks the state for the file's name.

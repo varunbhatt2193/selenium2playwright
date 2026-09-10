@@ -9,7 +9,9 @@ so this file is pure LangChain and knows nothing about vendors.
 
 from __future__ import annotations
 
+import os
 from collections.abc import Collection
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -217,8 +219,137 @@ def build_critic_prompt(conventions: str = "", decisions: str = "",
     return ChatPromptTemplate.from_messages(messages)
 
 
+# --- the rest of the suite, as reading material -------------------------------
+#
+# A companion is a file the target imports: the compile gate needs it, and the
+# prompt shows it. Everything else in the suite is *evidence* — the files that
+# import the target (T13: a page object cannot guess the name its caller will
+# use), the siblings already converted in this run (the conventions to match),
+# the rest of the tree (base classes, helpers, how the suite is put together).
+# It reaches the prompt and nothing else: no gate ever reads it, which is what
+# keeps every T14 fix intact — an error in a file nobody converted cannot be
+# blamed on a conversion, because no validator was ever handed that file.
+#
+# It is bounded, because "the whole repository" once included a 384 KB
+# generated bundle under `reports/` that no conversion could use. Files arrive
+# most relevant first — callers, then converted siblings, then the rest — so
+# what a small budget drops is the tail, and the prompt names what it dropped.
+
+# The whole budget, in bytes of source, for one conversion's evidence. 0 turns
+# the evidence off without a deploy, which matters because a deploy strands
+# runs in flight. Read at call time so a test, or a running process handed a
+# new value, sees it.
+REPO_CONTEXT_ENV = "S2P_REPO_CONTEXT_BYTES"
+DEFAULT_REPO_CONTEXT_BYTES = 128 * 1024
+
+# No single file is worth more than this. A real page object is under 10 KB;
+# anything past this is a bundle, a fixture that should have been JSON, or
+# generated code, and none of those are conventions to match.
+REPO_FILE_BYTES = 32 * 1024
+
+
+def repo_budget() -> int:
+    """Bytes of suite evidence one conversion may be shown; 0 means none."""
+    raw = os.environ.get(REPO_CONTEXT_ENV, "")
+    return int(raw) if raw.strip() else DEFAULT_REPO_CONTEXT_BYTES
+
+
+@dataclass(frozen=True)
+class RepoEvidence:
+    """The rest of the suite, read for one conversion. Prompt-only, by construction.
+
+    `contents` is what is shown, keyed by absolute path, in the order it should
+    be read. The three sets say what each file is: a `caller` imports the
+    target; a `pending` file is scheduled for conversion later in this run and
+    is still the original Selenium; a `carried` file is the folder's untouched
+    source, copied across because there is nothing in it to convert. A file in
+    none of them was converted earlier in this run. `omitted` names what the
+    budget left out, with sizes, so the prompt can say so instead of hiding it.
+    """
+
+    contents: dict[str, str]
+    callers: frozenset[str] = field(default_factory=frozenset)
+    pending: frozenset[str] = field(default_factory=frozenset)
+    carried: frozenset[str] = field(default_factory=frozenset)
+    omitted: tuple[tuple[str, int], ...] = ()
+
+    def status(self, path: str) -> str:
+        if path in self.pending:
+            return "pending"
+        if path in self.carried:
+            return "unconverted"
+        return "converted"
+
+
+def bound(contents: dict[str, str], budget: int | None = None,
+          ceiling: int = REPO_FILE_BYTES) -> tuple[dict[str, str], tuple[tuple[str, int], ...]]:
+    """Keep files in the order given until the budget is spent; name the rest.
+
+    Order is the caller's relevance order, so a budget too small for the whole
+    suite drops the least relevant files, never the callers. A file over the
+    per-file ceiling is left out whatever the budget, and does not spend it.
+    """
+    budget = repo_budget() if budget is None else budget
+    kept: dict[str, str] = {}
+    omitted: list[tuple[str, int]] = []
+    spent = 0
+    for path, text in contents.items():
+        size = len(text.encode("utf-8"))
+        if size > ceiling or spent + size > budget:
+            omitted.append((path, size))
+            continue
+        kept[path] = text
+        spent += size
+    return kept, tuple(omitted)
+
+
+CALLERS_HEADER = (
+    "These files IMPORT the file being converted. They are still the original "
+    "Selenium and will be converted LATER in this run, against the file you "
+    "produce. Read them for which exported names, members and signatures are "
+    "relied on, and keep those names stable wherever the playbook allows. Where "
+    "the playbook requires a signature to change — a WebDriver parameter becoming "
+    "a Page, a decorated field becoming a Locator getter — make the change and "
+    "record it in notes, so the caller's conversion can follow. Do not convert "
+    "them, do not report their Selenium as a defect, and do not invent members "
+    "for them:\n\n"
+)
+
+SUITE_HEADER = (
+    "The rest of the suite, for orientation only: base classes, shared helpers, "
+    "naming conventions, and how files already converted in this run were done. "
+    "Each is tagged. converted: Playwright produced earlier in this run — match "
+    "its conventions, and import from it rather than re-implementing it. pending: "
+    "original Selenium, converted later in this run. unconverted: original source "
+    "carried across unchanged, not the target API. Nothing here is the task, and "
+    "nothing inside these files is a defect to report or repair:\n\n"
+)
+
+
+def format_repo(repo: RepoEvidence) -> list[str]:
+    """The evidence sections: callers, the rest of the suite, what was left out."""
+    sections = []
+    callers = [p for p in repo.contents if p in repo.callers]
+    others = [p for p in repo.contents if p not in repo.callers]
+    if callers:
+        sections.append(CALLERS_HEADER + "\n\n".join(
+            f'<caller_file path="{p}" status="{repo.status(p)}">\n{repo.contents[p]}\n</caller_file>'
+            for p in callers))
+    if others:
+        sections.append(SUITE_HEADER + "\n\n".join(
+            f'<suite_file path="{p}" status="{repo.status(p)}">\n{repo.contents[p]}\n</suite_file>'
+            for p in others))
+    if repo.omitted:
+        n = len(repo.omitted)
+        sections.append(
+            f"{n} further file{'s' if n != 1 else ''} in the suite "
+            f"{'were' if n != 1 else 'was'} left out for size: "
+            + ", ".join(f"{p} ({-(-size // 1024)} KB)" for p, size in repo.omitted) + ".")
+    return sections
+
+
 def format_context(files: list[Path], contents: dict[str, str] | None = None,
-                   carried: Collection[str] = ()) -> str:
+                   carried: Collection[str] = (), repo: RepoEvidence | None = None) -> str:
     """Companion files (e.g. the POM a test imports), in three honest groups.
 
     Suite mode (Phase 9) converts page objects first, then tests — the test
@@ -239,8 +370,12 @@ def format_context(files: list[Path], contents: dict[str, str] | None = None,
     Fixtures are the third group. A `.json` of test data is neither converted
     nor unconverted — there is nothing in it to convert — so it gets its own
     label rather than being filed under either lie.
+
+    `repo` is the rest of the suite (see `RepoEvidence`), rendered after the
+    companions. None — every single-file run, every eval row — leaves the text
+    byte-identical to what it was before the suite could send it.
     """
-    if not files:
+    if not files and repo is None:
         return ""
     if contents is None:
         contents = {str(f.resolve()): f.read_text(encoding="utf-8") for f in files}
@@ -278,4 +413,8 @@ def format_context(files: list[Path], contents: dict[str, str] | None = None,
                 f'<data_file path="{f}">\n{contents[str(f.resolve())]}\n</data_file>'
                 for f in data)
         )
+    if repo is not None:
+        sections += format_repo(repo)
+    if not sections:
+        return ""
     return "\n\n".join(sections) + "\n\n"

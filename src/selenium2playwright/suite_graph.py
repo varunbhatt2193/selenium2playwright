@@ -149,7 +149,11 @@ class FileJob(TypedDict, total=False):
     source_path: str
     output_path: str
     context_paths: list[str]
-    carried_paths: list[str]  # the subset of context_paths that is still Selenium
+    carried_paths: list[str]  # every path in this job that is the folder's untouched source
+    # The rest of the suite, for the prompt and nothing else — see `repo_evidence`.
+    repo_paths: list[str]
+    caller_paths: list[str]
+    pending_paths: list[str]
 
 
 class SuiteState(TypedDict, total=False):
@@ -373,16 +377,63 @@ def dispatch(state: SuiteState) -> list[Send] | str:
         # introducing raw Selenium as the API to match.
         carried = {str(out_root / dep) for dep in deps
                    if getattr(by_path.get(dep), "action", suite.CONVERT) != suite.CONVERT}
+        # A companion that is missing is a dependency that failed to convert.
+        # Sending a path that is not there would crash intake; leaving it out
+        # converts this file without it, which 9.3's report will say out loud.
+        present = [p for p in companions if p.exists()]
+        evidence = repo_evidence(path, by_path, present, root, out_root)
         jobs.append(Send("convert_file", FileJob(
             path=path, wave=number, source_path=str(root / path),
             output_path=str(out_root / path),
-            # A companion that is missing is a dependency that failed to convert.
-            # Sending a path that is not there would crash intake; leaving it out
-            # converts this file without it, which 9.3's report will say out loud.
-            context_paths=[str(p) for p in companions if p.exists()],
-            carried_paths=[str(p) for p in companions if p.exists() and str(p) in carried],
+            context_paths=[str(p) for p in present],
+            carried_paths=[str(p) for p in present if str(p) in carried] + evidence.pop("carried"),
+            **evidence,
         )))
     return jobs
+
+
+def repo_evidence(path: str, by_path: dict, companions: list[Path],
+                  root: Path, out_root: Path) -> dict[str, list[str]]:
+    """Every other file the output tree will hold, as reading material for one job.
+
+    The companions are what the target imports, and the compile gate needs
+    them. This is everything else, and no gate ever sees it: the files that
+    import the target, so a page object can keep the member names its callers
+    use (T13); the siblings converted earlier in this run, so the tenth page
+    object is converted the way the first nine were; and the rest of the tree,
+    for the base classes and conventions a single file cannot show.
+
+    Each file is read from the output tree when it is there — converted in an
+    earlier wave, or copied across — and from the source tree when it is not,
+    which means it is still to be converted (`pending`). A file the plan skips
+    is not in either tree and is not here. Order is relevance, because the
+    prompt's byte budget keeps a prefix: direct callers first, then converted
+    siblings, then the files still to be converted, then the copied helpers,
+    each group by path. A companion that failed to convert is *not* excluded —
+    it is missing from `context_paths` for that reason — so the target can at
+    least see its original.
+    """
+    action = {p: getattr(f, "action", suite.CONVERT) for p, f in by_path.items()}
+    shown = {p.resolve() for p in companions}
+    others = [p for p in by_path if p != path and action[p] != suite.SKIP
+              and (out_root / p).resolve() not in shown and (root / p).resolve() not in shown]
+    callers = [p for p in others if p in set(getattr(by_path[path], "imported_by", ()) or ())]
+    converted = [p for p in others if action[p] == suite.CONVERT and (out_root / p).exists()]
+    rest = [p for p in others if p not in callers and p not in converted]
+    ordered = (callers + [p for p in converted if p not in callers]
+               + [p for p in rest if action[p] == suite.CONVERT]
+               + [p for p in rest if action[p] != suite.CONVERT])
+
+    def where(p: str) -> str:
+        return str(out_root / p if (out_root / p).exists() else root / p)
+
+    return {
+        "repo_paths": [where(p) for p in ordered],
+        "caller_paths": [where(p) for p in callers],
+        "pending_paths": [where(p) for p in ordered if action[p] == suite.CONVERT
+                          and not (out_root / p).exists()],
+        "carried": [where(p) for p in ordered if action[p] == suite.COPY],
+    }
 
 
 def convert_file(job: FileJob, runtime: Runtime[SuiteSettings] | None = None, *,
@@ -406,7 +457,11 @@ def convert_file(job: FileJob, runtime: Runtime[SuiteSettings] | None = None, *,
                                    max_attempts=run.max_attempts)
     inputs = {"source_path": job["source_path"], "output_path": job["output_path"],
               "context_paths": list(job.get("context_paths", [])),
-              "carried_paths": list(job.get("carried_paths", [])), "ask_risks": False}
+              "carried_paths": list(job.get("carried_paths", [])),
+              "repo_paths": list(job.get("repo_paths", [])),
+              "caller_paths": list(job.get("caller_paths", [])),
+              "pending_paths": list(job.get("pending_paths", [])),
+              "ask_risks": False}
     if run.user_id:
         inputs["user_id"] = run.user_id
     try:
