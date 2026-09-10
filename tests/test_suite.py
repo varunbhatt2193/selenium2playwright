@@ -296,20 +296,55 @@ class DataFixtures(unittest.TestCase):
         self.assertEqual(manifest.assets, ())
 
 
-class Cycles(unittest.TestCase):
-    """Two files importing each other have no valid order; say so, convert anyway."""
+SELENIUM = 'import { WebDriver } from "selenium-webdriver";\n'
 
-    def test_a_cycle_becomes_one_final_wave_with_a_note(self):
-        selenium = 'import { WebDriver } from "selenium-webdriver";\n'
+
+class Cycles(unittest.TestCase):
+    """Two files importing each other have no valid order; say so, convert anyway.
+
+    And convert everything *behind* them in its proper turn. The first planner
+    dumped every file a cycle blocked into one last wave, and on a real
+    repository — a `lib/` barrel re-exporting a file that imports the barrel
+    back — that was twelve of thirteen files converting blind, in parallel.
+    """
+
+    def test_a_cycle_converts_together_in_one_wave_with_a_note(self):
         with TemporaryDirectory() as tmp:
             root = build(Path(tmp), {
-                "pages/A.ts": selenium + 'import { B } from "./B";\nexport const A = B;\n',
-                "pages/B.ts": selenium + 'import { A } from "./A";\nexport const B = A;\n',
-                "pages/C.ts": selenium + "export const C = 1;\n",
+                "pages/A.ts": SELENIUM + 'import { B } from "./B";\nexport const A = B;\n',
+                "pages/B.ts": SELENIUM + 'import { A } from "./A";\nexport const B = A;\n',
+                "pages/C.ts": SELENIUM + "export const C = 1;\n",
             })
             manifest = suite.scan(root)
-        self.assertEqual(manifest.waves, (("pages/C.ts",), ("pages/A.ts", "pages/B.ts")))
-        self.assertIn("import cycle between pages/A.ts, pages/B.ts", manifest.notes[0])
+        # Nothing waits on anything outside the cycle, so all three are wave 1:
+        # the cycle is not held back, it is simply converted as one.
+        self.assertEqual(manifest.waves, (("pages/A.ts", "pages/B.ts", "pages/C.ts"),))
+        self.assertEqual(manifest.notes, (
+            "import cycle between pages/A.ts, pages/B.ts — converted together in wave 1, none first",))
+
+    def test_files_behind_a_cycle_still_wait_for_it(self):
+        manifest = suite.scan_sources({
+            "lib/index.ts": SELENIUM + "export * from './page';\n",
+            "lib/page.ts": SELENIUM + "import './index';\nexport class Page {}\n",
+            "pages/Home.ts": SELENIUM + "import { Page } from '../lib';\nexport class Home extends Page {}\n",
+            "specs/a.spec.ts": SELENIUM + "import { Home } from '../pages/Home';\nit('x', () => new Home());\n",
+            "lib/util.ts": SELENIUM + "export const u = 1;\n",
+        })
+        self.assertEqual(manifest.waves, (
+            ("lib/index.ts", "lib/page.ts", "lib/util.ts"),
+            ("pages/Home.ts",),
+            ("specs/a.spec.ts",),
+        ))
+        self.assertEqual(len(manifest.notes), 1)
+        self.assertIn("lib/index.ts, lib/page.ts", manifest.notes[0])
+
+    def test_two_cycles_are_two_notes_in_path_order(self):
+        manifest = suite.scan_sources({
+            "b1.ts": SELENIUM + "import './b2';\n", "b2.ts": SELENIUM + "import './b1';\n",
+            "a1.ts": SELENIUM + "import './a2';\n", "a2.ts": SELENIUM + "import './a1';\n",
+        })
+        self.assertEqual([n.split(" — ")[0] for n in manifest.notes],
+                         ["import cycle between a1.ts, a2.ts", "import cycle between b1.ts, b2.ts"])
 
 
 class CountingTests(unittest.TestCase):
@@ -373,7 +408,7 @@ class ManifestJson(unittest.TestCase):
         self.assertEqual(len(payload["waves"]), 2)
         first = payload["files"][0]
         self.assertEqual(set(first) - {"path", "kind", "action", "reason", "wave", "lines",
-                                       "language", "automation", "runner", "imports",
+                                       "language", "automation", "runner", "via", "imports",
                                        "imported_by", "external_imports", "data_imports"}, set())
         json.dumps(payload)  # no dataclasses left in it
 
@@ -488,3 +523,120 @@ class WholeSuiteOnlyTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# A repository that wraps WebDriver in its own `lib/`, the shape of
+# goenning/typescript-selenium-example: one file imports Selenium, the barrel
+# re-exports it, the page object imports the barrel, the spec imports the page
+# object. Read one file at a time, only the first is Selenium.
+WRAPPED = {
+    "lib/driver.ts": (
+        'import { Builder, WebDriver } from "selenium-webdriver";\n'
+        "export class Browser { driver: WebDriver = new Builder().build(); }\n"),
+    "lib/conditions.ts": (
+        'import { Browser } from "./driver";\n'
+        "export const visible = (b: Browser) => true;\n"),
+    "lib/index.ts": "export * from './driver';\nexport * from './conditions';\n",
+    "lib/bdd.ts": "export const when = (name: string, fn: () => void) => describe(name, fn);\n",
+    "pages/HomePage.ts": (
+        "import { Browser } from '../lib';\n"
+        "export class HomePage { constructor(public browser: Browser) {} }\n"),
+    "specs/home.spec.ts": (
+        "import { HomePage } from '../pages/HomePage';\n"
+        "import { when } from '../lib/bdd';\n"
+        "when('home', () => { it('loads', () => new HomePage(null as any)); });\n"),
+    "config.ts": "export default { baseUrl: 'http://x' };\n",
+}
+
+
+class WrapperSuite(unittest.TestCase):
+    """A file that imports a Selenium file is Selenium, and so on up the imports.
+
+    Measured on the real repo this fixture is shaped after: 4 of 16 files import
+    selenium-webdriver, 13 of 16 reach it. Read alone, the nine in between were
+    "no recognised automation library", so they were copied across and sat in
+    the converted tree as Selenium — every page object, the spec, the barrel.
+    """
+
+    def setUp(self):
+        self.manifest = suite.scan_sources(WRAPPED)
+        self.by_path = {f.path: f for f in self.manifest.files}
+
+    def actions(self) -> dict[str, str]:
+        return {path: f.action for path, f in self.by_path.items()}
+
+    def test_everything_that_reaches_selenium_converts_and_nothing_else_does(self):
+        self.assertEqual(self.actions(), {
+            "lib/driver.ts": suite.CONVERT,  # imports it
+            "lib/conditions.ts": suite.CONVERT,  # imports the file that does
+            "lib/index.ts": suite.CONVERT,  # re-exports both
+            "pages/HomePage.ts": suite.CONVERT,  # imports the barrel
+            "specs/home.spec.ts": suite.CONVERT,  # imports the page object
+            "lib/bdd.ts": suite.COPY,  # a runner helper: imports nothing, reaches nothing
+            "config.ts": suite.COPY,
+        })
+        self.assertEqual(suite.conversions(WRAPPED), 5)
+
+    def test_a_flipped_file_says_which_import_made_it_selenium(self):
+        home = self.by_path["pages/HomePage.ts"]
+        self.assertEqual(home.kind, "page-object")
+        self.assertEqual(home.classification.automation, "selenium")
+        self.assertTrue(home.classification.supported)
+        self.assertEqual(home.classification.via, "lib/index.ts")
+        self.assertEqual(home.reason, "page object / helper driving Selenium through lib/index.ts")
+        spec = self.by_path["specs/home.spec.ts"]
+        self.assertEqual((spec.kind, spec.classification.via), ("test", "pages/HomePage.ts"))
+        self.assertEqual(spec.reason, "mocha test file driving Selenium through pages/HomePage.ts")
+        # A direct import keeps the wording it always had, and no `via`.
+        driver = self.by_path["lib/driver.ts"]
+        self.assertEqual((driver.classification.via, driver.reason),
+                         ("", "page object / helper driving Selenium"))
+
+    def test_a_flipped_test_file_has_its_cases_counted(self):
+        self.assertEqual(self.by_path["specs/home.spec.ts"].cases, 1)
+        self.assertEqual(suite.census(self.manifest.files)["tests"], 1)
+
+    def test_the_waves_run_up_the_import_chain(self):
+        wave = {p: f.wave for p, f in self.by_path.items()}
+        self.assertLess(wave["lib/driver.ts"], wave["lib/conditions.ts"])
+        self.assertLess(wave["lib/conditions.ts"], wave["lib/index.ts"])
+        self.assertLess(wave["lib/index.ts"], wave["pages/HomePage.ts"])
+        self.assertLess(wave["pages/HomePage.ts"], wave["specs/home.spec.ts"])
+        self.assertEqual((wave["lib/bdd.ts"], wave["config.ts"]), (0, 0))
+
+    def test_the_manifest_json_carries_the_path_it_was_reached_through(self):
+        rows = {row["path"]: row for row in suite.manifest_json(self.manifest)["files"]}
+        self.assertEqual(rows["pages/HomePage.ts"]["via"], "lib/index.ts")
+        self.assertEqual(rows["lib/driver.ts"]["via"], "")
+
+    def test_a_recognised_library_is_never_overridden(self):
+        """A Playwright spec that imports the Selenium wrapper is still Playwright."""
+        tree = WRAPPED | {"specs/new.spec.ts": (
+            'import { test } from "@playwright/test";\n'
+            "import { HomePage } from '../pages/HomePage';\n"
+            "test('x', () => new HomePage(null as any));\n")}
+        item = {f.path: f for f in suite.scan_sources(tree).files}["specs/new.spec.ts"]
+        self.assertEqual(item.action, suite.SKIP)
+        self.assertIn("already a Playwright file", item.reason)
+        self.assertEqual(item.classification.via, "")
+
+    def test_a_javascript_file_reaching_selenium_is_refused_like_a_direct_one(self):
+        """Same answer as a `.js` file that imports selenium-webdriver itself: not v1."""
+        tree = WRAPPED | {"legacy/old.js": "const { HomePage } = require('../pages/HomePage');\n"}
+        item = {f.path: f for f in suite.scan_sources(tree).files}["legacy/old.js"]
+        self.assertEqual(item.action, suite.SKIP)
+        self.assertEqual(item.classification.automation, "selenium")
+        self.assertIn("javascript source reaching Selenium through pages/HomePage.ts", item.reason)
+        self.assertIn("v1 converts TypeScript only", item.reason)
+
+    def test_a_cycle_of_helpers_that_never_reaches_selenium_terminates_and_stays_copied(self):
+        tree = {"a.ts": "import './b';\nexport const a = 1;\n",
+                "b.ts": "import './a';\nexport const b = 2;\n"}
+        manifest = suite.scan_sources(tree)
+        self.assertEqual({f.action for f in manifest.files}, {suite.COPY})
+
+    def test_the_sample_suite_is_unchanged(self):
+        """Every file there imports Selenium directly, so nothing has anything to flip."""
+        manifest = suite.scan(SAMPLE)
+        self.assertEqual({f.classification.via for f in manifest.files}, {""})
+        self.assertEqual(len(manifest.convertible), 12)

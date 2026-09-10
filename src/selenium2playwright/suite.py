@@ -7,7 +7,10 @@ Phase 9 does afterwards:
   * **What each file is.** A page object, a test, a plain helper with no
     automation in it at all, or something outside the MVP. Only the first two
     are worth a model call; a helper is copied across untouched; the rest are
-    refused by name, with the reason, rather than silently dropped.
+    refused by name, with the reason, rather than silently dropped. One file
+    alone cannot always say which it is: a page object in a repository that
+    wraps WebDriver in its own `lib/` imports the wrapper and never Selenium,
+    so it is the import graph, not the file, that settles it (`reaches_selenium`).
   * **What imports what.** `tests/login.spec.ts` imports `pages/LoginPage`, so
     the page object has to be converted first — and once it is, the converted
     page object is exactly the context the test's conversion needs (the graph
@@ -44,7 +47,7 @@ from fnmatch import fnmatch
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from selenium2playwright.classify import Classification, classify
+from selenium2playwright.classify import Classification, classify, through
 
 # Suffixes worth reading. Everything else in the tree (JSON, markdown, fixtures,
 # screenshots) is not source we convert, so it is not in the manifest at all.
@@ -263,9 +266,10 @@ def decide(classification: Classification) -> tuple[str, str, str]:
     this function exists.
     """
     if classification.supported:
+        via = f" through {classification.via}" if classification.via else ""
         if classification.runner == "none":
-            return "page-object", CONVERT, "page object / helper driving Selenium"
-        return "test", CONVERT, f"{classification.runner} test file"
+            return "page-object", CONVERT, f"page object / helper driving Selenium{via}"
+        return "test", CONVERT, f"{classification.runner} test file driving Selenium{via}"
     if classification.automation == "unknown":
         return ("support", COPY,
                 "no automation library in it; carried over to the converted suite unchanged")
@@ -280,27 +284,79 @@ def plan_waves(files: dict[str, SuiteFile]) -> tuple[tuple[tuple[str, ...], ...]
     dependency list; repeat. Only convertible files take part — a copied helper
     needs no conversion, so nothing waits on it.
 
-    A cycle (two files importing each other) has no valid order at all. Rather
-    than loop forever or drop the files, the rest go into one final wave with a
-    note saying so: they will convert, just without the guarantee that each one
-    sees its companion already converted.
+    A cycle (two files importing each other) has no valid order at all, and a
+    plain Kahn's stalls on one: nothing in the cycle is ever ready, so nothing
+    *behind* it is either. The first version of this put every stalled file in
+    one last wave, and on a real repository that was twelve of thirteen files.
+    Its wrapper `lib/` is a barrel that re-exports `page.ts`, which imports the
+    barrel back; every page object and every spec imports the barrel; so all of
+    them stalled together — one wave, all in parallel, none seeing a converted
+    companion. The wave plan's whole promise, given up over a two-file cycle.
+
+    So the layering runs over the cycles rather than the files. Each strongly
+    connected component — a file on its own, or a set of files that import each
+    other around — is one node; the components cannot form a cycle among
+    themselves, by definition; Kahn's runs on those. A cycle's members convert
+    together in one wave, which is the only order they can have, and the note
+    says so. Everything downstream of it waits its proper turn.
     """
-    pending = {p: {d for d in f.imports if files[d].action == CONVERT}
-               for p, f in files.items() if f.action == CONVERT}
+    convert = {p for p, f in files.items() if f.action == CONVERT}
+    edges = {p: sorted(d for d in files[p].imports if d in convert) for p in sorted(convert)}
+    components = strongly_connected(edges)
+    home = {p: c for c in components for p in c}
+    pending = {c: {home[d] for p in c for d in edges[p] if home[d] != c} for c in components}
     waves: list[tuple[str, ...]] = []
     notes: list[str] = []
     while pending:
-        ready = tuple(sorted(p for p, deps in pending.items() if not deps))
-        if not ready:  # every survivor is in or behind an import cycle
-            stuck = tuple(sorted(pending))
-            notes.append("import cycle between " + ", ".join(stuck) +
-                         " — converted together in the last wave, none first")
-            waves.append(stuck)
-            break
-        waves.append(ready)
+        ready = [c for c, deps in pending.items() if not deps]
+        waves.append(tuple(sorted(p for c in ready for p in c)))
+        for cycle in sorted((c for c in ready if len(c) > 1), key=min):
+            notes.append("import cycle between " + ", ".join(sorted(cycle))
+                         + f" — converted together in wave {len(waves)}, none first")
         done = set(ready)
-        pending = {p: deps - done for p, deps in pending.items() if p not in done}
+        pending = {c: deps - done for c, deps in pending.items() if c not in done}
     return tuple(waves), notes
+
+
+def strongly_connected(edges: dict[str, list[str]]) -> list[frozenset[str]]:
+    """Tarjan's algorithm: the sets of files that import each other around.
+
+    A file in no cycle is a component of one. Recursive, which is fine at the
+    sizes here — the depth is a suite's longest import chain, not its file
+    count — and deterministic: nodes and their imports are visited in sorted
+    order, so the same tree gives the same components, in the same order,
+    every time. A plan that is not reproducible is not one for a report.
+    """
+    index: dict[str, int] = {}
+    low: dict[str, int] = {}
+    stack: list[str] = []
+    on_stack: set[str] = set()
+    found: list[frozenset[str]] = []
+
+    def visit(node: str) -> None:
+        index[node] = low[node] = len(index)
+        stack.append(node)
+        on_stack.add(node)
+        for dep in edges.get(node, ()):
+            if dep not in index:
+                visit(dep)
+                low[node] = min(low[node], low[dep])
+            elif dep in on_stack:
+                low[node] = min(low[node], index[dep])
+        if low[node] == index[node]:  # `node` is the root of a component: pop it
+            members = []
+            while True:
+                top = stack.pop()
+                on_stack.discard(top)
+                members.append(top)
+                if top == node:
+                    break
+            found.append(frozenset(members))
+
+    for node in sorted(edges):
+        if node not in index:
+            visit(node)
+    return found
 
 
 def scan(root: Path) -> Manifest:
@@ -364,6 +420,8 @@ def scan_sources(sources: dict[str, str], root: str = "uploaded files") -> Manif
             cases=count_cases(source) if kind == "test" else 0,
         )
 
+    files = reaches_selenium(files, sources)
+
     # The reverse edge, filled in once every file is known: who is waiting on this one.
     for path in list(files):
         for target in files[path].imports:
@@ -378,6 +436,53 @@ def scan_sources(sources: dict[str, str], root: str = "uploaded files") -> Manif
     return Manifest(root=root, files=tuple(files[p] for p in sorted(files)),
                     waves=waves, notes=tuple(notes),
                     assets=tuple(sorted({a for f in files.values() for a in f.data_imports})))
+
+
+def reaches_selenium(files: dict[str, SuiteFile], sources: dict[str, str]) -> dict[str, SuiteFile]:
+    """Every file the first reading could not place, read again along its imports.
+
+    The rule is one sentence: a file that imports Selenium is Selenium, and so
+    is a file that imports *that* file. Applied until nothing changes, it turns
+    a wrapper repository's "4 Selenium files, 12 helpers" into the 13-file
+    Selenium suite it actually is, and every file it flips takes the path it
+    was reached through into its reason (`classify.through`).
+
+    Why this is here and not in classify(): classify() is a pure function of
+    one file's text, and this is a property of the folder. It is also why the
+    single-file command still refuses such a page object — handed the file
+    alone, "no recognised automation library" is the honest answer, and a
+    suite is the unit that can do better.
+
+    A fixed point rather than a walk: the graph may have cycles, and a cycle
+    of helpers that never reaches Selenium must terminate as quietly as one
+    that does. Paths are visited in sorted order so the file named as `via`
+    is the same on every run, which a report needs.
+
+    Only `automation == "unknown"` is revisited. A recognised library — Playwright,
+    Cypress — is a verdict about the file itself and importing a Selenium helper
+    does not change it; a language v1 does not convert stays refused, now with
+    the path in its reason, exactly as a direct import in that language would.
+    """
+    reached = {path for path, item in files.items()
+               if item.classification.automation == "selenium"}
+    changed = True
+    while changed:
+        changed = False
+        for path in sorted(files):
+            item = files[path]
+            if path in reached or item.classification.automation != "unknown":
+                continue
+            via = next((dep for dep in item.imports if dep in reached), None)
+            if via is None:
+                continue
+            classification = through(item.classification, via)
+            kind, action, reason = decide(classification)
+            files[path] = replace(item, kind=kind, action=action, reason=reason,
+                                  classification=classification,
+                                  cases=count_cases(sources[path]) if kind == "test" else 0)
+            reached.add(path)
+            changed = True
+    return files
 
 
 def selected(path: str, patterns: list[str]) -> bool:
@@ -443,6 +548,7 @@ def manifest_json(manifest: Manifest) -> dict:
             "language": f.classification.language,
             "automation": f.classification.automation,
             "runner": f.classification.runner,
+            "via": f.classification.via,
             "imports": list(f.imports), "imported_by": list(f.imported_by),
             "external_imports": list(f.external_imports),
             "data_imports": list(f.data_imports),

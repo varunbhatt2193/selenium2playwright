@@ -56,7 +56,10 @@ its inputs come from.
 
 The algorithm is Kahn's, written out in `plan_waves`: take everything with no
 outstanding dependency (that is a wave), remove it from everyone else's list,
-repeat.
+repeat. It runs over **strongly connected components** rather than over files
+(`strongly_connected`, Tarjan's algorithm), so an import cycle is one node of
+the layering: its members convert together, and the files behind it still wait
+their turn. See §6 for why that matters on a real repository.
 
 ## 3. Four kinds, three actions
 
@@ -202,10 +205,30 @@ Resolution does what TypeScript does: `"./BasePage"` is tried as `BasePage.ts`,
   drops `dist`, `out`, `coverage`, `playwright-report` and `.s2p` — build output
   and our own output are not input.
 * **An import cycle has no valid order.** Two page objects importing each other
-  cannot both go first. Rather than looping forever or dropping them,
-  `plan_waves` puts the whole cycle in one final wave and adds a note saying so:
-  they will convert, just without the guarantee that each sees the other
-  already converted. Honest beats clever.
+  cannot both go first. `plan_waves` converts the cycle's members together in
+  one wave — the only order they can have — and adds a note saying so: they
+  convert, just without the guarantee that each sees the other already
+  converted. The first version put every file a cycle *blocked* into one last
+  wave too, and on `goenning/typescript-selenium-example` that was twelve of
+  thirteen files: its `lib/index.ts` barrel re-exports `lib/page.ts`, which
+  imports the barrel back, and every page object and spec imports the barrel.
+  Layering over strongly connected components instead gives that repo five
+  waves — the decorator helper, the `lib/` cycle, one standalone page, the
+  `pages/` cycle, the two specs — and each wave sees the one before it converted.
+* **A file that never imports Selenium can still be a Selenium file.** A
+  repository that wraps WebDriver in its own `lib/` has page objects that
+  import `../lib` and nothing else; read alone, `classify()` calls that "no
+  recognised automation library", and in a folder that answer means *copy* —
+  so every page object was carried into the converted tree untouched. On that
+  same repo 4 of 16 files import `selenium-webdriver` and 13 of 16 reach it.
+  `reaches_selenium` re-reads every unplaced file along its imports until
+  nothing changes: a file that imports a Selenium file is Selenium, and its
+  reason names the path (`page object / helper driving Selenium through
+  lib/index.ts`; `via` in the manifest JSON). A recognised library is never
+  overridden — a Playwright spec importing the wrapper is still Playwright —
+  and a language v1 does not convert is refused exactly as a direct import in
+  that language would be. The single-file command still refuses such a page
+  object on its own, and rightly: alone, the honest answer is "no library here".
 * **A relative import that leaves the folder resolves to nothing.**
   `"../../shared/Base"` from a suite root is outside the suite; it is not an
   in-suite edge and it is not an external package either. It simply is not in

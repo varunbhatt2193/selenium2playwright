@@ -12,7 +12,7 @@ regex demonstrably misclassifies a real file (same policy as the validators).
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import PurePath
 
 # order matters: the first pattern that matches wins.
@@ -45,6 +45,10 @@ class Classification:
     language: str  # typescript | javascript | java | python | csharp | unknown
     supported: bool
     reason: str  # human-readable; shown to the user verbatim on refusal
+    # The in-suite file through which this one reaches Selenium when it has no
+    # selenium-webdriver import of its own (see `through`). "" for a file that
+    # imports Selenium directly, and for one that never reaches it at all.
+    via: str = ""
 
 
 def _first_match(signatures: list[tuple[str, str]], source: str) -> str:
@@ -73,3 +77,39 @@ def classify(source: str, path: str) -> Classification:
                               "(other Selenium languages are on the roadmap)")
     kind = "page object / helper" if runner == "none" else f"{runner} tests"
     return Classification(automation, runner, language, True, f"selenium-webdriver {kind} in TypeScript")
+
+
+def through(base: Classification, via: str) -> Classification:
+    """`base` read again, now that it is known to reach Selenium through `via`.
+
+    classify() sees one file alone, and alone is where it is wrong about a
+    repository that wraps WebDriver in its own abstraction layer. There, a page
+    object imports `../lib` and never `selenium-webdriver`, so on its own it
+    reads as "no recognised automation library" — and in a suite that answer
+    means *copy*, so it is carried into the converted tree untouched and sits
+    there as Selenium forever. Measured on one real repo: 4 of 16 files import
+    Selenium, 13 of 16 reach it; the nine in between were every page object,
+    the spec, and the barrel that imports the driver.
+
+    Only the suite scanner knows the import graph, so only it can say a file
+    reaches Selenium; this is the classification it says it with. The answer
+    is the one classify() would have given had the import been direct — same
+    kind, same language rule, same refusal for a language v1 does not convert —
+    with the path it was reached through kept, because "converted: page object
+    driving Selenium through lib/index.ts" is the line a reader of the report
+    needs and a bare "converted" is not.
+
+    A file whose library *was* recognised is left alone: a Playwright spec that
+    imports a Selenium helper is still a Playwright spec, and a Cypress one is
+    still refused as Cypress. Only "unknown" is a verdict this may revise.
+    """
+    if base.automation != "unknown":
+        return base
+    if base.language != "typescript":
+        return replace(base, automation="selenium", via=via,
+                       reason=f"{base.language} source reaching Selenium through {via}; "
+                              "v1 converts TypeScript only (other Selenium languages are "
+                              "on the roadmap)")
+    kind = "page object / helper" if base.runner == "none" else f"{base.runner} tests"
+    return Classification("selenium", base.runner, base.language, True,
+                          f"{kind} in TypeScript reaching Selenium through {via}", via=via)
