@@ -144,7 +144,15 @@ declare -a SECRETS=(
 # workspace it acts in (llm.py sends it as the anthropic-workspace-id header).
 # The skip list below is short and is about things the deployment defines for
 # itself, not about which providers we happen to use.
-SKIP="POSTGRES_URI DATABASE_URI REDIS_URI PORT S2P_SANDBOX LANGGRAPH_DEPLOYMENT_URL"
+# Anything app.toml's [env] block versions is never pushed from .env. A Fly
+# secret of the same name silently outranks the toml, and this loop is how a
+# "stale" S2P_DAILY_LIMIT secret came back after every deploy: .env carried
+# one, the toml said another, and the deploy made the secret win without
+# anyone typing `fly secrets set`. Found 2026-09-09, after the handoff had
+# recorded it unset. The toml is the versioned answer; keep it that way.
+VERSIONED="$(sed -n '/^\[env\]/,/^\[/p' "$HERE/app.toml" \
+  | sed -n 's/^ *\([A-Za-z_][A-Za-z0-9_]*\) *=.*/\1/p' | tr '\n' ' ')"
+SKIP="POSTGRES_URI DATABASE_URI REDIS_URI LANGGRAPH_DEPLOYMENT_URL $VERSIONED"
 while IFS= read -r KEY; do
   case " $SKIP " in *" $KEY "*) continue ;; esac
   VALUE="$(sed -n "s/^${KEY}=//p" .env | tail -1 | tr -d '"'"'"'' || true)"
