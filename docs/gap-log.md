@@ -310,3 +310,59 @@ report has no companions, every file in it answers for itself.
 blocking findings → **0**, `lib/ensure.ts` 2 → **0**, `tests/test.ts` 39 → 3,
 and those three are `describe`/`it` in the unconverted stand-in used as the
 target, which converted output does not contain.
+
+## Addendum 2026-09-09, later — measured on the same repo (T15)
+
+### T15 · One file alone cannot say whether it is Selenium
+`classify()` is a pure function of one file's text, and its Selenium test is
+an import of `selenium-webdriver`. A repository that wraps WebDriver in its
+own abstraction layer — `goenning/typescript-selenium-example` has a `lib/`
+with `Browser`, `WebComponent`, a `@findBy` decorator and an `ensure()`
+assertion helper — has page objects that import `../lib` and nothing else.
+Alone, each one reads as *"no recognised automation library"*, and in a
+suite that answer means **copy**. Measured: **4 of 16** files import
+Selenium, **13 of 16** reach it through imports. The nine in between were
+every page object, the spec, and the `lib/index.ts` barrel — carried into
+the converted tree untouched, sitting there as Selenium forever, and every
+T14 symptom was the tool being honest about a tree that should never have
+had them in it.
+
+What makes it a taxonomy entry: nothing in a single file distinguishes
+`pages/HomePage.ts` from `support/users.ts`. Both import in-suite files and
+no automation package. The difference is a property of the *graph*, and a
+classifier that reads files one at a time cannot have it. The single-file
+command still refuses such a page object, correctly — asked about the file
+alone, "no library here" is the true answer.
+
+*Gate:* `suite.reaches_selenium` re-reads every unplaced file along its
+in-suite imports to a fixed point: a file that imports a Selenium file is
+Selenium. Each flipped file names the path in its reason (`page object /
+helper driving Selenium through lib/index.ts`; `via` in the manifest JSON). A
+recognised library is never overridden — a Playwright spec that imports the
+wrapper stays Playwright — and a language v1 does not convert is refused as
+a direct import in that language would be. Measured with no model: goenning
+4 → 13 conversions, imranwijaya 6 → 16, webdriverjs-pom 3 → 5; sadabnepal and
+the sample suite unchanged, because every file there imports Selenium itself.
+
+The fix exposed a second, older defect in the planner: that repo's barrel
+re-exports `lib/page.ts`, which imports the barrel back, and a plain Kahn's
+stalls on a cycle *and on everything behind it* — twelve of thirteen files
+in one final wave, converting blind and in parallel. `plan_waves` now layers
+strongly connected components, so a cycle converts together and the files
+behind it wait their turn: one wave became five.
+
+### T14, one layer out (2026-09-09, later) · a *converted* companion's errors are not this file's either
+Same repo, after T15 made all thirteen files convert. The `lib/` cycle
+converted blind and three of its five files had type errors of their own;
+every spec that imports the barrel was then handed nine compile findings in
+files it could not edit, and the critic — reading them exactly right — asked
+the spec to *"restore green compilation for the provided converted companion
+files"*, three laps running. The first T14 fix excused errors by location
+only for companions the run *never converted*. The distinction does not
+matter to the file under review: it cannot edit a companion of either kind.
+
+*Gate:* `compile_check(files, others=…)` excuses an error inside any
+companion; what a companion breaks *in this file* (a missing export, a
+changed signature) lands in this file and still blocks. The whole-tree
+compile in `assemble` passes no `others` and counts every error, which is
+where a converted companion's own mistakes belong.

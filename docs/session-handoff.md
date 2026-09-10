@@ -16,6 +16,130 @@ page. **Four apps now** (`s2p`, `s2p-postgres`, `s2p-redis`, `varun-s2p`) ≈
 **$23/month**, flat and traffic-independent — a public link does not move it.
 Model spend is the only cost that responds to traffic, capped at ~$5/day.
 
+### 2026-09-09, second session — 11.3b: the whole repo as evidence, imports decide what is Selenium, waves around cycles
+
+Commits `1536cf0`, `e17fc4d`, `86a8ef4`, `081df5d`, `2d723b9`, `e6667bc`, and one
+more for the three follow-up fixes. Deployed: both apps, three times (last at
+`e6667bc`; the follow-ups are not deployed). 743 offline tests.
+
+**Varun's decision, restated:** give the model the entire repository. Built
+as **context, not output** — one file is still emitted per call, and every
+gate, the scorecard, the meter and the repair loop are untouched. The
+hosted page is not for whole suites; anyone who wants one clones the repo
+and runs it with their own key. Cost of verification was accepted up front.
+
+**What shipped, in the order it was built:**
+
+1. **`suite.reaches_selenium`** — a file that imports a Selenium file is
+   Selenium, to a fixed point. `Classification.via` names the path
+   (`page object / helper driving Selenium through lib/index.ts`; `via` in
+   the manifest JSON). goenning 4 → 13 conversions, imranwijaya 6 → 16,
+   webdriverjs-pom 3 → 5, sadabnepal and the sample suite unchanged.
+   `docs/gap-log.md` **T15**. Whole-repo context could never have done
+   this: it changes what the model *reads*, not which files get a call.
+2. **`plan_waves` over strongly connected components** (Tarjan, then Kahn).
+   The old planner dumped everything *behind* a cycle into one last wave;
+   goenning's `lib/index.ts` ↔ `lib/page.ts` cycle would have put twelve of
+   thirteen files in one blind, parallel wave. Now five waves, both cycles
+   named in the notes.
+3. **Suite evidence** (`suite_graph.repo_evidence`, `graph.read_repo`,
+   `prompts.RepoEvidence`): each job also carries `repo_paths` (most
+   relevant first: direct callers, converted siblings, pending files, copied
+   helpers), `caller_paths`, `pending_paths`; copied files join
+   `carried_paths`. `intake` reads them into `repo_files`, cut to
+   `S2P_REPO_CONTEXT_BYTES` (128 KB, 32 KB per file; **`0` switches it off
+   without a deploy**). Rendered after the companions as `<caller_file>` and
+   `<suite_file status="converted|pending|unconverted">`. **No gate ever sees
+   one** — `validate` reads `context_files` only — and with nothing sent the
+   prompt is byte-identical, so single-file mode and every eval row are
+   where they were. `tests/test_repo_context.py` pins both halves. The guard
+   refuses the three new path inputs for demo keys.
+4. **Deploy landmine, root cause found.** `deploy.sh` pushed *every* key in
+   `.env` to the graph app as a secret, and `.env` carries
+   `S2P_DAILY_LIMIT=15`. That is why the "unset" secret was back: every
+   deploy re-created it. Keys the toml's `[env]` versions are now skipped
+   (`86a8ef4`). **The existing secret is still there and still 15** — I did
+   not unset it; the toml says 12, the UI reads the cap from the graph's
+   `/limits` so the page and the meter agree at 15 in practice, but the
+   repo text and the deployment disagree. Decide: `fly secrets unset -a s2p
+   S2P_DAILY_LIMIT` (then goenning, 13 files, is refused on the hosted
+   page) or set the toml to 15. Also: the busy check died silently under
+   `set -e` when its query failed — one deploy exited 1 with an empty log —
+   fixed in `081df5d`.
+
+**Live run 1 — sadabnepal, evidence as first worded, s2p on `e17fc4d`:**
+3 passed · 4 needs-review · every gate green on every file · tree compiles
+(0 findings, 1 excused) · 178.6 s. Baseline v25: 5 passed · 2 needs-review ·
+122.5 s. The two files that slipped from passed to needs-review both said
+why in their TODOs: *"Kept string extractor temporarily for pending caller
+compatibility"* — `login.page.ts` kept `getHeaderText()` returning a string
+so the still-Selenium spec would keep working. **The callers section had
+taught the actor to stay compatible with Selenium.** That is the risk
+named in the plan, measured on the first run. Fixed in `2d723b9`: callers
+are "rewritten later in this run against the file you produce — not an API
+to stay compatible with", full Playwright idioms, no transitional members
+or TODOs whose only reason is an unconverted caller. (The stream from this
+laptop also closed after 0.2 s while the server ran the suite to the end;
+the results above were read back from LangSmith. The verification script
+now creates the run and polls, and logs the visitor id, because a demo
+thread is only readable under the visitor that made it.)
+
+**Live run 2 — sadabnepal, reworded prompt, s2p on `2d723b9`:** **5 passed ·
+2 needs-review · tree compiles · 164.0 s**, no shims, `unexplained: 1`
+(`browserConfig.ts` dropped `getBrowserInstance` with no reason — the same
+file that regressed on 2026-09-09 morning; not new). Back to the baseline's
+shape with the whole repo in view. Every page object converted in 2 laps,
+both specs in 1.
+
+**Live run 3 — goenning, first attempt, s2p on `2d723b9`: invalid.** The
+planner dispatched 13 files and the single-file graph **refused nine** at
+intake — `classify()` reads one file alone, which is the very limit the
+scanner exists to get past. Fixed in `e6667bc`: the job carries `via`, and
+intake re-reads its verdict with `classify.through`. 13 conversions spent.
+
+**Live run 4 — goenning, s2p on `e6667bc`: 13 of 13 converted, 0 passed ·
+13 needs-review · tree does not compile (11 findings) · 419.4 s.** Every
+file took 3 laps with the critic on revise. Read out of LangSmith, three
+causes, all fixed offline in the commit after `e6667bc` and **none verified
+live yet** — the meter had 2 conversions left and the run costs 13:
+
+1. **`import … from '../../out/lib'`.** The specs were shown their source
+   under `/…/src/` and their converted companions under `/…/out/`, did the
+   arithmetic, and wrote a path that can never compile. `prompts.shown`
+   now labels every file by its path inside the suite (`suite_roots` on
+   the job) and says imports follow the original's specifiers.
+2. **T14, one layer out.** The `lib/` cycle (5 files) converted blind, three
+   with type errors of their own; every spec importing the barrel then
+   failed compile for nine findings in files it could not edit, and the
+   critic asked the spec to *"restore green compilation for the provided
+   converted companion files"* three laps running. `compile_check` now
+   excuses an error inside **any** companion (`others=`), converted or not;
+   what a companion breaks *in this file* still blocks; the whole-tree
+   compile still counts everything. `tests/test_graph_validation.py` had a
+   test asserting the old behaviour; it is flipped, with the reason.
+3. **The critic argued with the callers.** `lib/components.ts`: every gate
+   green every lap; the critic asked for `getText()` to go (rule 28), then
+   to come back ("callers rely on it"), then to go again. The reviewer now
+   gets `review_context` — companions, no suite evidence. The writer keeps
+   the evidence.
+
+**What is left after those three, and it is structural:** an import cycle
+converts blind by definition — five `lib/` files each invented their own
+`Browser`/`Page` contract, and `lib/index.ts` re-exported a `WaitCondition`
+from two of them. The evidence shows cycle-mates each other's *Selenium*,
+not each other's conversions. The fix worth designing is a **settle pass**:
+after a cycle's wave, convert each member once more with its mates'
+converted files as companions. On goenning that is +9 conversions per run.
+Decision for Varun; not built.
+
+**Budget used today (UTC 2026-09-10): 43 of 45** — guardrails probes 3,
+sadabnepal 7 + 7, goenning 13 + 13. **Next:** deploy both apps (the three
+fixes are committed, not deployed), run goenning once more — with the
+owner key from the environment if the meter has not reset, `--owner` in
+`live_suite.py` under the session scratchpad — and read the same four
+numbers. Expected if the fixes hold: both specs green, the `lib/` cycle
+still red until a settle pass exists.
+
 ### 2026-09-09 session — commits `16574f8`, `1c86ab4`, `7f9d614`, `598980c`, `b442cdc`
 
 Deployed: graph app **s2p v25**. UI unchanged (nothing in this session touches it).
