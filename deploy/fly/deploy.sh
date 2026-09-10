@@ -33,8 +33,13 @@ refuse_if_busy() {
   # The script goes in on stdin rather than inside -C "...": nesting python
   # quotes inside a shell string inside flyctl's own argument parsing produced
   # an empty answer, and an empty answer here reads as "carry on".
+  # `|| true` on the pipeline: under `set -e` a failing command substitution
+  # in an assignment exits the script, and with the query's stderr discarded
+  # that exit printed nothing at all — a deploy that stopped before its first
+  # line and said nothing about why (2026-09-09). An empty answer already has
+  # a branch below; a dead script does not.
   local running
-  running="$(fly ssh console -a "$APP" -C "python -" <<'PYQUERY' 2>/dev/null | tr -dc '0-9'
+  running="$(fly ssh console -a "$APP" -C "python -" <<'PYQUERY' 2>/dev/null | tr -dc '0-9' || true
 import asyncio, os, psycopg
 async def main():
     uri = os.environ.get("POSTGRES_URI") or os.environ.get("DATABASE_URI")
