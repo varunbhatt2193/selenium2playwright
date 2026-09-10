@@ -163,6 +163,12 @@ class ServerFilesystemTests(unittest.TestCase):
             self.assertEqual(caught.exception.status_code, 403, field)
             self.assertIn(field, caught.exception.detail, field)
 
+    def test_via_cannot_be_used_to_talk_a_refusal_round(self):
+        """`via` makes intake read an unplaced file as Selenium; only the scanner may say so."""
+        with self.assertRaises(Auth.exceptions.HTTPException) as caught:
+            run(guard.guard_run(VISITOR, run_body(source_text="export {}", via="lib/index.ts")))
+        self.assertIn("via", caught.exception.detail)
+
     def test_remember_cannot_be_set_by_a_visitor(self):
         # Long-term memory is shared. One visitor teaching a bad convention
         # would quietly degrade every later conversion, for everybody.

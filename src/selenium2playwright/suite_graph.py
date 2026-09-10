@@ -154,6 +154,7 @@ class FileJob(TypedDict, total=False):
     repo_paths: list[str]
     caller_paths: list[str]
     pending_paths: list[str]
+    via: str  # the scanner's "reaches Selenium through …", or "" (see graph.ConversionState)
 
 
 class SuiteState(TypedDict, total=False):
@@ -387,6 +388,10 @@ def dispatch(state: SuiteState) -> list[Send] | str:
             output_path=str(out_root / path),
             context_paths=[str(p) for p in present],
             carried_paths=[str(p) for p in present if str(p) in carried] + evidence.pop("carried"),
+            # The scanner's verdict travels with the job. Without it the child
+            # graph classifies the file alone and refuses a wrapper repo's page
+            # objects — which it did, nine of thirteen, on the first live run.
+            via=getattr(getattr(by_path.get(path), "classification", None), "via", "") or "",
             **evidence,
         )))
     return jobs
@@ -461,6 +466,7 @@ def convert_file(job: FileJob, runtime: Runtime[SuiteSettings] | None = None, *,
               "repo_paths": list(job.get("repo_paths", [])),
               "caller_paths": list(job.get("caller_paths", [])),
               "pending_paths": list(job.get("pending_paths", [])),
+              "via": job.get("via") or "",
               "ask_risks": False}
     if run.user_id:
         inputs["user_id"] = run.user_id

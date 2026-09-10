@@ -60,7 +60,7 @@ from langgraph.types import interrupt
 # parameter `store`, because that is the name LangGraph fills in.
 from selenium2playwright import env, risk
 from selenium2playwright import store as memory_store
-from selenium2playwright.classify import Classification, classify
+from selenium2playwright.classify import Classification, classify, through
 from selenium2playwright.llm import make_model, prepare_messages, structured_kwargs
 from selenium2playwright.prompts import (RepoEvidence, bound, build_critic_prompt, build_prompt,
                                          format_context, format_conventions, format_decisions,
@@ -137,6 +137,15 @@ class ConversionState(TypedDict, total=False):
     repo_paths: list[str]
     caller_paths: list[str]
     pending_paths: list[str]
+    # The in-suite file through which this one reaches Selenium, when the
+    # suite scanner decided it does and the file alone does not show it
+    # (`suite.reaches_selenium`, gap T15). classify() reads one file, and a
+    # page object that imports only its repository's own wrapper is refused
+    # by it — correctly for a single file, wrongly inside a suite that has
+    # already read the import graph. Nine of thirteen files on one real repo
+    # were dispatched as conversions and refused at intake before this. "" is
+    # the normal case and changes nothing.
+    via: str
     # step 10.2 — the same two inputs, sent as text instead of as paths. A
     # deployed server has none of the caller's files, so a path is a promise it
     # cannot keep; these are how a paste box, an HTTP client or Studio hands the
@@ -236,6 +245,21 @@ def read_inputs(state: ConversionState) -> tuple[str, str, list[Path], dict[str,
     return source, name, paths, contents
 
 
+def classified(source: str, name: str, via: str = "") -> Classification:
+    """What this file is: too big, then the file's own text, then the suite's word.
+
+    `via` is the suite scanner saying "this file reaches Selenium through
+    that one". It re-reads only a verdict of "unknown" (`classify.through`),
+    so a Playwright file stays Playwright and a Cypress file stays refused
+    whatever the suite says, and an oversized file is refused before either.
+    """
+    too_big = oversized(source)
+    if too_big is not None:
+        return too_big
+    classification = classify(source, name)
+    return through(classification, via) if via else classification
+
+
 def read_repo(state: ConversionState) -> RepoEvidence | None:
     """The rest of the suite, read off disk and cut to budget; None when none was sent.
 
@@ -320,7 +344,7 @@ def intake(state: ConversionState, runtime: Runtime[RunSettings] | None = None) 
             # one, and everything downstream — the scorecard title, the recall
             # query, the report — asks the state for the file's name.
             "source_path": name,
-            "classification": oversized(source) or classify(source, name),
+            "classification": classified(source, name, state.get("via") or ""),
             "risks": risk.detect_risks(source),
             "max_attempts": resolve_attempt_cap(cap),
             "models": env.resolve_roles(run.model, run.critic_model),

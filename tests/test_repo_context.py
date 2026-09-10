@@ -289,3 +289,70 @@ class BudgetTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ScannerVerdictTests(unittest.TestCase):
+    """The suite's "reaches Selenium through …" must reach the file's own intake.
+
+    First live run on the wrapper repo: the planner dispatched thirteen files
+    and the single-file graph refused nine of them at intake — "no recognised
+    automation library" — because classify() reads one file alone. The verdict
+    now travels with the job as `via`.
+    """
+
+    WRAPPED_PAGE = ("import { Browser } from '../lib';\n"
+                    "export class HomePage { constructor(public browser: Browser) {} }\n")
+
+    def test_intake_accepts_a_wrapper_page_object_when_the_scanner_says_so(self):
+        with TemporaryDirectory() as tmp:
+            page = Path(tmp) / "pages/HomePage.ts"
+            page.parent.mkdir(parents=True)
+            page.write_text(self.WRAPPED_PAGE)
+            alone = graph.intake({"source_path": str(page)})
+            told = graph.intake({"source_path": str(page), "via": "lib/index.ts"})
+        self.assertFalse(alone["classification"].supported)
+        self.assertTrue(told["classification"].supported)
+        self.assertEqual(told["classification"].via, "lib/index.ts")
+        self.assertEqual(graph.route_after_intake(told), "recall")
+
+    def test_via_never_overrides_a_recognised_library_or_an_oversized_file(self):
+        with TemporaryDirectory() as tmp:
+            pw = Path(tmp) / "a.spec.ts"
+            pw.write_text('import { test } from "@playwright/test";\ntest("x", () => {});\n')
+            self.assertFalse(graph.intake({"source_path": str(pw), "via": "lib/x.ts"})["classification"].supported)
+            big = Path(tmp) / "big.ts"
+            big.write_text("x" * (graph.MAX_SOURCE_BYTES + 1))
+            reason = graph.intake({"source_path": str(big), "via": "lib/x.ts"})["classification"].reason
+            self.assertIn("limit for one request", reason)
+
+    def test_dispatch_sends_the_scanners_verdict_with_the_job(self):
+        from selenium2playwright.classify import Classification
+        with TemporaryDirectory() as tmp:
+            build(Path(tmp) / "src", {"pages/Home.ts": self.WRAPPED_PAGE})
+            flipped = Classification("selenium", "none", "typescript", True, "reached", via="lib/index.ts")
+            files = [SimpleNamespace(path="pages/Home.ts", action="convert", imports=(),
+                                     classification=flipped)]
+            sends = suite_graph.dispatch({
+                "waves": [["pages/Home.ts"]], "wave": 1, "root": str(Path(tmp) / "src"),
+                "out_root": str(Path(tmp) / "out"), "manifest": SimpleNamespace(files=files)})
+            self.assertEqual(sends[0].arg["via"], "lib/index.ts")
+        seen = {}
+
+        class Child:
+            def invoke(self, inputs, **kwargs):
+                seen.update(inputs)
+                return {"status": "refused", "refusal": "scripted"}
+
+        with patch.object(suite_graph.single, "build_graph", return_value=Child()):
+            suite_graph.convert_file({"path": "p", "wave": 1, "source_path": "s",
+                                      "output_path": "o", "via": "lib/index.ts"})
+        self.assertEqual(seen["via"], "lib/index.ts")
+
+    def test_a_file_without_a_verdict_sends_an_empty_via(self):
+        with TemporaryDirectory() as tmp:
+            build(Path(tmp) / "src", {"a.ts": "x"})
+            files = [SimpleNamespace(path="a.ts", action="convert", imports=())]
+            sends = suite_graph.dispatch({
+                "waves": [["a.ts"]], "wave": 1, "root": str(Path(tmp) / "src"),
+                "out_root": str(Path(tmp) / "out"), "manifest": SimpleNamespace(files=files)})
+            self.assertEqual(sends[0].arg["via"], "")

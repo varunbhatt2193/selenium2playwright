@@ -86,6 +86,7 @@ FORBIDDEN_INPUTS = {
     "caller_paths": "reads files on the server; a suite is sent as source_tree instead",
     "pending_paths": "reads files on the server; a suite is sent as source_tree instead",
     "output_path": "writes a file on the server",
+    "via": "is the suite scanner's verdict, not the caller's to give",
     "remember": "writes to shared long-term memory",
     "root": "belongs to the suite graph, which reads server-side directories",
     "out_root": "belongs to the suite graph, which writes server-side directories",
