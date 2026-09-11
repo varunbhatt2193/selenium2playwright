@@ -16,6 +16,7 @@ import {
 import { convert, download } from '../api'
 import type { ConvertDone, Limits, Sample, Session } from '../types'
 import Code from './Code'
+import GraphPanel from './GraphPanel'
 import Ring from './Ring'
 
 type Props = { session: Session | null; limits: Limits | null; onSpent: () => void }
@@ -56,6 +57,9 @@ export default function Lab({ session, limits, onSpent }: Props) {
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [status, setStatus] = useState<Status>('idle')
   const [trail, setTrail] = useState<string[]>([])
+  // The raw node names, beside the human labels: the graph panel needs the
+  // node the run reported, not the sentence the page shows for it.
+  const [reported, setReported] = useState<string[]>([])
   const [result, setResult] = useState<ConvertDone | null>(null)
   const [error, setError] = useState('')
   const [tab, setTab] = useState<Tab>('before')
@@ -113,6 +117,7 @@ export default function Lab({ session, limits, onSpent }: Props) {
     setStatus('running')
     setError('')
     setTrail([])
+    setReported([])
     setResult(null)
     try {
       for await (const event of convert({
@@ -121,7 +126,10 @@ export default function Lab({ session, limits, onSpent }: Props) {
         companion_name: companionName,
         companion_text: companionText,
       })) {
-        if (event.kind === 'node') setTrail((t) => [...t, event.label])
+        if (event.kind === 'node') {
+          setTrail((t) => [...t, event.label])
+          setReported((n) => [...n, event.node])
+        }
         else if (event.kind === 'done') {
           setResult(event)
           setTab(event.card.code ? 'after' : 'before')
@@ -369,15 +377,18 @@ export default function Lab({ session, limits, onSpent }: Props) {
               </>
             )}
 
-            {running && (
+            {(running || reported.length > 0) && (
               <>
                 <div className="coverage-heading">
                   <span>Agent trace</span>
-                  <span className="coverage-badge live">
-                    <Loader2 size={12} className="spin" /> running
-                  </span>
+                  {running && (
+                    <span className="coverage-badge live">
+                      <Loader2 size={12} className="spin" /> running
+                    </span>
+                  )}
                 </div>
-                <Trail trail={trail} live />
+                <GraphPanel reported={reported} running={running} />
+                {running && <Trail trail={trail} live />}
               </>
             )}
 
