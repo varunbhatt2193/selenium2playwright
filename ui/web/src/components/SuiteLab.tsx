@@ -3,6 +3,7 @@ import { Check, Download, FolderArchive, Layers, Loader2, Play, ShieldCheck, Spa
 import { convertSuite, download, planSuite, sampleSuite, suiteZip } from '../api'
 import type { FileRow, Limits, PlanResponse, SuiteResult } from '../types'
 import Code from './Code'
+import SuiteGraphPanel from './SuiteGraphPanel'
 
 type Props = { limits: Limits | null; onSpent: () => void }
 type Status = 'idle' | 'planning' | 'running' | 'done'
@@ -24,6 +25,11 @@ export default function SuiteLab({ limits, onSpent }: Props) {
   // `progress` is the last file to land, which changes twelve times and used
   // to overwrite the stage line the moment it appeared.
   const [stages, setStages] = useState<string[]>([])
+  // The graph panel reads the run's own shape: which top-level node last
+  // reported, and which wave it dispatched. The stage list beside it keeps
+  // the sentences; these are the two numbers a picture can use.
+  const [stage, setStage] = useState('')
+  const [wave, setWave] = useState(0)
   const [progress, setProgress] = useState('')
   const [expected, setExpected] = useState(0)
   const [result, setResult] = useState<SuiteResult | null>(null)
@@ -73,6 +79,8 @@ export default function SuiteLab({ limits, onSpent }: Props) {
     setRows([])
     setResult(null)
     setStages([planned.plan.found])
+    setStage('')
+    setWave(0)
     setProgress('Sending the suite to the agent…')
     setExpected(planned.plan.files)
     try {
@@ -86,9 +94,15 @@ export default function SuiteLab({ limits, onSpent }: Props) {
         if (event.kind === 'start') {
           setExpected(event.files)
           setStages([event.found])
-        } else if (event.kind === 'node') setStages((s) => [...s, event.label])
-        else if (event.kind === 'file') {
+          setStage('plan')
+        } else if (event.kind === 'node') {
+          setStages((s) => [...s, event.label])
+          setStage(event.node)
+          if (event.wave) setWave(event.wave)
+        } else if (event.kind === 'file') {
           setRows((r) => [...r, event.row])
+          // A file landing means the fan-out is running, whatever node reported last.
+          setStage('convert_file')
           // No `landed/of` prefix: `.progress-count` at the end of the same line
           // already carries it, and the line read "2/12 · … 2/12".
           setProgress(`${event.row.path} — ${event.row.status}`)
@@ -260,6 +274,17 @@ export default function SuiteLab({ limits, onSpent }: Props) {
 
         {(running || rows.length > 0 || error || result) && (
           <div className="suite-progress">
+            {(running || result) && (
+              <SuiteGraphPanel
+                stage={stage}
+                wave={wave}
+                waves={planned?.plan.waves.length ?? 0}
+                landed={rows.length}
+                expected={expected}
+                running={running}
+                done={!running && !!result}
+              />
+            )}
             {running && stages.length > 0 && <Stages stages={stages} />}
             {running && (
               <div className="progress-line">

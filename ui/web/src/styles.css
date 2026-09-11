@@ -2426,7 +2426,16 @@ pre.code:not(.numbered) .line {
   font-variant-numeric: tabular-nums;
 }
 
-.graph-svg { width: 100%; height: auto; display: block; }
+.graph-svg {
+  width: 100%;
+  /* The single-file pane is ~340px and the suite page's progress strip is three
+     times that. Without a cap the same viewBox renders as a wall of boxes on one
+     page and a diagram on the other. */
+  max-width: 360px;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
 
 .graph-edge {
   stroke: var(--line-strong);
@@ -2510,3 +2519,13 @@ pre.code:not(.numbered) .line {
   color: var(--muted, #8cb4b8);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
+
+/* A count the node carries: which wave was dispatched, how many files landed. */
+.graph-node-badge {
+  font-size: 9.5px;
+  fill: var(--accent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.graph-node.idle .graph-node-badge { opacity: 0.5; }
