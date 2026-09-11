@@ -97,6 +97,11 @@ IMPORT_PATTERN = re.compile(
 # "../pages/LoginPage" on disk is LoginPage.ts; a folder import is its index.
 RESOLUTION_ORDER = (".ts", ".tsx", ".d.ts", ".js", ".mjs", ".cjs", "/index.ts", "/index.js")
 
+# What a TypeScript file compiles *to*. An ESM project must spell its own
+# imports with these — `./LoginPage.js` meaning LoginPage.ts — so a specifier
+# ending in one of them is stripped back to its stem and resolved again.
+EMITTED_EXTENSIONS = (".js", ".mjs", ".cjs", ".jsx")
+
 # One test case, in Mocha and in Jest alike: `it("…")` or `test("…")`, with any
 # modifier chain in between — `it.only`, `it.skip`, `test.each`, which is why
 # the call can open with a backtick as well as a bracket.
@@ -240,6 +245,23 @@ def resolve_import(specifier: str, source_path: str, known: set[str]) -> str | N
         candidate = base + ending
         if candidate in known:
             return candidate
+    # The fourth spelling carries an extension that is a lie on purpose:
+    # `../pages/LoginPage.js` written inside LoginPage.ts, which is what
+    # TypeScript requires under `"type": "module"` — the specifier names the
+    # file that will exist *after* compilation, and tsc resolves it back to the
+    # .ts sibling itself (moduleResolution node16/nodenext).
+    #
+    # Read literally there is no such file in the tree, so every edge in an ESM
+    # repository disappeared: a suite with page objects, specs and a base class
+    # planned as ONE wave, each spec converted with no page object beside it.
+    # Measured on othaime-en/saucedemo-typescript-automation — 10 files, 1 wave,
+    # nine of ten needs-review after three laps each.
+    stem, dot, ext = base.rpartition(".")
+    if dot and f".{ext}" in EMITTED_EXTENSIONS:
+        for ending in RESOLUTION_ORDER:
+            candidate = stem + ending
+            if candidate in known:
+                return candidate
     return None
 
 

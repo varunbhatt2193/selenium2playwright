@@ -249,6 +249,45 @@ class Imports(unittest.TestCase):
         self.assertEqual(resolve("tests/pages//login.page", "tests/specs/e2e.spec.ts", known),
                          "tests/pages/login.page.ts")
 
+    def test_an_esm_js_specifier_resolves_to_the_typescript_it_names(self):
+        """`"type": "module"` makes TypeScript spell its own imports `./X.js`.
+
+        The specifier names the file that will exist after compilation; tsc
+        resolves it back to the .ts sibling (moduleResolution node16). Read
+        literally it matches nothing, which silently emptied the import graph of
+        every ESM repository — one measured suite planned ten files as a single
+        wave and scored 0 passed, 10 needs-review.
+        """
+        known = {"src/pages/BasePage.ts", "src/pages/LoginPage.ts",
+                 "src/utils/WebDriverManager.ts", "src/types/index.ts"}
+        resolve = suite.resolve_import
+        self.assertEqual(resolve("./BasePage.js", "src/pages/LoginPage.ts", known),
+                         "src/pages/BasePage.ts")
+        self.assertEqual(resolve("../src/pages/LoginPage.js", "tests/login.test.ts", known),
+                         "src/pages/LoginPage.ts")
+        self.assertEqual(resolve("../src/utils/WebDriverManager.js", "tests/e2e.test.ts", known),
+                         "src/utils/WebDriverManager.ts")
+        self.assertEqual(resolve("../types/index.js", "src/pages/BasePage.ts", known),
+                         "src/types/index.ts")
+
+    def test_a_real_javascript_file_still_wins_over_its_typescript_stem(self):
+        """Stripping the extension is a fallback, never a redirection.
+
+        A tree that genuinely holds `helpers.js` must resolve to that file, not
+        to a `helpers.ts` sitting beside it — the literal reading is tried first
+        and only a miss falls through to the stem.
+        """
+        known = {"support/helpers.js", "support/helpers.ts"}
+        self.assertEqual(suite.resolve_import("./helpers.js", "support/a.ts", known),
+                         "support/helpers.js")
+
+    def test_an_unknown_js_specifier_is_still_not_ours(self):
+        """A package that happens to end in .js does not become an in-suite file."""
+        known = {"src/pages/BasePage.ts"}
+        for specifier in ("some-package/dist/index.js", "./Missing.js", "../gone.mjs"):
+            with self.subTest(specifier=specifier):
+                self.assertIsNone(suite.resolve_import(specifier, "src/pages/LoginPage.ts", known))
+
     def test_a_package_is_not_mistaken_for_a_bare_root_import(self):
         """Only the tree answering to it makes a bare specifier one of ours."""
         known = {"tests/pages/login.page.ts"}
