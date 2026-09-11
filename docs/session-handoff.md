@@ -132,7 +132,43 @@ after a cycle's wave, convert each member once more with its mates'
 converted files as companions. On goenning that is +9 conversions per run.
 Decision for Varun; not built.
 
-**Budget used today (UTC 2026-09-10): 43 of 45** — guardrails probes 3,
+**Evening of 2026-09-10 PDT (2026-09-11 UTC) — what happened after the commits, in order:**
+
+- The three follow-up fixes (`0c806df`) **are deployed** to both apps. The
+  goenning verification run **was not made**: the chain that would have
+  run it was stopped, see next point. Both apps run `c72b18a`'s code.
+- **My deploy restarted the graph while Varun's run was in flight** → the
+  page showed *"The backend failed (500)"*, and the server re-claimed the
+  orphaned run. His retry started 12 s after the restart, and **both runs
+  wedged with the CPU idle** (load 0.04, no model call for 3 min, the
+  suite node never advancing to wave 2). The wedge began the second two
+  suites ran concurrently in one worker — the same shape as the three
+  wedges of 2026-09-08 that were blamed on CPU credits. **Working
+  hypothesis: two concurrent suite runs deadlock the sync fan-out.** Not
+  proven; do not run two suites at once, and never deploy while one runs.
+  Remedy that worked: `UPDATE run SET status='interrupted'` for every
+  running row, then `fly machine restart`, then confirm 0 in flight.
+- **Two Fly secrets were set on `s2p` for the demo video, at Varun's
+  request, and should be put back afterwards:**
+  `S2P_DAILY_LIMIT=45` (per-visitor cap; was 15 via the same secret, toml
+  says 12) and `S2P_DAILY_BUDGET_USD=12` (100 conversions/day; toml says
+  5.40 = 45). The page reads both from the graph's `/limits`, so no UI
+  change was needed. Put back with
+  `fly secrets unset -a s2p S2P_DAILY_LIMIT S2P_DAILY_BUDGET_USD` — this
+  restarts the machine, so check nothing is in flight first. `deploy.sh`
+  no longer pushes either from `.env`.
+- **The goal for the evening was a demo video.** The repo to film is
+  `sadabnepal/selenium-javascript-test` (7 conversions, 3 waves, ~3 min,
+  comes back 5 passed · 2 needs-review · tree compiles). A run of it was
+  in progress at handoff time. The video goes into `DEMO_VIDEO` in
+  `ui/web/src/components/Home.tsx` (a YouTube/Loom share link or an `.mp4`
+  URL), then `cd ui/web && npm run build` and `./deploy/fly/deploy-ui.sh`
+  — the UI deploy restarts only the page, but do it between runs.
+  `imranwijaya/selenium-typescript-example` planned as 16 conversions in
+  7 waves on the page and was refused at the old cap of 15, which is why
+  the cap was raised.
+
+**Budget used on UTC 2026-09-10: 43 of 45** — guardrails probes 3,
 sadabnepal 7 + 7, goenning 13 + 13. **Next:** deploy both apps (the three
 fixes are committed, not deployed), run goenning once more — with the
 owner key from the environment if the meter has not reset, `--owner` in
