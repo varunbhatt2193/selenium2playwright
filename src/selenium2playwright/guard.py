@@ -62,7 +62,7 @@ from typing import Any
 
 from langgraph_sdk import Auth
 
-from selenium2playwright import limits, suite
+from selenium2playwright import limits, screen, suite
 
 auth = Auth()
 
@@ -330,6 +330,19 @@ async def guard_run(ctx, value: dict) -> bool:
             status_code=403,
             detail=f"`max_attempts` is capped at {MAX_DEMO_ATTEMPTS} on the public demo.",
         )
+
+    # The same screen the playground's server runs, for the caller who skips the
+    # playground: not Selenium, or text aimed at the model, never reaches it —
+    # and is refused before `limits.spend`, so a refusal costs the visitor nothing.
+    companions = payload.get("context_text")
+    complaint = (
+        screen.screen_source(str(payload.get("source_text") or ""), named)
+        or next((c for name, text in (companions.items() if isinstance(companions, dict) else ())
+                 if (c := screen.screen_companion(str(text), str(name)))), "")
+        or screen.screen_instruction(str(payload.get("refinement") or ""))
+    )
+    if complaint:
+        raise Auth.exceptions.HTTPException(status_code=403, detail=complaint)
 
     # Memories are namespaced by user_id, and a caller who picks their own could
     # read somebody else's. Overwritten rather than validated: there is no value

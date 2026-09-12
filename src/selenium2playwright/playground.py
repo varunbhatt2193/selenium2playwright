@@ -47,7 +47,7 @@ from urllib.parse import urlsplit
 import httpx
 from langgraph_sdk import get_sync_client
 
-from selenium2playwright import assemble, env, suite, suite_graph
+from selenium2playwright import assemble, env, screen, suite, suite_graph
 
 # `langgraph up` puts the production image here; the Fly deployment answers on
 # https. The playground has no idea which one it is talking to, which is what
@@ -359,12 +359,17 @@ PLAIN_NAME_COMPLAINT = (
 
 
 def check_input(source_text: str, source_path: str, *,
-                companion_name: str = "", companion_text: str = "") -> str:
+                companion_name: str = "", companion_text: str = "", refinement: str = "") -> str:
     """Say what is wrong with this submission, or "" if nothing is.
 
     Everything here is checked again by the server. Checking it first is the
     difference between a sentence under the text box and a refusal after the
     button — the same rule, delivered at the moment it can still be fixed.
+
+    The last three checks are `screen`: is the file Selenium, and is anything in
+    it — or in the companion, or in a refine instruction — addressed to the
+    model. They run after the cheap shape checks, so an oversized paste is told
+    it is oversized rather than being read.
     """
     if not source_text.strip():
         return "Paste a TypeScript Selenium file, or press one of the sample buttons."
@@ -380,7 +385,9 @@ def check_input(source_text: str, source_path: str, *,
         return "Give the companion a file name, so the converted file can import it."
     if companion_name and not BARE_NAME.match(companion_name):
         return f"The companion's name {PLAIN_NAME_COMPLAINT}."
-    return ""
+    return (screen.screen_source(source_text, source_path)
+            or (screen.screen_companion(companion_text, companion_name) if companion_text.strip() else "")
+            or screen.screen_instruction(refinement))
 
 
 def stream(client_, thread_id: str | None, request: dict[str, Any],

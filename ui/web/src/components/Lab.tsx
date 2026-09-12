@@ -37,8 +37,10 @@ const STEPS: [string, string][] = [
 const MAX_BYTES = 256 * 1024
 const BARE_NAME = /^(?!\.)[A-Za-z0-9._-]{1,255}$/
 
-// The same checks playground.check_input makes, one hop earlier, so the button
-// greys out with a reason instead of the request coming back 400.
+// The cheap shape checks playground.check_input makes, one hop earlier, so the
+// button greys out with a reason instead of the request coming back 400. The
+// screen that follows them there (is it Selenium, is anything in it aimed at the
+// model) stays on the server only, and its refusal arrives as the 400's sentence.
 function complaint(source: string, filename: string, companionName: string, companionText: string): string {
   if (!source.trim()) return 'Paste a TypeScript Selenium file, or pick a sample.'
   const size = new TextEncoder().encode(source).length

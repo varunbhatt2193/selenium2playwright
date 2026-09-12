@@ -288,7 +288,8 @@ def convert(body: ConvertRequest,
             x_s2p_visitor: str | None = Header(default=None)) -> StreamingResponse:
     complaint = pg.check_input(body.source, body.filename,
                                companion_name=body.companion_name,
-                               companion_text=body.companion_text)
+                               companion_text=body.companion_text,
+                               refinement=body.refinement)
     if complaint:
         raise HTTPException(status_code=400, detail=complaint)
     if body.thread_id and not THREAD.match(body.thread_id):
