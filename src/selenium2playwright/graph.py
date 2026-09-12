@@ -548,7 +548,9 @@ def validate(state: ConversionState) -> ConversionState:
         ("compile", lambda: compile_check(files, others=others)),
         ("residue", lambda: residue_check(converted)),
         ("lint", lambda: lint_check(converted)),
-        ("parity", lambda: parity_check({relative: state["source"]}, converted)),
+        # `tree` also asks whether the conversion loads anything its source did
+        # not — the gate an instruction smuggled into the source has to pass.
+        ("parity", lambda: parity_check({relative: state["source"]}, converted, tree=files)),
     ]
     reports = []
     for gate, check in checks:

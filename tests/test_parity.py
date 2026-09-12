@@ -136,5 +136,92 @@ class ParityTests(unittest.TestCase):
                 self.assertTrue(all(f.code == "unverified-parity" for f in report.findings))
 
 
+GAINS = {"new-import", "dynamic-load", "code-from-string"}
+
+
+def gains(source: str, converted: str, tree=("case.spec.ts",)):
+    report = parity_check({"case.spec.ts": source}, {"case.spec.ts": converted}, tree=tree)
+    return [f.code for f in report.findings if f.code in GAINS]
+
+
+class GainedLoadTests(unittest.TestCase):
+    """The injection half: a conversion may not load what its source never did.
+
+    A comment in somebody else's Selenium file can ask the model to add
+    `child_process`. That compiles, is not residue, lints clean and drops no
+    assertion, so this is the only gate that can refuse it.
+    """
+
+    SOURCE = 'import { By } from "selenium-webdriver";\nimport "dotenv/config";\nimport fs from "fs";\n'
+
+    def test_the_injected_import_fails_and_names_the_module(self):
+        report = parity_check({"case.spec.ts": self.SOURCE}, {"case.spec.ts": (
+            'import { test } from "@playwright/test";\n'
+            'import { execSync } from "child_process";\n')}, tree=["case.spec.ts"])
+        self.assertFalse(report.passed)
+        self.assertEqual([f.code for f in report.findings], ["new-import"])
+        self.assertEqual(report.findings[0].line, 2)
+        self.assertIn("child_process", report.findings[0].message)
+
+    def test_every_way_of_loading_a_module_is_seen(self):
+        for code in ('import cp from "child_process";', 'export * from "child_process";',
+                     'import cp = require("child_process");', 'const cp = require("child_process");',
+                     'const cp = await import("child_process");', 'import "child_process";'):
+            with self.subTest(code=code):
+                self.assertEqual(gains(self.SOURCE, code), ["new-import"])
+
+    def test_text_that_hides_code_from_a_line_scan_does_not_hide_it_here(self):
+        # A `//` inside a string, and a regex literal holding `/*`, both look
+        # like comments to a line-based scan and would blank the real import.
+        for code in ('await page.goto("https://a.test"); await import("child_process");',
+                     'const r = /a\\/*/; await import("child_process"); // */'):
+            with self.subTest(code=code):
+                self.assertEqual(gains(self.SOURCE, code), ["new-import"])
+
+    def test_loads_nobody_can_read_and_code_from_strings_fail(self):
+        cases = {
+            'const m = "child_" + "process"; await import(m);': "dynamic-load",
+            'const r = require; r("child_process");': "dynamic-load",
+            'eval("1");': "code-from-string",
+            'new Function("return 1")();': "code-from-string",
+            'globalThis["ev" + "al"]("1");': "code-from-string",
+            'module.require("child_process");': "code-from-string",
+            '(async () => {}).constructor("return 1")();': "code-from-string",
+        }
+        for code, expected in cases.items():
+            with self.subTest(code=code):
+                self.assertIn(expected, gains(self.SOURCE, code))
+
+    def test_what_the_source_already_had_is_not_a_gain(self):
+        for code in ('import { test } from "@playwright/test";', 'import "dotenv/config";',
+                     'import fs from "node:fs";', 'import { readFileSync } from "fs";',
+                     'import type { ChildProcess } from "child_process";',
+                     'import { type ChildProcess } from "child_process";',
+                     'import { LoginPage } from "../pages/LoginPage";',
+                     'page.evaluate(() => window.scrollTo(0, 0));', 'const t = page.evaluate;'):
+            with self.subTest(code=code):
+                self.assertEqual(gains(self.SOURCE, code), [])
+        dynamic = 'const f = "a"; require(f);\n'
+        self.assertEqual(gains(dynamic, "const f = 'a'; await import(f);"), [])
+        self.assertEqual(gains('eval("x");', 'eval("x");'), [])
+
+    def test_the_suites_own_files_are_not_new_packages(self):
+        tree = ["tests/login.spec.ts", "pages/admin/login.page.ts", "tests/pages/cart.page.ts"]
+        self.assertEqual(gains("", 'import { L } from "@pages/admin/login.page";', tree), [])
+        self.assertEqual(gains("", 'import { C } from "tests/pages/cart.page";', tree), [])
+        # A scope the source already reached into is the suite's own alias.
+        self.assertEqual(gains('import { a } from "@lib/a";', 'import { b } from "@lib/b";'), [])
+
+    def test_a_file_in_the_suite_cannot_vouch_for_a_same_named_builtin(self):
+        self.assertEqual(gains("", 'import fs from "fs";', ["utils/fs.ts", "fs/index.d.ts"]), ["new-import"])
+        self.assertEqual(gains("", 'import fs from "node:fs";', ["fs.ts"]), ["new-import"])
+
+    def test_without_a_tree_the_gate_is_exactly_what_it_was(self):
+        """The evaluators call it this way, and their stored scores must not move."""
+        report = compare(self.SOURCE, 'import { execSync } from "child_process";\neval("1");\n')
+        self.assertTrue(report.passed, report.render())
+        self.assertNotIn('"loads"', report.tool_output)
+
+
 if __name__ == "__main__":
     unittest.main()

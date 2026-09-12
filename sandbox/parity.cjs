@@ -93,8 +93,75 @@ function inventory(file, code) {
   return result;
 }
 
+// Everything a file loads or runs from a string, found by walking the whole
+// tree. A separate walk on purpose: `visit` above stops at shapes it cannot
+// count (`.each`, a dynamic title), and a load hidden inside one of those must
+// still be seen. The syntax tree is what makes this trustworthy where a regex
+// is not: `"https://x"; import("fs")` has a `//` inside a string, and a regex
+// literal can contain `/*` — both hide real code from a line-based scan.
+const RUNTIME_GLOBALS = new Set(["globalThis", "global", "module", "process"]);
+const CODE_FROM_STRING = new Set(["eval", "Function", "require", "mainModule", "binding", "dlopen"]);
+
+function loads(file, code) {
+  const tree = ts.createSourceFile(file, code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const found = [];
+  const add = (node, kind, specifier = null) => {
+    const { line, character } = tree.getLineAndCharacterOfPosition(node.getStart(tree));
+    found.push({ kind, specifier, line: line + 1, column: character + 1,
+      text: node.getText(tree).replace(/\s+/g, " ").slice(0, 120) });
+  };
+  const literal = (node) => (node && ts.isStringLiteralLike(node) ? node.text : null);
+  // An import that only names types is erased before anything runs.
+  const typeOnly = (node) => node.importClause?.isTypeOnly ||
+    (node.importClause && !node.importClause.name && node.importClause.namedBindings &&
+     ts.isNamedImports(node.importClause.namedBindings) &&
+     node.importClause.namedBindings.elements.length > 0 &&
+     node.importClause.namedBindings.elements.every((item) => item.isTypeOnly));
+
+  function walk(node) {
+    if (ts.isImportDeclaration(node)) {
+      if (!typeOnly(node)) add(node, "module", literal(node.moduleSpecifier));
+    } else if (ts.isExportDeclaration(node) && node.moduleSpecifier) {
+      if (!node.isTypeOnly) add(node, "module", literal(node.moduleSpecifier));
+    } else if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference)) {
+      add(node, "module", literal(node.moduleReference.expression));
+    } else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+      const specifier = literal(node.arguments[0]);
+      add(node, specifier === null ? "dynamic" : "module", specifier);
+    } else if (ts.isIdentifier(node) && node.text === "require" &&
+               !(ts.isPropertyAccessExpression(node.parent) && node.parent.name === node)) {
+      const call = ts.isCallExpression(node.parent) && node.parent.expression === node;
+      const specifier = call ? literal(node.parent.arguments[0]) : null;
+      // `require("x")` is an import by another name; `require(name)` or a bare
+      // `require` passed around is a load nobody can read statically.
+      add(call ? node.parent : node, specifier === null ? "dynamic" : "module", specifier);
+    } else if (ts.isIdentifier(node) && (node.text === "eval" || node.text === "Function") &&
+               !(ts.isPropertyAccessExpression(node.parent) && node.parent.name === node) &&
+               !(ts.isPropertyAssignment(node.parent) && node.parent.name === node)) {
+      add(node, "code", node.text);
+    } else if ((ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) &&
+               ts.isIdentifier(node.expression) && RUNTIME_GLOBALS.has(node.expression.text)) {
+      const name = ts.isPropertyAccessExpression(node) ? node.name.text : literal(node.argumentExpression);
+      // `globalThis.eval`, `module.require`, `process.mainModule`, and
+      // `globalThis[anything computed]` all reach the same place by a side door.
+      if (name === null || CODE_FROM_STRING.has(name)) add(node, "code", name ?? "computed");
+    } else if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) &&
+               node.expression.name.text === "constructor") {
+      // `(async () => {}).constructor("...")` is `new Function` without the name.
+      add(node, "code", "constructor");
+    }
+    ts.forEachChild(node, walk);
+  }
+  walk(tree);
+  return found;
+}
+
 // One process inventories both sides; JSON avoids shell quoting and work files.
-const groups = JSON.parse(readFileSync(0, "utf8"));
-process.stdout.write(JSON.stringify(groups.map((files) => Object.fromEntries(
-  Object.entries(files).map(([file, code]) => [file, inventory(file, code)]),
+// An optional third element asks for the load inventory too. Only the graph
+// asks, so every other caller gets exactly the output it always did.
+const [sourceFiles, convertedFiles, options = {}] = JSON.parse(readFileSync(0, "utf8"));
+process.stdout.write(JSON.stringify([sourceFiles, convertedFiles].map((files) => Object.fromEntries(
+  Object.entries(files).map(([file, code]) => [file, options.loads
+    ? { ...inventory(file, code), loads: loads(file, code) }
+    : inventory(file, code)]),
 ))));
