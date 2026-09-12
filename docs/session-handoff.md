@@ -51,7 +51,7 @@ unannounced (the lockfile's 0.13.4 only governs local `langgraph dev`); the
 next thing it would have delivered is 0.15/0.16. 0.14.0 is pinned because it
 is the version every live result since 2026-09-09 was produced on.
 
-**Still open, Varun's call:** why two concurrent suites wedge at all
+**Still open, Varun's call — sized and ordered in `docs/prevention-backlog.md`:** why two concurrent suites wedge at all
 (third occurrence; 2026-09-08 twice, before 0.14.0 existed — so not the
 upgrade). The shape fits a deadlock around the gRPC client pool (5 clients)
 between the Python workers and the Go core when two fan-outs run at once.
