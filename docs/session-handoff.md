@@ -16,6 +16,50 @@ page. **Four apps now** (`s2p`, `s2p-postgres`, `s2p-redis`, `varun-s2p`) ≈
 **$23/month**, flat and traffic-independent — a public link does not move it.
 Model spend is the only cost that responds to traffic, capped at ~$5/day.
 
+### 2026-09-12 — the outage was a wedge, not a streaming regression
+
+The page had been showing "the backend did not answer in time" on every
+conversion since the evening of 2026-09-11. The 2026-09-11 handoff blamed
+langgraph-api 0.14.0's streaming. **That diagnosis was wrong.** Streaming on
+0.14.0 works: verified 2026-09-12 05:24 UTC with one single-file conversion
+through the public page — 12 server-sent events, done in 48 s.
+
+**What was actually wrong.** Two suite runs, started two minutes apart on
+2026-09-11 (07:09 and 07:11 UTC), wedged the graph and sat at `status =
+'running'` in Postgres for 22 hours. Every machine restart freed the API for
+about two minutes, until the runs sweeper re-claimed them
+(`source=sweep_abandoned`, `attempt=3`); a few model calls later the workers
+wedged again, and from then on **every authenticated request to a graph route
+hung before it was even logged** — `POST /threads`, `GET /assistants/{id}`,
+owner key or demo key, from the page or from a laptop. Unauthenticated
+requests still got a fast 401 and `/ok`, `/info`, `/limits` still answered,
+which is why the machine looked healthy. That two-minute window is also why
+"restart s2p and s2p-postgres" on 2026-09-11 seemed to change nothing.
+
+**The remedy that works, now in the repo:** `deploy/fly/unwedge.py` — opens
+`fly proxy 15432:5432 -a s2p-postgres`, lists runs still `running`, and on
+`interrupt` marks them `interrupted` (the sweeper only re-claims `running`)
+and their threads `idle`. Then `fly machine restart <id> -a s2p`. The SDK's
+`runs.cancel` cannot do this: the API it would talk to is the thing that is
+hung. Both steps ran from the agent this time; `fly ssh console` was not
+needed.
+
+**Also fixed:** `langgraph.json` now pins `"api_version": "0.14.0"`, so the
+generated Dockerfile says `FROM langchain/langgraph-api:0.14.0-py3.12`
+instead of the floating `:3.12` tag. That floating tag is how 0.14.0 arrived
+unannounced (the lockfile's 0.13.4 only governs local `langgraph dev`); the
+next thing it would have delivered is 0.15/0.16. 0.14.0 is pinned because it
+is the version every live result since 2026-09-09 was produced on.
+
+**Still open, Varun's call:** why two concurrent suites wedge at all
+(third occurrence; 2026-09-08 twice, before 0.14.0 existed — so not the
+upgrade). The shape fits a deadlock around the gRPC client pool (5 clients)
+between the Python workers and the Go core when two fan-outs run at once.
+Cheapest guard: refuse a second suite run while one is in flight (429 with
+a retry-after), in `guard_run` for the `suite` assistant. Four older threads
+are still `busy` with no running run behind them — harmless, left alone.
+The demo-video secrets on `s2p` are untouched.
+
 ### 2026-09-09, second session — 11.3b: the whole repo as evidence, imports decide what is Selenium, waves around cycles
 
 Commits `1536cf0`, `e17fc4d`, `86a8ef4`, `081df5d`, `2d723b9`, `e6667bc`, and one
