@@ -6,7 +6,7 @@ import Code from './Code'
 
 // The demo video slot. Paste a YouTube or Loom share link, or the URL of an
 // .mp4 (a file in ui/web/public is served from "/"). Empty renders nothing.
-const DEMO_VIDEO = ''
+const DEMO_VIDEO = '/demo.mp4'
 
 // The whole explanation, as code: the same login step before and after.
 const BEFORE = `await driver.findElement(By.id('email')).sendKeys('me@example.com');
@@ -100,12 +100,12 @@ function DemoVideo({ url }: { url: string }) {
   return (
     <div className="demo-video">
       <div className="example-label">
-        <PlayCircle size={14} /> Two-minute demo
+        <PlayCircle size={14} /> Four-minute demo
       </div>
       {embed ? (
         <iframe src={embed} title="Demo video" allow="fullscreen; picture-in-picture" allowFullScreen loading="lazy" />
       ) : (
-        <video src={url} controls playsInline preload="metadata" />
+        <video src={url} poster="/demo-poster.jpg" controls playsInline preload="metadata" />
       )}
     </div>
   )

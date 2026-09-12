@@ -506,7 +506,8 @@ def built_file(path: str) -> Path | None:
     return Path(candidate)
 
 
-@app.get("/{path:path}", include_in_schema=False)
+# HEAD as well as GET: a browser probes a <video> source before it streams it.
+@app.api_route("/{path:path}", methods=["GET", "HEAD"], include_in_schema=False)
 def page(path: str) -> Response:
     """The React page, for any path that is not the API.
 
