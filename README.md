@@ -6,7 +6,7 @@
 
 ## ▶ Try it — [varun-s2p.fly.dev](https://varun-s2p.fly.dev)
 
-No signup, nothing to install. Paste one file, or drop a zip of your whole Selenium folder and get a Playwright folder back.
+No signup, nothing to install. Paste one file, or drop a zip of your whole Selenium folder and get a Playwright folder back. The front page has a four-minute demo if you would rather watch first.
 
 [![The playground: Selenium in, Playwright out, four gates and a critic in between](docs/playground.jpg)](https://varun-s2p.fly.dev)
 
@@ -41,6 +41,7 @@ await expect(page).toHaveURL(/\/home/);
 - **It converts whole suites.** Page objects first, then the specs that import them, in parallel, and then the delivered tree is compiled as one project with a parity ledger you can hand over.
 - **It asks before it guesses.** Three Selenium patterns have more than one correct Playwright translation (dialogs, `executeScript`, a session shared by a `before` hook). The run suspends and asks you, then remembers the answer.
 - **It learns your conventions.** Tell it once ("wrap each action in a named `test.step()`") and it applies that rule in later conversations, on the files where it matters.
+- **It doesn't take orders from the file.** A pasted file that isn't Selenium, or that carries text aimed at the model (in a comment, a string, look-alike letters or invisible characters), is refused before any model sees it. The model is told the file is data, and a conversion that loads anything its source never did fails parity.
 
 ## Measured, not claimed
 
@@ -51,23 +52,24 @@ await expect(page).toHaveURL(/\/home/);
 | Style, scored by a calibrated LLM judge | Two judges agreed within one point on **100%** of rows |
 | The twelve SDET hard cases, as a second benchmark | **6/11 → 9/11** after two playbook rules, with the delta proven from the code |
 | Converted tests run in a real browser, in CI, with no model spend | **20/20** test rows pass when the page object interface is supplied |
-| Offline test suite | **632 tests**, on every push, no secrets and no tokens |
+| Offline test suite | **775 tests**, on every push, no secrets and no tokens |
 
 Full numbers and how they were produced: [Evaluation primer](docs/evaluation-primer.md) · [live evaluation page](https://varun-s2p.fly.dev/evaluation) · [what is still unsolved](docs/hard-cases.md).
 
-## Why an agent — and not just Claude in a repo?
+## Why not just Claude Code in the repo?
 
-Fair question: Claude in a chat can convert a Selenium file. The difference is what you can trust *unattended*:
+Fair question. Claude Code can convert a Selenium file, and for one file it does it well. The difference is what you can trust when nobody reviews every file: when the migration is repeated, large, or has to be right.
 
-| | Claude in a chat / repo | This agent |
+| | Claude Code in the repo | This agent |
 |---|---|---|
-| **Verification** | you review everything by hand | output must pass compile, lint, residue and parity gates; a critic loop repairs failures (up to 3 passes) *before you see the code* |
-| **Parity** | test cases or assertions can silently vanish in translation | test count and assertion coverage are checked against the source suite — a mismatch triggers self-correction, never a silent drop |
-| **Quality** | depends on that day's prompt — vibes | scored on a fixed eval dataset (compile-pass %, residue rate, judge score) with a CI gate against regressions |
-| **Scale** | file-by-file babysitting | whole suites: page objects first, then tests, converted in parallel |
-| **Reusability** | requires prompting skill | CLI + playground — same result for anyone, including a CI pipeline |
+| **Checking the output** | Runs tsc or the linter when it decides to, and decides for itself when it is done. | Compile, lint, residue and parity checks run on every attempt. They are steps in the graph, not a choice the model makes. A failure goes back with its findings, at most three times, before you see any code. |
+| **Tests that go missing** | A test or an assertion can vanish in translation and the file still compiles. Someone has to notice. | Test and assertion counts are compared with the source. A mismatch sends the file back for repair, never a silent drop. So does any import the source never had. |
+| **Quality** | Depends on the prompt and the day. Nobody measures it. | Scored on a fixed evaluation set, with a CI gate against regressions. A prompt change ships only after an A/B run on that set. |
+| **Scale** | File by file, with someone watching each one. | A whole suite from one zip: page objects first, then the tests that use them, compiled together as one project. |
+| **Who can run it** | Someone with prompting skill and access to the repo. | Anyone, with the same result: the playground, the CLI, or a CI pipeline. |
+| **What reaches the model** | Whatever is in the files, including text written to steer the model. | Anything that is not Selenium, or that talks to the model, is refused before a model sees it. Every run is metered against a budget. |
 
-For a one-off file, Claude in a repo is genuinely fine. An agent earns its existence when the job is **repeated, large, or needs guarantees** — and closing the gap from "the model can do it in chat" to "a system you can trust unattended" is exactly the engineering this project demonstrates.
+For a one-off file, Claude Code in the repo is genuinely fine. An agent earns its place when the job is **repeated, large, or needs guarantees**. Closing the gap between "the model can do it" and "a system you can trust unattended" is the engineering this project is about.
 
 ## How it works
 
@@ -77,7 +79,7 @@ intake → recall → risk_review → convert → validate → critic → assemb
                                    └── repair (≤ 3) ──────┘
 ```
 
-A LangGraph state machine. `intake` classifies the file or refuses it honestly. `recall` fetches the few remembered preferences that apply. `risk_review` pauses the run on a pattern with more than one right answer. `convert` writes Playwright, `validate` runs the four gates, `critic` reviews, and the graph loops back with the actual findings until it passes or the attempt cap is hit. `assemble` always reports the outcome and keeps the latest draft. Suite mode wraps the same graph in a scan, a parallel fan-out per wave, and a whole-tree compile.
+A LangGraph state machine. Before it starts, a pasted file is screened: anything that is not Selenium, or that talks to the model, is refused without a model call. `intake` classifies the file or refuses it honestly. `recall` fetches the few remembered preferences that apply. `risk_review` pauses the run on a pattern with more than one right answer. `convert` writes Playwright, `validate` runs the four gates, `critic` reviews, and the graph loops back with the actual findings until it passes or the attempt cap is hit. `assemble` always reports the outcome and keeps the latest draft. Suite mode wraps the same graph in a scan, a parallel fan-out per wave, and a whole-tree compile.
 
 **Stack:** Python · LangGraph · LangSmith · any LangChain chat model (Claude by default, OpenAI verified end to end, swappable per run with `--model`) · pinned TypeScript toolchain as the referee · React + Vite playground over FastAPI, self-hosted on Fly behind auth and a dollar budget.
 
@@ -96,4 +98,4 @@ uv run s2p suite samples/selenium-suite --out out/suite
 
 ---
 
-*Built in public by [Varun Bhatt](https://github.com/varunbhatt2193). The demo is metered at 15 conversions per visitor per day against a shared $5/day budget, because every conversion is real tokens on a real card.*
+*Built in public by [Varun Bhatt](https://github.com/varunbhatt2193). The demo is metered per visitor and against a shared daily dollar budget, because every conversion is real tokens on a real card. The page shows how many are left today.*
