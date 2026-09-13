@@ -27,7 +27,7 @@ ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 
 # Dependencies first, from the lockfile, in their own layer: they change far
 # less often than the page does, so an edit to ui/server.py reuses this.
-COPY pyproject.toml uv.lock README.md ./
+COPY pyproject.toml uv.lock README.md LICENSE ./
 RUN mkdir -p src/selenium2playwright && touch src/selenium2playwright/__init__.py \
  && uv sync --frozen --group ui --no-install-project
 

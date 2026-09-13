@@ -211,6 +211,19 @@ class DeployConfigTests(unittest.TestCase):
         for required in ("sandbox/package.json", "sandbox/package-lock.json"):
             self.assertIn(required, lines[lockfile])
 
+    def test_the_playground_image_copies_every_file_the_package_build_reads(self):
+        """`uv sync` builds the project, and the build opens the readme and the
+        license files. Dockerfile.ui copies named files, not the repository, so
+        a new one in pyproject.toml fails only on Fly: `license-files = ["LICENSE"]`
+        broke the playground deploy on 2026-09-13 with CI green."""
+        import tomllib
+        project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+        needed = [project["readme"], *project.get("license-files", [])]
+        copy = next(line for line in (ROOT / "deploy/fly/Dockerfile.ui").read_text().splitlines()
+                    if line.startswith("COPY pyproject.toml"))
+        for name in needed:
+            self.assertIn(name, copy.split(), f"Dockerfile.ui never copies {name}")
+
     def test_the_build_context_excludes_secrets_and_the_wrong_platforms_binaries(self):
         ignored = (ROOT / ".dockerignore").read_text(encoding="utf-8").split()
         # An image is copied, pulled and cached. A key baked into a layer is a
