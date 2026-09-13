@@ -1,6 +1,7 @@
 {
   "name": "selenium2playwright-samples",
   "private": true,
+  "license": "MIT",
   "description": "Realistic Selenium WebDriver (TS) samples \u2014 demo inputs and eval fixtures for the conversion agent",
   "scripts": {
     "typecheck": "tsc --noEmit",

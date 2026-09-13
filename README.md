@@ -100,9 +100,23 @@ uv sync
 cp .env.example .env            # add ANTHROPIC_API_KEY (or OPENAI_API_KEY + S2P_MODEL=openai:gpt-5.4)
 uv run s2p convert samples/selenium-suite/pages/LoginPage.ts
 uv run s2p suite samples/selenium-suite --out out/suite
+uv run --group ui python -m unittest discover -s tests   # the offline test suite; no key, no tokens
 ```
 
 `s2p convert` prints a scorecard and a before/after diff, and writes the converted TypeScript to stdout. `s2p suite` converts a folder and writes the report beside it. Add `--model haiku --critic-model opus` for a cheap actor with a strong reviewer, `--json` for the whole outcome as one document, or `uv run langgraph dev` to step through a run in LangGraph Studio. [CLI walkthrough](docs/cli.md) · [playground walkthrough](docs/playground.md) · [deployment](docs/deploy.md).
+
+## Contributing
+
+Pull requests are welcome, from a typo to a new gate. Start with
+[CONTRIBUTING.md](CONTRIBUTING.md): it covers setup, the test command, the
+rules you cannot guess from the code, and where the open work is. Issues
+labelled [good first issue](https://github.com/varunbhatt2193/selenium2playwright/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
+are small and self-contained; a wrong conversion is the most useful report you
+can file.
+
+## License
+
+[MIT](LICENSE).
 
 ---
 

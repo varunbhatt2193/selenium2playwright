@@ -1,0 +1,47 @@
+name: Conversion gap
+description: The agent converted a Selenium file wrongly, refused it, or dropped something. The most useful report you can make.
+labels: ["conversion gap"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Every entry in [docs/gap-log.md](https://github.com/varunbhatt2193/selenium2playwright/blob/main/docs/gap-log.md) started as a report like this one.
+        Strip anything private from the code before pasting. A small file that shows the problem beats a big one.
+  - type: textarea
+    id: input
+    attributes:
+      label: The Selenium input
+      description: The file, or the smallest part of it that shows the problem.
+      render: ts
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: What the agent produced
+      description: The Playwright output, plus the scorecard or gate findings if you have them.
+      render: ts
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What it should have produced
+      description: Playwright you would accept, or a description of what is missing or wrong.
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of gap
+      options:
+        - Wrong translation (compiles, but does the wrong thing)
+        - Dropped something (a test, an assertion, a wait, a comment that mattered)
+        - Refused a file that is Selenium
+        - A gate failed for the wrong reason
+        - Something else
+  - type: input
+    id: model
+    attributes:
+      label: Model and where you ran it
+      placeholder: anthropic:claude-sonnet-5, hosted playground

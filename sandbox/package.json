@@ -1,6 +1,7 @@
 {
   "name": "s2p-sandbox",
   "private": true,
+  "license": "MIT",
   "description": "Validation sandbox: the compiler + linter the agent's OUTPUT must satisfy. Deliberately contains NO selenium-webdriver, so any leftover Selenium import fails to compile instead of passing quietly.",
   "devDependencies": {
     "@eslint/js": "10.0.1",

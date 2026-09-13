@@ -1,0 +1,43 @@
+name: Bug report
+description: Something broke that is not a conversion result. For a wrong conversion, use "Conversion gap".
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks. The more exact the steps, the faster the fix.
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The command or the clicks, in order.
+      placeholder: |
+        1. uv run s2p convert samples/selenium-suite/pages/LoginPage.ts
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened instead
+      description: Paste the error text or output. Remove any API keys first.
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: where
+    attributes:
+      label: Where
+      description: CLI, langgraph dev, the hosted playground, or your own deployment. Add the commit if you know it.
+      placeholder: CLI at commit abc1234
+  - type: input
+    id: model
+    attributes:
+      label: Model
+      description: The S2P_MODEL value, if a model was involved.
+      placeholder: anthropic:claude-sonnet-5
