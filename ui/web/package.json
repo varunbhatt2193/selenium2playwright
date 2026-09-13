@@ -1,6 +1,7 @@
 {
   "name": "s2p-playground",
   "private": true,
+  "license": "MIT",
   "version": "0.1.0",
   "type": "module",
   "description": "The page in front of the Selenium → Playwright agent. React + Vite; served by ui/server.py.",

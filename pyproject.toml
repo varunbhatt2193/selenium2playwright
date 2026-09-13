@@ -5,6 +5,16 @@ description = "LangGraph agent that converts TypeScript Selenium suites to Playw
 readme = "README.md"
 authors = [{ name = "Varun Bhatt", email = "bhattvarunk@gmail.com" }]
 requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Testing",
+    "Topic :: Software Development :: Code Generators",
+]
 dependencies = [
     "langchain>=1.3.18",
     "langchain-anthropic>=1.7.0",

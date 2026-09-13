@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or idea
+    url: https://github.com/varunbhatt2193/selenium2playwright/discussions
+    about: Ask how something works, or float an idea before it becomes an issue.
+  - name: Security problem
+    url: https://github.com/varunbhatt2193/selenium2playwright/security/advisories/new
+    about: Report privately. Please do not open a public issue.
