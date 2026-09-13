@@ -1,4 +1,4 @@
-import { ArrowRight, BookOpen, CheckCircle2, Github } from 'lucide-react'
+import { ArrowRight, CheckCircle2, Github } from 'lucide-react'
 import { GITHUB } from '../links'
 import { STACK } from '../stack'
 import { Link } from '../router'
@@ -36,8 +36,6 @@ export default function HowItWorks() {
         </Link>
       </div>
 
-      <WhyNotClaudeCode />
-
       <h2>The system</h2>
       <p className="how-caption">
         What runs where, and what crosses each wire. The browser never sees a model key: it talks to the playground
@@ -56,6 +54,8 @@ export default function HowItWorks() {
         </span>
       </a>
 
+      <WhyNotClaudeCode />
+
       <h2>What happens to every file</h2>
       <p className="how-caption">
         One model converts, four deterministic checks judge the result, a second model reads the findings. Anything
@@ -63,7 +63,7 @@ export default function HowItWorks() {
       </p>
       <LoopDiagram />
 
-      <h2>The stack</h2>
+      <h2>The Tech Stack</h2>
       <div className="stack-grid">
         {STACK.map((group) => (
           <div className="stack-group" key={group.title}>
@@ -84,12 +84,6 @@ export default function HowItWorks() {
       <div className="how-links">
         <a href={GITHUB} target="_blank" rel="noreferrer">
           <Github size={15} /> Read the source
-        </a>
-        <a href={`${GITHUB}/blob/main/docs/playbook.md`} target="_blank" rel="noreferrer">
-          <BookOpen size={15} /> The conversion playbook
-        </a>
-        <a href={`${GITHUB}/blob/main/plan.md`} target="_blank" rel="noreferrer">
-          Architecture and decisions <ArrowRight size={13} />
         </a>
       </div>
     </section>
