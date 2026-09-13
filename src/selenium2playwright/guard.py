@@ -278,6 +278,25 @@ async def guard_run(ctx, value: dict) -> bool:
     if not _public_assistant(value.get("assistant_id")):
         raise Auth.exceptions.HTTPException(status_code=403, detail=suite.SUITE_CLOSED)
 
+    # The input is not the only thing a run carries. Each of these reaches the
+    # graph around every check below, so a demo caller sends none of them:
+    #   command  writes state directly (`update`) or answers an interrupt
+    #            (`resume`), skipping FORBIDDEN_INPUTS; the playground never
+    #            resumes, because it turns risk questions off
+    #   context  RunSettings: the model and the lap budget, i.e. the price
+    #   config   the same settings, spelled `configurable` (the server copies
+    #            one into the other, so `context` covers both)
+    #   webhook  an outbound request from this server to a URL of the caller's
+    kwargs = value.get("kwargs") if isinstance(value.get("kwargs"), dict) else {}
+    for field, why in (("command", "writes to the run's state around the input checks"),
+                       ("context", "chooses the model and the attempt budget, which is the price"),
+                       ("webhook", "makes this server call a URL of your choosing")):
+        if kwargs.get(field):
+            raise Auth.exceptions.HTTPException(
+                status_code=403,
+                detail=f"`{field}` is not available on the public demo: it {why}.",
+            )
+
     payload = _run_input(value)
 
     for field, why in FORBIDDEN_INPUTS.items():
@@ -437,6 +456,33 @@ async def owner_only_crons(ctx, value: Any) -> bool:
         return True
     raise Auth.exceptions.HTTPException(
         status_code=403, detail="Scheduled runs are not available on the public demo."
+    )
+
+
+@auth.on.assistants.read
+@auth.on.assistants.search
+async def read_assistants(ctx, value: Any) -> bool:
+    """The published graphs are public knowledge; langgraph.json is in the repo.
+    Listed explicitly so the catch-all below does not refuse them."""
+    return True
+
+
+@auth.on
+async def deny_everything_else(ctx, value: Any) -> bool:
+    """Deny by default: anything above does not name is the owner's.
+
+    The platform ALLOWS an action no handler covers. That is how a demo key could
+    update or delete any visitor's thread, and write state (`context_paths`
+    included) into one, until 2026-09-13: there was a handler for creating,
+    reading and searching threads, and none for `update` or `delete`. A handler
+    for a resource and action always wins over this one, so what is allowed is
+    exactly what is written out above, and a new API action the platform adds
+    later starts closed.
+    """
+    if _is_owner(ctx):
+        return True
+    raise Auth.exceptions.HTTPException(
+        status_code=403, detail="That is not available on the public demo."
     )
 
 
