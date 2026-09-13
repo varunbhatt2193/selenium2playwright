@@ -40,16 +40,16 @@ export default function HowItWorks() {
 
       <h2>The system</h2>
       <p className="how-caption">
-        Five layers, top to bottom. Nothing reaches a model until the front door has screened and metered it, and
-        nothing changes in the agent until the evals at the bottom say it is no worse. The browser never sees a model
-        key.
+        What runs where, and what crosses each wire. The browser never sees a model key: it talks to the playground
+        app, which screens the input and calls the agent server as a metered visitor. Below, the eval harness and the
+        CI gate decide what gets deployed.
       </p>
       <a className="architecture" href="/architecture.svg" target="_blank" rel="noreferrer">
         <img
           src="/architecture.svg"
-          width={1240}
-          height={1528}
-          alt="Architecture: the browser, CLI and CI call it; a front door screens and meters input; the one-file and whole-suite graphs convert and check; they use a model, a pinned TypeScript toolchain, Postgres and Redis; and an evals loop gates every change"
+          width={1280}
+          height={1052}
+          alt="Architecture: a browser calls the playground app on Fly, which screens input and calls the LangGraph API server with a visitor key; the server holds the guard, the convert and suite graphs and a pinned Node toolchain, keeps state in Postgres and Redis on a private network, and calls model providers and LangSmith; a developer machine runs the CLI, eval harness and deploy scripts, and GitHub runs the CI gate"
         />
         <span>
           Open full size <ArrowRight size={13} />

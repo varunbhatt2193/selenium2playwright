@@ -1,190 +1,182 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 1528" width="1240" height="1528" role="img" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
-<title>Selenium2Playwright architecture: callers, the front door that screens and meters input, the one-file and whole-suite graphs, what they use, and the evals loop that gates every change</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 1052" width="1280" height="1052" role="img" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+<title>Selenium2Playwright architecture: a browser calls the playground app on Fly, which screens input and calls the LangGraph API server with a visitor key; the server holds the guard, the convert and suite graphs and a pinned Node toolchain, keeps state in Postgres and Redis on a private network, and calls model providers and LangSmith. A developer machine runs the CLI, the eval harness and the deploy scripts; GitHub runs the CI gate on every push.</title>
 <defs>
 <marker id="head-muted" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#79a7ab"/></marker>
 <marker id="head-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#2dd4bf"/></marker>
+<marker id="head-model" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#38bdf8"/></marker>
 <marker id="head-good" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#34d399"/></marker>
 </defs>
-<rect width="1240" height="1528" fill="#0a2429"/>
-<text x="56" y="62" font-size="28" fill="#eafaf9" font-weight="800" text-anchor="start">Selenium2Playwright · architecture</text>
-<text x="56" y="92" font-size="16" fill="#79a7ab" font-weight="400" text-anchor="start">How a Selenium file becomes checked Playwright, and how every change is measured before it ships.</text>
-<rect x="56" y="124" width="1128" height="128" rx="18" fill="#0e2c32" stroke="#2b5258"/>
-<circle cx="91" cy="151" r="11" fill="none" stroke="#f2b84b"/>
-<text x="91" y="156" font-size="13" fill="#f2b84b" font-weight="700" text-anchor="middle">1</text>
-<text x="112" y="156" font-size="13.5" fill="#f2b84b" font-weight="700" text-anchor="start" letter-spacing="1.6">WHO CALLS IT</text>
-<text x="1160" y="156" font-size="14" fill="#79a7ab" font-weight="400" text-anchor="end"></text>
-<rect x="80" y="168" width="330" height="64" rx="12" fill="#12343b" stroke="#3d6a70" stroke-width="1.4"/>
-<text x="96" y="197" font-size="17" fill="#eafaf9" font-weight="700" text-anchor="start">Browser</text>
-<text x="96" y="221" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">the playground, varun-s2p.fly.dev</text>
-<rect x="830" y="168" width="330" height="64" rx="12" fill="#12343b" stroke="#3d6a70" stroke-width="1.4"/>
-<text x="846" y="197" font-size="17" fill="#eafaf9" font-weight="700" text-anchor="start">CLI · CI pipeline</text>
-<text x="846" y="221" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">s2p convert · s2p suite · your key</text>
-<text x="620" y="206" font-size="14.5" fill="#79a7ab" font-weight="400" text-anchor="middle">Visitors use the hosted page. Teams run the CLI.</text>
-<rect x="56" y="284" width="1128" height="176" rx="18" fill="#0e2c32" stroke="#2b5258"/>
-<circle cx="91" cy="311" r="11" fill="none" stroke="#f2b84b"/>
-<text x="91" y="316" font-size="13" fill="#f2b84b" font-weight="700" text-anchor="middle">2</text>
-<text x="112" y="316" font-size="13.5" fill="#f2b84b" font-weight="700" text-anchor="start" letter-spacing="1.6">THE FRONT DOOR</text>
-<text x="1096" y="316" font-size="14" fill="#79a7ab" font-weight="400" text-anchor="end">nothing reaches a model before this</text>
-<path d="M 340 232 V 328" fill="none" stroke="#79a7ab" stroke-width="1.8" marker-end="url(#head-muted)"/>
-<rect x="80" y="330" width="320" height="106" rx="12" fill="#12343b" stroke="#3d6a70" stroke-width="1.4"/>
-<text x="96" y="359" font-size="17" fill="#eafaf9" font-weight="700" text-anchor="start">Playground server</text>
-<text x="96" y="383" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">FastAPI · streams progress</text>
-<text x="96" y="404" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">holds no model key</text>
-<path d="M 400 383 H 430" fill="none" stroke="#79a7ab" stroke-width="1.8" marker-end="url(#head-muted)"/>
-<rect x="432" y="330" width="320" height="106" rx="12" fill="#3d2a33" stroke="#fb7185" stroke-width="1.4"/>
-<text x="448" y="359" font-size="17" fill="#eafaf9" font-weight="700" text-anchor="start">Input screen</text>
-<text x="448" y="383" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">not Selenium, or talks to the model?</text>
-<text x="448" y="404" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">refused before any model call</text>
-<path d="M 752 383 H 782" fill="none" stroke="#79a7ab" stroke-width="1.8" marker-end="url(#head-muted)"/>
-<rect x="784" y="330" width="280" height="106" rx="12" fill="#3a3a24" stroke="#fbbf24" stroke-width="1.4"/>
-<text x="800" y="359" font-size="17" fill="#eafaf9" font-weight="700" text-anchor="start">Guard, on the API</text>
-<text x="800" y="383" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">visitor key · screens again</text>
-<text x="800" y="404" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">per-visitor limits · budget</text>
-<path d="M 1120 232 V 490" fill="none" stroke="#79a7ab" stroke-width="1.8" marker-end="url(#head-muted)"/>
-<text x="1136" y="392" font-size="13" fill="#79a7ab" font-weight="400" text-anchor="middle" transform="rotate(-90 1136 392)">local run</text>
-<rect x="56" y="492" width="1128" height="480" rx="18" fill="#0e2c32" stroke="#2b5258"/>
-<circle cx="91" cy="519" r="11" fill="none" stroke="#f2b84b"/>
-<text x="91" y="524" font-size="13" fill="#f2b84b" font-weight="700" text-anchor="middle">3</text>
-<text x="112" y="524" font-size="13.5" fill="#f2b84b" font-weight="700" text-anchor="start" letter-spacing="1.6">THE AGENT</text>
-<text x="1160" y="524" font-size="14" fill="#79a7ab" font-weight="400" text-anchor="end">LangGraph · Docker on Fly · s2p.fly.dev</text>
-<path d="M 924 436 V 490" fill="none" stroke="#79a7ab" stroke-width="1.8" marker-end="url(#head-muted)"/>
-<rect x="80" y="540" width="1080" height="226" rx="14" fill="#0a2429" fill-opacity="0.45" stroke="#2b5258"/>
-<text x="100" y="566" font-size="12.5" fill="#79a7ab" font-weight="700" text-anchor="start" letter-spacing="1.4">ONE FILE</text>
-<text x="1140" y="566" font-size="13.5" fill="#79a7ab" font-weight="400" text-anchor="end">every attempt runs all four checks</text>
-<rect x="96.0" y="616" width="128" height="66" rx="12" fill="#12343b" stroke="#3d6a70" stroke-width="1.4"/>
-<text x="160.0" y="644" font-size="16" fill="#eafaf9" font-weight="700" text-anchor="middle">intake</text>
-<text x="160.0" y="666" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="middle">classify it</text>
-<rect x="249.33" y="616" width="128" height="66" rx="12" fill="#12343b" stroke="#3d6a70" stroke-width="1.4"/>
-<text x="313.33000000000004" y="644" font-size="16" fill="#eafaf9" font-weight="700" text-anchor="middle">recall</text>
-<text x="313.33000000000004" y="666" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="middle">your conventions</text>
-<path d="M 224.0 649 H 247.3" fill="none" stroke="#79a7ab" stroke-width="1.8" marker-end="url(#head-muted)"/>
-<rect x="402.66" y="616" width="128" height="66" rx="12" fill="#3a3a24" stroke="#fbbf24" stroke-width="1.4"/>
-<text x="466.66" y="644" font-size="16" fill="#eafaf9" font-weight="700" text-anchor="middle">risk review</text>
-<text x="466.66" y="666" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="middle">may pause to ask</text>
-<path d="M 377.3 649 H 400.7" fill="none" stroke="#79a7ab" stroke-width="1.8" marker-end="url(#head-muted)"/>
-<rect x="555.99" y="616" width="128" height="66" rx="12" fill="#123a48" stroke="#38bdf8" stroke-width="1.4"/>
-<text x="619.99" y="644" font-size="16" fill="#eafaf9" font-weight="700" text-anchor="middle">convert</text>
-<text x="619.99" y="666" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="middle">model writes</text>
-<path d="M 530.7 649 H 554.0" fill="none" stroke="#79a7ab" stroke-width="1.8" marker-end="url(#head-muted)"/>
-<rect x="709.32" y="616" width="128" height="66" rx="12" fill="#11392f" stroke="#34d399" stroke-width="1.4"/>
-<text x="773.32" y="644" font-size="16" fill="#eafaf9" font-weight="700" text-anchor="middle">validate</text>
-<text x="773.32" y="666" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="middle">four checks</text>
-<path d="M 684.0 649 H 707.3" fill="none" stroke="#79a7ab" stroke-width="1.8" marker-end="url(#head-muted)"/>
-<rect x="862.6500000000001" y="616" width="128" height="66" rx="12" fill="#123a48" stroke="#38bdf8" stroke-width="1.4"/>
-<text x="926.6500000000001" y="644" font-size="16" fill="#eafaf9" font-weight="700" text-anchor="middle">critic</text>
-<text x="926.6500000000001" y="666" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="middle">model reviews</text>
-<path d="M 837.3 649 H 860.7" fill="none" stroke="#79a7ab" stroke-width="1.8" marker-end="url(#head-muted)"/>
-<rect x="1015.98" y="616" width="128" height="66" rx="12" fill="#12343b" stroke="#3d6a70" stroke-width="1.4"/>
-<text x="1079.98" y="644" font-size="16" fill="#eafaf9" font-weight="700" text-anchor="middle">assemble</text>
-<text x="1079.98" y="666" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="middle">code + report</text>
-<path d="M 990.6 649 H 1014.0" fill="none" stroke="#79a7ab" stroke-width="1.8" marker-end="url(#head-muted)"/>
-<rect x="616.3" y="580" width="74" height="24" rx="12" fill="#11392f" stroke="#34d399"/>
-<text x="653.32" y="597" font-size="12.5" fill="#eafaf9" font-weight="600" text-anchor="middle">compile</text>
-<rect x="696.3" y="580" width="74" height="24" rx="12" fill="#11392f" stroke="#34d399"/>
-<text x="733.32" y="597" font-size="12.5" fill="#eafaf9" font-weight="600" text-anchor="middle">residue</text>
-<rect x="776.3" y="580" width="74" height="24" rx="12" fill="#11392f" stroke="#34d399"/>
-<text x="813.32" y="597" font-size="12.5" fill="#eafaf9" font-weight="600" text-anchor="middle">lint</text>
-<rect x="856.3" y="580" width="74" height="24" rx="12" fill="#11392f" stroke="#34d399"/>
-<text x="893.32" y="597" font-size="12.5" fill="#eafaf9" font-weight="600" text-anchor="middle">parity</text>
-<path d="M 773.3 604 V 614" stroke="#34d399" stroke-width="1.4"/>
-<path d="M 160.0 682 V 710" fill="none" stroke="#79a7ab" stroke-width="1.8" marker-end="url(#head-muted)"/>
-<rect x="96" y="712" width="206" height="34" rx="10" fill="#3d2a33" stroke="#fb7185"/>
-<text x="199" y="734" font-size="13.5" fill="#eafaf9" font-weight="600" text-anchor="middle">refuse, with the reason</text>
-<path d="M 926.7 682 V 722 H 620.0 V 684" fill="none" stroke="#2dd4bf" stroke-width="1.8" marker-end="url(#head-accent)"/>
-<text x="773.32" y="746" font-size="13.5" fill="#2dd4bf" font-weight="600" text-anchor="middle">fails: back to convert with the findings, at most 3 attempts</text>
-<rect x="80" y="782" width="1080" height="172" rx="14" fill="#0a2429" fill-opacity="0.45" stroke="#2b5258"/>
-<text x="100" y="808" font-size="12.5" fill="#79a7ab" font-weight="700" text-anchor="start" letter-spacing="1.4">WHOLE SUITE</text>
-<text x="1140" y="808" font-size="13.5" fill="#79a7ab" font-weight="400" text-anchor="end">one zip in, one Playwright folder out</text>
-<rect x="96" y="822" width="220" height="88" rx="12" fill="#12343b" stroke="#3d6a70" stroke-width="1.4"/>
-<text x="112" y="851" font-size="17" fill="#eafaf9" font-weight="700" text-anchor="start">plan</text>
-<text x="112" y="875" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">scan the folder,</text>
-<text x="112" y="896" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">order it into waves</text>
-<path d="M 316 866 H 344" fill="none" stroke="#79a7ab" stroke-width="1.8" marker-end="url(#head-muted)"/>
-<rect x="346" y="822" width="220" height="88" rx="12" fill="#12343b" stroke="#3d6a70" stroke-width="1.4"/>
-<text x="362" y="851" font-size="17" fill="#eafaf9" font-weight="700" text-anchor="start">next wave</text>
-<text x="362" y="875" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">page objects first,</text>
-<text x="362" y="896" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">then the tests</text>
-<path d="M 566 856 H 610" fill="none" stroke="#79a7ab" stroke-width="1.8" marker-end="url(#head-muted)"/>
-<rect x="624" y="810" width="276" height="88" rx="12" fill="#12343b" stroke="#3d6a70"/>
-<rect x="618" y="816" width="276" height="88" rx="12" fill="#12343b" stroke="#3d6a70"/>
-<rect x="612" y="822" width="276" height="88" rx="12" fill="#123a48" stroke="#38bdf8" stroke-width="1.4"/>
-<text x="628" y="851" font-size="17" fill="#eafaf9" font-weight="700" text-anchor="start">convert each file</text>
-<text x="628" y="875" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">the one-file graph above,</text>
-<text x="628" y="896" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">files in a wave in parallel</text>
-<path d="M 750 910 V 928 H 456 V 912" fill="none" stroke="#2dd4bf" stroke-width="1.8" marker-end="url(#head-accent)"/>
-<text x="603" y="948" font-size="12.5" fill="#2dd4bf" font-weight="600" text-anchor="middle">next wave</text>
-<path d="M 888 866 H 922" fill="none" stroke="#79a7ab" stroke-width="1.8" marker-end="url(#head-muted)"/>
-<rect x="924" y="822" width="220" height="88" rx="12" fill="#11392f" stroke="#34d399" stroke-width="1.4"/>
-<text x="940" y="851" font-size="17" fill="#eafaf9" font-weight="700" text-anchor="start">finish</text>
-<text x="940" y="875" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">whole tree compiled once</text>
-<text x="940" y="896" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">parity ledger · zip</text>
-<rect x="56" y="1004" width="1128" height="152" rx="18" fill="#0e2c32" stroke="#2b5258"/>
-<circle cx="91" cy="1031" r="11" fill="none" stroke="#f2b84b"/>
-<text x="91" y="1036" font-size="13" fill="#f2b84b" font-weight="700" text-anchor="middle">4</text>
-<text x="112" y="1036" font-size="13.5" fill="#f2b84b" font-weight="700" text-anchor="start" letter-spacing="1.6">WHAT IT USES</text>
-<text x="1160" y="1036" font-size="14" fill="#79a7ab" font-weight="400" text-anchor="end"></text>
-<rect x="80" y="1050" width="252" height="90" rx="12" fill="#123a48" stroke="#38bdf8" stroke-width="1.4"/>
-<text x="96" y="1079" font-size="17" fill="#eafaf9" font-weight="700" text-anchor="start">Model</text>
-<text x="96" y="1103" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">any LangChain chat model</text>
-<text x="96" y="1124" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">Claude or OpenAI</text>
-<path d="M 280 974 V 1048" fill="none" stroke="#79a7ab" stroke-width="1.8" marker-end="url(#head-muted)"/>
-<rect x="356" y="1050" width="252" height="90" rx="12" fill="#11392f" stroke="#34d399" stroke-width="1.4"/>
-<text x="372" y="1079" font-size="17" fill="#eafaf9" font-weight="700" text-anchor="start">TypeScript toolchain</text>
-<text x="372" y="1103" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">pinned in the image</text>
-<text x="372" y="1124" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">Node · tsc · ESLint</text>
-<path d="M 556 974 V 1048" fill="none" stroke="#79a7ab" stroke-width="1.8" marker-end="url(#head-muted)"/>
-<rect x="632" y="1050" width="252" height="90" rx="12" fill="#12343b" stroke="#3d6a70" stroke-width="1.4"/>
-<text x="648" y="1079" font-size="17" fill="#eafaf9" font-weight="700" text-anchor="start">Postgres</text>
-<text x="648" y="1103" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">run checkpoints</text>
-<text x="648" y="1124" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">long-term memory, pgvector</text>
-<path d="M 832 974 V 1048" fill="none" stroke="#79a7ab" stroke-width="1.8" marker-end="url(#head-muted)"/>
-<rect x="908" y="1050" width="252" height="90" rx="12" fill="#12343b" stroke="#3d6a70" stroke-width="1.4"/>
-<text x="924" y="1079" font-size="17" fill="#eafaf9" font-weight="700" text-anchor="start">Redis</text>
-<text x="924" y="1103" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">run queue · limit counters</text>
-<text x="924" y="1124" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">the daily budget</text>
-<path d="M 1108 974 V 1048" fill="none" stroke="#79a7ab" stroke-width="1.8" marker-end="url(#head-muted)"/>
-<rect x="56" y="1188" width="1128" height="262" rx="18" fill="#0e2c32" stroke="#2dd4bf"/>
-<circle cx="91" cy="1215" r="11" fill="none" stroke="#f2b84b"/>
-<text x="91" y="1220" font-size="13" fill="#f2b84b" font-weight="700" text-anchor="middle">5</text>
-<text x="112" y="1220" font-size="13.5" fill="#f2b84b" font-weight="700" text-anchor="start" letter-spacing="1.6">EVALS</text>
-<text x="1160" y="1220" font-size="14" fill="#79a7ab" font-weight="400" text-anchor="end">nothing ships unmeasured</text>
-<rect x="80" y="1234" width="240" height="116" rx="12" fill="#12343b" stroke="#3d6a70" stroke-width="1.4"/>
-<text x="96" y="1263" font-size="17" fill="#eafaf9" font-weight="700" text-anchor="start">Every run traced</text>
-<text x="96" y="1287" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">LangSmith, every run</text>
-<text x="96" y="1308" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">thumbs up or down</text>
-<text x="96" y="1329" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">become dataset rows</text>
-<rect x="360" y="1234" width="240" height="116" rx="12" fill="#12343b" stroke="#3d6a70" stroke-width="1.4"/>
-<text x="376" y="1263" font-size="17" fill="#eafaf9" font-weight="700" text-anchor="start">Fixed datasets</text>
-<text x="376" y="1287" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">12 sample files</text>
-<text x="376" y="1308" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">11 hard cases</text>
-<text x="376" y="1329" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">golden Playwright answers</text>
-<path d="M 320 1292 H 358" fill="none" stroke="#79a7ab" stroke-width="1.8" marker-end="url(#head-muted)"/>
-<rect x="640" y="1234" width="240" height="116" rx="12" fill="#12343b" stroke="#3d6a70" stroke-width="1.4"/>
-<text x="656" y="1263" font-size="17" fill="#eafaf9" font-weight="700" text-anchor="start">Scored</text>
-<text x="656" y="1287" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">deterministic evaluators</text>
-<text x="656" y="1308" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">calibrated LLM judge</text>
-<text x="656" y="1329" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">two judges agree</text>
-<path d="M 600 1292 H 638" fill="none" stroke="#79a7ab" stroke-width="1.8" marker-end="url(#head-muted)"/>
-<rect x="920" y="1234" width="240" height="116" rx="12" fill="#11392f" stroke="#34d399" stroke-width="1.4"/>
-<text x="936" y="1263" font-size="17" fill="#eafaf9" font-weight="700" text-anchor="start">A/B before shipping</text>
-<text x="936" y="1287" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">same data, both arms</text>
-<text x="936" y="1308" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">repair loop · playbook</text>
-<text x="936" y="1329" font-size="14.5" fill="#b0d5d8" font-weight="400" text-anchor="start">must not regress</text>
-<path d="M 880 1292 H 918" fill="none" stroke="#79a7ab" stroke-width="1.8" marker-end="url(#head-muted)"/>
-<rect x="80" y="1366" width="1080" height="60" rx="12" fill="#11392f" stroke="#34d399" stroke-width="1.4"/>
-<text x="98" y="1402" font-size="17" fill="#eafaf9" font-weight="700" text-anchor="start">CI gate, every push</text>
-<text x="286" y="1402" font-size="15" fill="#b0d5d8" font-weight="400" text-anchor="start">775 offline tests, no tokens · converted goldens run in a real browser · playground build</text>
-<path d="M 56 650 H 28 V 1292 H 78" fill="none" stroke="#2dd4bf" stroke-width="1.8" stroke-dasharray="7 6" marker-end="url(#head-accent)"/>
-<text x="18" y="960" font-size="13" fill="#2dd4bf" font-weight="600" text-anchor="middle" transform="rotate(-90 18 960)">traces · feedback</text>
-<path d="M 1160 1316 H 1212 V 600 H 1186" fill="none" stroke="#2dd4bf" stroke-width="1.8" stroke-dasharray="7 6" marker-end="url(#head-accent)"/>
-<text x="1226" y="950" font-size="13" fill="#2dd4bf" font-weight="600" text-anchor="middle" transform="rotate(90 1226 950)">a prompt change ships only when green</text>
-<rect x="56" y="1473" width="18" height="18" rx="5" fill="#123a48" stroke="#38bdf8" stroke-width="1.4"/>
-<text x="84" y="1487" font-size="14" fill="#79a7ab" font-weight="400" text-anchor="start">model call</text>
-<rect x="286" y="1473" width="18" height="18" rx="5" fill="#11392f" stroke="#34d399" stroke-width="1.4"/>
-<text x="314" y="1487" font-size="14" fill="#79a7ab" font-weight="400" text-anchor="start">deterministic, no model</text>
-<rect x="516" y="1473" width="18" height="18" rx="5" fill="#3a3a24" stroke="#fbbf24" stroke-width="1.4"/>
-<text x="544" y="1487" font-size="14" fill="#79a7ab" font-weight="400" text-anchor="start">pauses or limits</text>
-<rect x="746" y="1473" width="18" height="18" rx="5" fill="#3d2a33" stroke="#fb7185" stroke-width="1.4"/>
-<text x="774" y="1487" font-size="14" fill="#79a7ab" font-weight="400" text-anchor="start">refuses</text>
-<text x="1184" y="1487" font-size="14" fill="#79a7ab" font-weight="400" text-anchor="end">github.com/varunbhatt2193/selenium2playwright</text>
+<rect width="1280" height="1052" fill="#0a2429"/>
+<text x="32" y="52" font-size="27" fill="#eafaf9" font-weight="800" text-anchor="start">Selenium2Playwright · architecture</text>
+<text x="32" y="80" font-size="15" fill="#79a7ab" font-weight="400" text-anchor="start">What runs where, what each part holds, and what crosses each wire. Evals and CI decide what gets deployed.</text>
+<rect x="32" y="110" width="180" height="500" rx="16" fill="#0d2a30" stroke="#3d6a70" stroke-width="1.5" stroke-dasharray="8 6"/>
+<text x="50" y="138" font-size="13" fill="#f2b84b" font-weight="700" text-anchor="start" letter-spacing="1.5">VISITOR</text>
+<rect x="50" y="262" width="30" height="24" rx="4" fill="none" stroke="#b0d5d8" stroke-width="1.5"/>
+<path d="M 50 269 H 80" stroke="#b0d5d8" stroke-width="1.5"/>
+<circle cx="55" cy="265.6" r="1.3" fill="#b0d5d8"/>
+<circle cx="60" cy="265.6" r="1.3" fill="#b0d5d8"/>
+<circle cx="65" cy="265.6" r="1.3" fill="#b0d5d8"/>
+<text x="92" y="280" font-size="16" fill="#eafaf9" font-weight="700" text-anchor="start">Browser</text>
+<rect x="46" y="250" width="152" height="96" rx="10" fill="none" stroke="#3d6a70"/>
+<text x="62" y="312" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">any device,</text>
+<text x="62" y="331" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">no signup</text>
+<rect x="236" y="110" width="708" height="500" rx="16" fill="#0d2a30" stroke="#2dd4bf" stroke-width="1.5" stroke-dasharray="8 6"/>
+<text x="254" y="138" font-size="13" fill="#f2b84b" font-weight="700" text-anchor="start" letter-spacing="1.5">FLY.IO · REGION IAD</text>
+<text x="926" y="138" font-size="13" fill="#79a7ab" font-weight="400" text-anchor="end">each app its own image</text>
+<rect x="256" y="150" width="196" height="318" rx="14" fill="#12343b" stroke="#2dd4bf" stroke-width="1.6"/>
+<text x="272" y="174" font-size="12.5" fill="#2dd4bf" font-weight="600" text-anchor="start" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">varun-s2p</text>
+<text x="272" y="196" font-size="17" fill="#eafaf9" font-weight="700" text-anchor="start">Playground</text>
+<rect x="270" y="212" width="168" height="58" rx="10" fill="#174048" stroke="#3d6a70" stroke-width="1.3"/>
+<text x="284" y="237" font-size="15.5" fill="#eafaf9" font-weight="700" text-anchor="start">React SPA</text>
+<text x="284" y="258" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">built by Vite, static</text>
+<rect x="270" y="280" width="168" height="58" rx="10" fill="#174048" stroke="#3d6a70" stroke-width="1.3"/>
+<text x="284" y="305" font-size="15.5" fill="#eafaf9" font-weight="700" text-anchor="start">FastAPI server</text>
+<text x="284" y="326" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">the page&#x27;s only backend</text>
+<rect x="270" y="348" width="168" height="58" rx="10" fill="#3d2a33" stroke="#fb7185" stroke-width="1.3"/>
+<text x="284" y="373" font-size="15.5" fill="#eafaf9" font-weight="700" text-anchor="start">Input screen</text>
+<text x="284" y="394" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">refuses, no model call</text>
+<text x="270" y="446" font-size="13" fill="#79a7ab" font-weight="400" text-anchor="start">holds no model key</text>
+<rect x="508" y="150" width="418" height="318" rx="14" fill="#12343b" stroke="#2dd4bf" stroke-width="1.6"/>
+<text x="524" y="174" font-size="12.5" fill="#2dd4bf" font-weight="600" text-anchor="start" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">s2p</text>
+<text x="524" y="196" font-size="17" fill="#eafaf9" font-weight="700" text-anchor="start">LangGraph API server</text>
+<text x="910" y="174" font-size="12" fill="#79a7ab" font-weight="400" text-anchor="end" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">langgraph-api 0.14</text>
+<rect x="524" y="212" width="186" height="76" rx="10" fill="#37381f" stroke="#fbbf24" stroke-width="1.3"/>
+<text x="538" y="237" font-size="15.5" fill="#eafaf9" font-weight="700" text-anchor="start">Guard</text>
+<text x="538" y="258" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">auth · visitor key</text>
+<text x="538" y="277" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">screen · limits · budget</text>
+<rect x="726" y="212" width="186" height="76" rx="10" fill="#123a48" stroke="#38bdf8" stroke-width="1.3"/>
+<text x="740" y="237" font-size="15.5" fill="#eafaf9" font-weight="700" text-anchor="start">Convert graph</text>
+<text x="740" y="258" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">convert → 4 checks →</text>
+<text x="740" y="277" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">critic, at most 3 laps</text>
+<rect x="524" y="300" width="186" height="76" rx="10" fill="#174048" stroke="#3d6a70" stroke-width="1.3"/>
+<text x="538" y="325" font-size="15.5" fill="#eafaf9" font-weight="700" text-anchor="start">HTTP routes</text>
+<text x="538" y="346" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">/limits · /feedback</text>
+<text x="538" y="365" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">for the page</text>
+<rect x="726" y="300" width="186" height="76" rx="10" fill="#123a48" stroke="#38bdf8" stroke-width="1.3"/>
+<text x="740" y="325" font-size="15.5" fill="#eafaf9" font-weight="700" text-anchor="start">Suite graph</text>
+<text x="740" y="346" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">waves, one convert</text>
+<text x="740" y="365" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">graph per file</text>
+<rect x="524" y="388" width="388" height="64" rx="10" fill="#11392f" stroke="#34d399" stroke-width="1.3"/>
+<text x="538" y="413" font-size="15.5" fill="#eafaf9" font-weight="700" text-anchor="start">Node toolchain, pinned in the image</text>
+<text x="538" y="434" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">tsc · ESLint · residue · parity, run as a subprocess</text>
+<path d="M 710 250 H 724" fill="none" stroke="#79a7ab" stroke-width="1.7" marker-end="url(#head-muted)"/>
+<path d="M 819 300 V 290" fill="none" stroke="#79a7ab" stroke-width="1.7" marker-end="url(#head-muted)"/>
+<rect x="256" y="488" width="670" height="114" rx="16" fill="#0d2a30" stroke="#2b5258" stroke-width="1.5"/>
+<text x="274" y="516" font-size="13" fill="#f2b84b" font-weight="700" text-anchor="start" letter-spacing="1.5">PRIVATE NETWORK</text>
+<text x="274" y="540" font-size="13.5" fill="#79a7ab" font-weight="400" text-anchor="start">no public IP, reached</text>
+<text x="274" y="559" font-size="13.5" fill="#79a7ab" font-weight="400" text-anchor="start">only from inside Fly</text>
+<path d="M 543 529.36 V 560.64 A 17.0 7.36 0 0 0 577 560.64 V 529.36" fill="#174048" stroke="#b0d5d8" stroke-width="1.5"/>
+<ellipse cx="560.0" cy="529.36" rx="17.0" ry="7.36" fill="#12343b" stroke="#b0d5d8" stroke-width="1.5"/>
+<text x="593" y="532" font-size="12" fill="#2dd4bf" font-weight="600" text-anchor="start" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">s2p-postgres</text>
+<text x="593" y="552" font-size="15.5" fill="#eafaf9" font-weight="700" text-anchor="start">Postgres + pgvector</text>
+<text x="593" y="572" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">run checkpoints</text>
+<text x="593" y="591" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">long-term memory</text>
+<path d="M 760 529.36 V 560.64 A 17.0 7.36 0 0 0 794 560.64 V 529.36" fill="#174048" stroke="#b0d5d8" stroke-width="1.5"/>
+<ellipse cx="777.0" cy="529.36" rx="17.0" ry="7.36" fill="#12343b" stroke="#b0d5d8" stroke-width="1.5"/>
+<text x="810" y="532" font-size="12" fill="#2dd4bf" font-weight="600" text-anchor="start" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">s2p-redis</text>
+<text x="810" y="552" font-size="15.5" fill="#eafaf9" font-weight="700" text-anchor="start">Redis</text>
+<text x="810" y="572" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">run queue</text>
+<text x="810" y="591" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">limits · budget</text>
+<rect x="968" y="110" width="280" height="500" rx="16" fill="#0d2a30" stroke="#3d6a70" stroke-width="1.5" stroke-dasharray="8 6"/>
+<text x="986" y="138" font-size="13" fill="#f2b84b" font-weight="700" text-anchor="start" letter-spacing="1.5">EXTERNAL SERVICES</text>
+<rect x="984" y="150" width="248" height="150" rx="12" fill="#123a48" stroke="#38bdf8" stroke-width="1.4"/>
+<path d="M 1006 184 H 1024 A 6 6 0 0 0 1023 172 A 9 9 0 0 0 1006 173 A 5.5 5.5 0 0 0 1006 184 Z" fill="none" stroke="#b0d5d8" stroke-width="1.5"/>
+<text x="1040" y="182" font-size="16" fill="#eafaf9" font-weight="700" text-anchor="start">Model providers</text>
+<text x="1000" y="214" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">Anthropic · Claude</text>
+<text x="1000" y="234" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">OpenAI · GPT</text>
+<text x="1000" y="254" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">any LangChain chat model,</text>
+<text x="1000" y="274" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">chosen per run</text>
+<rect x="984" y="330" width="248" height="162" rx="12" fill="#174048" stroke="#3d6a70" stroke-width="1.4"/>
+<path d="M 1006 364 H 1024 A 6 6 0 0 0 1023 352 A 9 9 0 0 0 1006 353 A 5.5 5.5 0 0 0 1006 364 Z" fill="none" stroke="#b0d5d8" stroke-width="1.5"/>
+<text x="1040" y="362" font-size="16" fill="#eafaf9" font-weight="700" text-anchor="start">LangSmith</text>
+<text x="1000" y="394" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">a trace for every run</text>
+<text x="1000" y="414" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">👍 / 👎 from the page</text>
+<text x="1000" y="434" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">eval datasets</text>
+<text x="1000" y="454" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">experiments and A/B runs</text>
+<path d="M 198 298 H 254" fill="none" stroke="#79a7ab" stroke-width="1.7" marker-end="url(#head-muted)"/>
+<rect x="198.0" y="260.5" width="56.0" height="23" rx="9" fill="#0a2429" stroke="#79a7ab" stroke-opacity="0.7"/>
+<text x="226" y="276.5" font-size="12" fill="#b0d5d8" font-weight="600" text-anchor="middle" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">HTTPS</text>
+<path d="M 452 250 H 506" fill="none" stroke="#79a7ab" stroke-width="1.7" marker-end="url(#head-muted)"/>
+<rect x="428.2" y="193.0" width="101.6" height="38" rx="9" fill="#0a2429" stroke="#79a7ab" stroke-opacity="0.7"/>
+<text x="479" y="209.0" font-size="12" fill="#b0d5d8" font-weight="600" text-anchor="middle" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">SDK +</text>
+<text x="479" y="224.0" font-size="12" fill="#b0d5d8" font-weight="600" text-anchor="middle" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">visitor key</text>
+<path d="M 926 196 H 982" fill="none" stroke="#38bdf8" stroke-width="1.7" marker-end="url(#head-model)"/>
+<rect x="926.0" y="160.5" width="56.0" height="23" rx="9" fill="#0a2429" stroke="#38bdf8" stroke-opacity="0.7"/>
+<text x="954" y="176.5" font-size="12" fill="#b0d5d8" font-weight="600" text-anchor="middle" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">HTTPS</text>
+<path d="M 926 410 H 982" fill="none" stroke="#79a7ab" stroke-width="1.7" marker-end="url(#head-muted)"/>
+<rect x="914.6" y="353.0" width="78.8" height="38" rx="9" fill="#0a2429" stroke="#79a7ab" stroke-opacity="0.7"/>
+<text x="954" y="369.0" font-size="12" fill="#b0d5d8" font-weight="600" text-anchor="middle" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">traces ·</text>
+<text x="954" y="384.0" font-size="12" fill="#b0d5d8" font-weight="600" text-anchor="middle" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">feedback</text>
+<path d="M 560 468 V 520" fill="none" stroke="#79a7ab" stroke-width="1.7" marker-end="url(#head-muted)"/>
+<rect x="574.0" y="478.5" width="56.0" height="23" rx="9" fill="#0a2429" stroke="#79a7ab" stroke-opacity="0.7"/>
+<text x="602" y="494.5" font-size="12" fill="#b0d5d8" font-weight="600" text-anchor="middle" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">:5432</text>
+<path d="M 777 468 V 520" fill="none" stroke="#79a7ab" stroke-width="1.7" marker-end="url(#head-muted)"/>
+<rect x="792.0" y="478.5" width="56.0" height="23" rx="9" fill="#0a2429" stroke="#79a7ab" stroke-opacity="0.7"/>
+<text x="820" y="494.5" font-size="12" fill="#b0d5d8" font-weight="600" text-anchor="middle" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">:6379</text>
+<rect x="32" y="650" width="596" height="300" rx="16" fill="#0d2a30" stroke="#3d6a70" stroke-width="1.5" stroke-dasharray="8 6"/>
+<text x="50" y="678" font-size="13" fill="#f2b84b" font-weight="700" text-anchor="start" letter-spacing="1.5">DEVELOPER MACHINE</text>
+<text x="610" y="678" font-size="13" fill="#79a7ab" font-weight="400" text-anchor="end">your own keys</text>
+<rect x="48" y="696" width="180" height="150" rx="10" fill="#174048" stroke="#3d6a70" stroke-width="1.3"/>
+<rect x="62" y="708" width="30" height="24" rx="4" fill="none" stroke="#b0d5d8" stroke-width="1.5"/>
+<path d="M 69 716 L 74 720 L 69 724 M 77 725 H 85" fill="none" stroke="#b0d5d8" stroke-width="1.5"/>
+<text x="102" y="726" font-size="15.5" fill="#eafaf9" font-weight="700" text-anchor="start">s2p CLI</text>
+<text x="62" y="758" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">convert · suite</text>
+<text x="62" y="777" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">same graphs,</text>
+<text x="62" y="796" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">in-process</text>
+<text x="62" y="815" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">runs in any CI job</text>
+<rect x="240" y="696" width="180" height="150" rx="10" fill="#11392f" stroke="#34d399" stroke-width="1.3"/>
+<text x="254" y="721" font-size="15.5" fill="#eafaf9" font-weight="700" text-anchor="start">Eval harness</text>
+<text x="254" y="742" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">fixed datasets:</text>
+<text x="254" y="761" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">12 files, 11 hard cases</text>
+<text x="254" y="780" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">evaluators + LLM judge</text>
+<text x="254" y="799" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">A/B before a prompt</text>
+<text x="254" y="818" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">change ships</text>
+<rect x="432" y="696" width="180" height="150" rx="10" fill="#174048" stroke="#3d6a70" stroke-width="1.3"/>
+<text x="446" y="721" font-size="15.5" fill="#eafaf9" font-weight="700" text-anchor="start">Deploy scripts</text>
+<text x="446" y="742" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">flyctl, both apps</text>
+<text x="446" y="761" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">refuses while runs</text>
+<text x="446" y="780" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">are in flight</text>
+<text x="446" y="799" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">pinned API image</text>
+<rect x="652" y="650" width="596" height="300" rx="16" fill="#0d2a30" stroke="#3d6a70" stroke-width="1.5" stroke-dasharray="8 6"/>
+<text x="670" y="678" font-size="13" fill="#f2b84b" font-weight="700" text-anchor="start" letter-spacing="1.5">GITHUB</text>
+<text x="1230" y="678" font-size="13" fill="#79a7ab" font-weight="400" text-anchor="end">varunbhatt2193/selenium2playwright</text>
+<rect x="668" y="696" width="170" height="150" rx="10" fill="#174048" stroke="#3d6a70" stroke-width="1.3"/>
+<text x="682" y="721" font-size="15.5" fill="#eafaf9" font-weight="700" text-anchor="start">Repository</text>
+<text x="682" y="742" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">main</text>
+<text x="682" y="761" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">goldens immutable</text>
+<text x="682" y="780" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">CodeQL scanning</text>
+<rect x="858" y="696" width="374" height="150" rx="10" fill="#11392f" stroke="#34d399" stroke-width="1.3"/>
+<text x="872" y="721" font-size="15.5" fill="#eafaf9" font-weight="700" text-anchor="start">Actions: CI gate, every push</text>
+<text x="872" y="742" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">775 offline tests, no tokens</text>
+<text x="872" y="761" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">converted goldens run in Chromium</text>
+<text x="872" y="780" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">playground build</text>
+<text x="872" y="799" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">red blocks the merge</text>
+<path d="M 838 770 H 856" fill="none" stroke="#34d399" stroke-width="1.7" marker-end="url(#head-good)"/>
+<path d="M 470 696 V 612" fill="none" stroke="#2dd4bf" stroke-width="1.7" marker-end="url(#head-accent)"/>
+<rect x="411.6" y="620.5" width="116.8" height="23" rx="9" fill="#0a2429" stroke="#2dd4bf" stroke-opacity="0.7"/>
+<text x="470" y="636.5" font-size="12" fill="#b0d5d8" font-weight="600" text-anchor="middle" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">flyctl deploy</text>
+<path d="M 612 896 H 753 V 848" fill="none" stroke="#79a7ab" stroke-width="1.7" marker-end="url(#head-muted)"/>
+<rect x="600.6" y="884.5" width="78.8" height="23" rx="9" fill="#0a2429" stroke="#79a7ab" stroke-opacity="0.7"/>
+<text x="640" y="900.5" font-size="12" fill="#b0d5d8" font-weight="600" text-anchor="middle" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">git push</text>
+<path d="M 138 846 V 978 H 1262 V 240" fill="none" stroke="#38bdf8" stroke-width="1.7" stroke-dasharray="6 5"/>
+<path d="M 330 846 V 978" fill="none" stroke="#38bdf8" stroke-width="1.7" stroke-dasharray="6 5"/>
+<path d="M 1262 240 H 1234" fill="none" stroke="#38bdf8" stroke-width="1.7" stroke-dasharray="6 5" marker-end="url(#head-model)"/>
+<path d="M 1262 430 H 1234" fill="none" stroke="#38bdf8" stroke-width="1.7" stroke-dasharray="6 5" marker-end="url(#head-model)"/>
+<rect x="425.0" y="966.5" width="550.0" height="23" rx="9" fill="#0a2429" stroke="#38bdf8" stroke-opacity="0.7"/>
+<text x="700" y="982.5" font-size="12" fill="#b0d5d8" font-weight="600" text-anchor="middle" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">CLI and eval harness → model providers · traces, datasets, experiments</text>
+<rect x="32" y="1010" width="20" height="16" rx="4" fill="none" stroke="#3d6a70" stroke-dasharray="4 3"/>
+<text x="60" y="1023" font-size="13.5" fill="#79a7ab" font-weight="400" text-anchor="start">boundary</text>
+<rect x="149.2" y="1010" width="20" height="16" rx="4" fill="#12343b" stroke="#2dd4bf"/>
+<text x="177.2" y="1023" font-size="13.5" fill="#79a7ab" font-weight="400" text-anchor="start">deployed app</text>
+<rect x="296.0" y="1010" width="20" height="16" rx="4" fill="#174048" stroke="#3d6a70"/>
+<text x="324.0" y="1023" font-size="13.5" fill="#79a7ab" font-weight="400" text-anchor="start">component</text>
+<path d="M 423.6 1011.2 V 1024.8 A 7.0 3.2 0 0 0 437.6 1024.8 V 1011.2" fill="#174048" stroke="#b0d5d8" stroke-width="1.5"/>
+<ellipse cx="430.6" cy="1011.2" rx="7.0" ry="3.2" fill="#12343b" stroke="#b0d5d8" stroke-width="1.5"/>
+<text x="448.6" y="1023" font-size="13.5" fill="#79a7ab" font-weight="400" text-anchor="start">data store</text>
+<rect x="552.6" y="1010" width="20" height="16" rx="4" fill="#123a48" stroke="#38bdf8"/>
+<text x="580.6" y="1023" font-size="13.5" fill="#79a7ab" font-weight="400" text-anchor="start">model call</text>
+<rect x="684.6" y="1010" width="20" height="16" rx="4" fill="#11392f" stroke="#34d399"/>
+<text x="712.6" y="1023" font-size="13.5" fill="#79a7ab" font-weight="400" text-anchor="start">gate, no model</text>
+<rect x="846.2" y="1010" width="20" height="16" rx="4" fill="#3d2a33" stroke="#fb7185"/>
+<text x="874.2" y="1023" font-size="13.5" fill="#79a7ab" font-weight="400" text-anchor="start">refuses</text>
 </svg>

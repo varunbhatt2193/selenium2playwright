@@ -73,7 +73,15 @@ For a one-off file, Claude Code in the repo is genuinely fine. An agent earns it
 
 ## How it works
 
-[![Architecture: who calls it, the front door that screens and meters input, the one-file and whole-suite graphs, what they use, and the evals loop that gates every change](ui/web/public/architecture.svg)](ui/web/public/architecture.svg)
+[![Architecture: the playground and the LangGraph API server on Fly with Postgres and Redis on a private network, model providers and LangSmith outside, and the developer machine and GitHub that evaluate, gate and deploy it](ui/web/public/architecture.svg)](ui/web/public/architecture.svg)
+
+Inside the convert graph, every file:
+
+```
+intake → recall → risk_review → convert → validate → critic → assemble
+                                   ▲                      │
+                                   └── repair (≤ 3) ──────┘
+```
 
 A LangGraph state machine. Before it starts, a pasted file is screened: anything that is not Selenium, or that talks to the model, is refused without a model call. `intake` classifies the file or refuses it honestly. `recall` fetches the few remembered preferences that apply. `risk_review` pauses the run on a pattern with more than one right answer. `convert` writes Playwright, `validate` runs the four gates, `critic` reviews, and the graph loops back with the actual findings until it passes or the attempt cap is hit. `assemble` always reports the outcome and keeps the latest draft. Suite mode wraps the same graph in a scan, a parallel fan-out per wave, and a whole-tree compile.
 
