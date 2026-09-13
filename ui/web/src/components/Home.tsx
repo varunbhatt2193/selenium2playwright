@@ -30,6 +30,9 @@ export default function Home() {
         Paste a TypeScript Selenium test. An AI agent rewrites it in Playwright and checks that the result compiles
         before you see it.
       </p>
+      <Link to="/how-it-works#why-not-claude-code" className="home-why">
+        Why not just use Claude Code in the repo? <ArrowRight size={15} />
+      </Link>
 
       <div className="home-example" aria-label="Example conversion">
         <div className="example-pane">

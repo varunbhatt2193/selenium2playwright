@@ -37,7 +37,8 @@ export function navigate(to: string) {
   window.dispatchEvent(new PopStateEvent('popstate'))
 }
 
-type LinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & { to: Page }
+// A link may name a section of a page: `/how-it-works#why-not-claude-code`.
+type LinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & { to: Page | `${Page}#${string}` }
 
 // A real anchor — middle-click, cmd-click and "copy link" all work — that
 // stays on the page for a plain left click.

@@ -36,6 +36,8 @@ export default function HowItWorks() {
         </Link>
       </div>
 
+      <WhyNotClaudeCode />
+
       <h2>The system</h2>
       <p className="how-caption">
         The browser never sees a model key. The page talks to a small FastAPI server, which calls the deployed agent
@@ -81,6 +83,86 @@ export default function HowItWorks() {
         </a>
       </div>
     </section>
+  )
+}
+
+// --- why an agent ---------------------------------------------------------------
+// The first question a technical visitor asks, answered where they will see it.
+// Same argument as the README's "Why an agent" table; change both together.
+
+const COMPARISON: [string, string, string][] = [
+  [
+    'Checking the output',
+    'Runs tsc or the linter when it decides to, and decides for itself when it is done.',
+    'Compile, lint, residue and parity checks run on every attempt. They are steps in the graph, not a choice the model makes. A failure goes back with its findings, at most three times, before you see any code.',
+  ],
+  [
+    'Tests that go missing',
+    'A test or an assertion can vanish in translation and the file still compiles. Someone has to notice.',
+    'Test and assertion counts are compared with the source. A mismatch sends the file back for repair, never a silent drop. So does any import the source never had.',
+  ],
+  [
+    'Quality',
+    'Depends on the prompt and the day. Nobody measures it.',
+    'Scored on a fixed evaluation set, with a CI gate against regressions. A prompt change ships only after an A/B run on that set.',
+  ],
+  [
+    'Scale',
+    'File by file, with someone watching each one.',
+    'A whole suite from one zip: page objects first, then the tests that use them, compiled together as one project.',
+  ],
+  [
+    'Who can run it',
+    'Someone with prompting skill and access to the repo.',
+    'Anyone, with the same result: this page, the CLI, or a CI pipeline.',
+  ],
+  [
+    'What reaches the model',
+    'Whatever is in the files, including text written to steer the model.',
+    'Anything that is not Selenium, or that talks to the model, is refused before a model sees it. Every run is metered against a budget.',
+  ],
+]
+
+function WhyNotClaudeCode() {
+  return (
+    <>
+      <h2 id="why-not-claude-code">Why not just Claude Code in the repo?</h2>
+      <p className="how-caption">
+        Fair question. Claude Code can convert a Selenium file, and for one file it does it well. The difference is
+        what you can trust when nobody reviews every file: when the migration is repeated, large, or has to be right.
+      </p>
+      <div className="compare-wrap">
+        <table className="compare">
+          <thead>
+            <tr>
+              <th scope="col">
+                <span className="sr-only">Concern</span>
+              </th>
+              <th scope="col">Claude Code in the repo</th>
+              <th scope="col" className="compare-us">
+                This agent
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {COMPARISON.map(([concern, repo, agent]) => (
+              <tr key={concern}>
+                <th scope="row">{concern}</th>
+                <td data-label="Claude Code in the repo">{repo}</td>
+                <td data-label="This agent" className="compare-us">
+                  {agent}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="how-note">
+        For a one-off file, Claude Code in the repo is genuinely fine. An agent earns its place when the job is
+        repeated, large, or needs guarantees. Closing the gap between &ldquo;the model can do it&rdquo; and &ldquo;a
+        system you can trust unattended&rdquo; is the engineering this project is about.
+      </p>
+    </>
   )
 }
 

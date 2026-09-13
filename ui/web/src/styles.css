@@ -1928,6 +1928,87 @@ pre.code:not(.numbered) .line {
   white-space: nowrap;
 }
 
+.compare-wrap {
+  overflow-x: auto;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+}
+
+.compare {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  line-height: 1.55;
+  text-align: left;
+}
+
+.compare th,
+.compare td {
+  padding: 14px 18px;
+  vertical-align: top;
+  border-bottom: 1px solid var(--line);
+}
+
+.compare tbody tr:last-child th,
+.compare tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.compare thead th {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  background: var(--hover-2);
+}
+
+.compare thead th.compare-us {
+  color: var(--good);
+}
+
+.compare tbody th {
+  width: 18%;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.compare td {
+  width: 36%;
+  color: var(--text-3);
+}
+
+.compare td.compare-us {
+  width: 46%;
+  color: var(--text);
+  background: rgba(52, 211, 153, 0.05);
+  border-left: 1px solid rgba(52, 211, 153, 0.25);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.home-why {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: -8px;
+  font-weight: 700;
+  font-size: 14.5px;
+  color: var(--accent);
+}
+
+.home-why:hover {
+  color: var(--text);
+}
+
 .diagram {
   width: 100%;
   height: auto;
@@ -2360,6 +2441,50 @@ pre.code:not(.numbered) .line {
   }
   .home-cards {
     grid-template-columns: 1fr;
+  }
+  /* The comparison stacks: each concern becomes a card, each cell says whose it is. */
+  .compare thead {
+    display: none;
+  }
+  .compare,
+  .compare tbody,
+  .compare tr,
+  .compare th,
+  .compare td {
+    display: block;
+    width: auto;
+  }
+  .compare tbody tr {
+    border-bottom: 1px solid var(--line-strong);
+  }
+  .compare tbody tr:last-child {
+    border-bottom: 0;
+  }
+  .compare th,
+  .compare td {
+    border-bottom: 0;
+    padding: 6px 16px;
+  }
+  .compare tbody th {
+    padding-top: 16px;
+  }
+  .compare td:last-child {
+    padding-bottom: 16px;
+  }
+  .compare td.compare-us {
+    border-left: 0;
+  }
+  .compare td::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-3);
+  }
+  .compare td.compare-us::before {
+    color: var(--good);
   }
 }
 

@@ -26,9 +26,12 @@ export default function App() {
       .catch((err: Error) => setBoot(err.message))
   }, [])
 
-  // A new page starts at its top, with its own tab title.
+  // A new page starts at its top, with its own tab title — or at the section
+  // the link named, which has rendered by the time this runs.
   useEffect(() => {
-    window.scrollTo({ top: 0 })
+    const section = window.location.hash && document.getElementById(window.location.hash.slice(1))
+    if (section) section.scrollIntoView()
+    else window.scrollTo({ top: 0 })
     document.title = page ? PAGES[page] : 'Page not found · Selenium → Playwright'
   }, [page])
 
