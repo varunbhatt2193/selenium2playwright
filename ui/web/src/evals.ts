@@ -87,7 +87,7 @@ export const EXECUTION = {
   hardArms: '9, 9 and 8 of 11',
   testRows: '20/20 test rows across four runs',
   pageObjectRows: '20/30 page-object rows',
-  caught: 'a dropped 10 s wait budget, so a 5 s default lost the race — found twice, months apart',
+  caught: 'a dropped 10 s wait budget, so a 5 s default lost the race — found in two independent runs',
   spend: 'zero tokens, about four minutes of browser time',
 }
 

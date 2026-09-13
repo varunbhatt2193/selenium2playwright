@@ -422,6 +422,18 @@ export default function Lab({ session, limits, onSpent }: Props) {
                       {card.attempts === 1 ? '' : 's'}
                     </strong>
                     <p>{card.reason}</p>
+                    {/* Which model wrote this. The published eval numbers name
+                        the model they were measured on; a result on screen has
+                        to do the same, or the two cannot be compared. */}
+                    {Object.keys(card.models).length > 0 && (
+                      <p className="score-models">
+                        {Object.entries(card.models).map(([role, name]) => (
+                          <span key={role}>
+                            {role} <code>{name}</code>
+                          </span>
+                        ))}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -465,6 +477,19 @@ export default function Lab({ session, limits, onSpent }: Props) {
                       <li key={i}>{todo}</li>
                     ))}
                   </ul>
+                )}
+                {/* What the conversion decided on your behalf: a rewritten URL,
+                    a renamed method, a locator it had to infer. The graph has
+                    always returned these; the page used to drop them. */}
+                {card.notes.length > 0 && (
+                  <div className="score-notes">
+                    <strong>What it decided for you</strong>
+                    <ul>
+                      {card.notes.map((note, i) => (
+                        <li key={i}>{note}</li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
                 {card.errors.length > 0 && (
                   <ul className="todo-list errors">

@@ -108,12 +108,17 @@ const COMPARISON: [string, string, string][] = [
   [
     'Quality',
     'Depends on the prompt and the day. Nobody measures it.',
-    'Scored on a fixed evaluation set, with a CI gate against regressions. A prompt change ships only after an A/B run on that set.',
+    'Scored on a fixed evaluation set, and a prompt change ships only after an A/B run on that set. CI replays the golden fixtures in a real browser on every push.',
   ],
   [
     'Scale',
     'File by file, with someone watching each one.',
     'A whole suite in one command: page objects first, then the tests that use them, compiled together as one project.',
+  ],
+  [
+    'Token spend',
+    'Explores the repo to build its own context: every file it opens and every retry is tokens, and the same job costs a different amount each time.',
+    'One Selenium file per call, plus the page objects it imports and a capped slice of its callers. Helpers and config are copied across with no model call, and the four checks are a compiler, a linter and two scripts, which cost nothing.',
   ],
   [
     'Who can run it',
@@ -218,13 +223,13 @@ function Defs() {
 
 function LoopDiagram() {
   return (
-    <svg className="diagram" viewBox="0 0 980 262" role="img" aria-label="Agent loop: intake, which can refuse; recall; risk review, which can pause to ask you; convert; validate with four gates; critic; report; with failures going back to convert at most three times">
+    <svg className="diagram" viewBox="0 0 980 262" role="img" aria-label="Agent loop: intake, which can refuse; recall; risk review, which flags a pattern with two right answers and asks you when run locally; convert; validate with four gates; critic; report; with failures going back to convert at most three times">
       <Defs />
       <Box x={12} y={52} w={108} h={86} title="Intake" lines={['page object', 'or spec?']} />
       <Arrow d="M 120 95 H 134" />
       <Box x={136} y={52} w={108} h={86} title="Recall" lines={['conventions', 'you taught it']} />
       <Arrow d="M 244 95 H 258" />
-      <Box x={260} y={52} w={130} h={86} title="Risk review" lines={['pauses to ask you', 'when a pattern has', 'two right answers']} />
+      <Box x={260} y={52} w={130} h={86} title="Risk review" lines={['flags a pattern with', 'two right answers; asks', 'you when run locally']} />
       <Arrow d="M 390 95 H 404" />
       <Box x={406} y={52} w={118} h={86} title="Convert" lines={['one model writes', 'the Playwright', 'version']} tone="accent" />
       <Arrow d="M 524 95 H 538" />

@@ -2779,3 +2779,42 @@ pre.code:not(.numbered) .line {
   flex-wrap: wrap;
   gap: 12px;
 }
+
+/* --- scorecard: the model that wrote it, and what it decided for you ------- */
+
+.score-models {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.score-models code {
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.score-notes {
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--hover-2);
+}
+
+.score-notes strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.score-notes ul {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-left: 18px;
+  list-style: disc;
+  color: var(--text-2);
+  font-size: 13px;
+}

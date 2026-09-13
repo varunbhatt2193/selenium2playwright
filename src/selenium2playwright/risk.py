@@ -86,10 +86,11 @@ RISKS: dict[str, RiskKind] = {
                    "the action that opens the dialog, choosing accept() or dismiss() to match exactly what "
                    "the Selenium code did, and assert the dialog's message where the original did."),
             Option("expect-event", "await the dialog event alongside the action",
-                   "Handle browser dialogs by awaiting the dialog event alongside the triggering action "
-                   "(register the handler or waitForEvent(\"dialog\") first, then perform the action, then "
-                   "await both), so the dialog object itself is available to assert on. Match the original "
-                   "accept/dismiss choice exactly."),
+                   "Handle browser dialogs by awaiting the dialog event alongside the triggering action, "
+                   "handling it the moment it opens: await Promise.all([page.waitForEvent(\"dialog\").then("
+                   "(dialog) => { assert on dialog.message() here; return dialog.accept(); }), the action]). "
+                   "Never await the dialog and handle it in a later statement: the open dialog blocks the "
+                   "action, so that stalls. Match the original accept/dismiss choice exactly."),
             Option("auto-dismiss", "let Playwright auto-dismiss; assert only the page outcome",
                    "Do not register a dialog handler: rely on Playwright's default auto-dismiss and assert "
                    "only the resulting page state. Apply this ONLY where the Selenium code dismissed the "

@@ -58,8 +58,8 @@ export const STACK: StackGroup[] = [
     blurb: 'Self-hosted, metered, with a dollar budget.',
     items: [
       ['Docker on Fly.io', 'the agent image carries Node and the pinned toolchain, so it can compile its own output'],
-      ['Postgres + pgvector', 'run checkpoints and the long-term memory of conventions users teach it'],
-      ['Redis', 'the run queue and the atomic counters behind per-visitor limits and the daily budget'],
+      ['Postgres + pgvector', 'run checkpoints, the long-term memory of conventions users teach it, and the counters behind per-visitor limits and the daily budget'],
+      ['Redis', 'the run queue, and the live stream of a run as it happens'],
       ['GitHub Actions', 'unit tests, the web build, execution evals in a real browser, CodeQL — no model spend'],
     ],
   },

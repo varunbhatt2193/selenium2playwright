@@ -46,7 +46,7 @@ export default function Evaluation() {
           <FlaskConical size={18} />
           <strong>Execution in a real browser</strong>
           <p>Saved conversions replayed through Chromium against a pinned demo app. The browser gets a vote.</p>
-          <small>Runs in CI on every push with zero model spend, because finished experiments already hold the code.</small>
+          <small>The golden fixtures run this way in CI on every push. Saved conversions were replayed with zero model spend, because finished experiments already hold the code.</small>
         </div>
       </div>
 
@@ -116,7 +116,7 @@ export default function Evaluation() {
           <p>
             For the small model it fixed every compile failure: {SHOOTOUT[0].one} to {SHOOTOUT[0].reflection} of twelve. For the
             large model, {SHOOTOUT[2].one} to {SHOOTOUT[2].reflection}, at {AB.actorTokens} the actor tokens and {AB.wallClock} the
-            wall-clock. That trade is the production default.
+            wall-clock. The loop is on by default in production.
           </p>
         </div>
         <div className="finding">
@@ -221,7 +221,7 @@ export default function Evaluation() {
 
       <div className="how-links">
         <a href={doc(REPORTS.primer)} target="_blank" rel="noreferrer">
-          <BookOpen size={15} /> Evaluation primer
+          <BookOpen size={15} /> How the evals were designed, before they ran
         </a>
         <a href={doc(REPORTS.gapLog)} target="_blank" rel="noreferrer">
           The gap log <ArrowRight size={13} />

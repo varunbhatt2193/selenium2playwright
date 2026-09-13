@@ -181,8 +181,9 @@ def draw() -> str:
     zone(256, 488, 670, 114, "Private network", dashed=False, stroke=C["line"])
     text(274, 540, "no public IP, reached", 13.5, C["text3"])
     text(274, 559, "only from inside Fly", 13.5, C["text3"])
-    store(543, 518, 200, "s2p-postgres", "Postgres + pgvector", ("run checkpoints", "long-term memory"))
-    store(760, 518, 160, "s2p-redis", "Redis", ("run queue", "limits · budget"))
+    store(543, 518, 200, "s2p-postgres", "Postgres + pgvector",
+          ("checkpoints · memory", "limits · budget"))
+    store(760, 518, 160, "s2p-redis", "Redis", ("run queue", "live run streams"))
 
     # --- external services -------------------------------------------------------
     zone(968, 110, 280, 500, "External services")
@@ -218,7 +219,7 @@ def draw() -> str:
     # --- GitHub -------------------------------------------------------------------
     zone(652, 650, 596, 300, "GitHub", "varunbhatt2193/selenium2playwright")
     part(668, 696, 170, 150, "Repository", ("main", "goldens immutable", "CodeQL scanning"))
-    part(858, 696, 374, 150, "Actions: CI gate, every push", ("775 offline tests, no tokens", "converted goldens run in Chromium", "playground build", "red blocks the merge"), "good")
+    part(858, 696, 374, 150, "Actions: CI gate, every push", ("790+ offline tests, no tokens", "golden fixtures run in Chromium", "playground build", "red blocks the merge"), "good")
     wire("M 838 770 H 856", colour="good")
 
     # --- wires from the build side ----------------------------------------------------
