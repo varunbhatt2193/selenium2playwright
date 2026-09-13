@@ -19,7 +19,7 @@ export default function Nav({ page }: Props) {
       <nav className="nav" aria-label="Primary navigation">
         <Link to="/" className="brand" aria-label="Home">
           <Brand />
-          <span>
+          <span className="brand-name">
             Selenium <span className="brand-arrow">→</span> Playwright
           </span>
         </Link>
@@ -30,6 +30,8 @@ export default function Nav({ page }: Props) {
               to={to}
               className={`nav-link ${page === to ? 'active' : ''}`}
               aria-current={page === to ? 'page' : undefined}
+              aria-label={label}
+              title={label}
             >
               <Icon size={15} /> <span>{label}</span>
             </Link>

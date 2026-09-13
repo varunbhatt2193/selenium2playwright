@@ -159,6 +159,7 @@ main {
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  white-space: nowrap;
   font-weight: 700;
   font-size: 15px;
   letter-spacing: -0.01em;
@@ -2518,18 +2519,40 @@ pre.code:not(.numbered) .line {
   }
 }
 
+/* The labelled bar needs about 1100px; below that the links go to icons, each
+   still named for screen readers by its hidden label or aria-label. */
+@media (max-width: 1120px) {
+  .nav-link span,
+  .nav-sep {
+    display: none;
+  }
+}
+
+@media (max-width: 600px) {
+  /* The mark alone still says home; the name is the first thing the page shows. */
+  .brand-name {
+    display: none;
+  }
+}
+
 @media (max-width: 720px) {
   main,
   .nav {
     padding-left: 16px;
     padding-right: 16px;
   }
-  .nav-link span,
-  .nav-sep {
-    display: none;
+  /* Seven icon links and the name did not fit a phone: the bar scrolled sideways. */
+  .nav-meta {
+    gap: 2px;
+  }
+  .nav-link {
+    padding: 8px 9px;
   }
   .home {
     padding-top: 44px;
+  }
+  .home-noise {
+    inset: 0 -16px;
   }
   .section-heading-row {
     flex-direction: column;
