@@ -216,6 +216,10 @@ class DeployConfigTests(unittest.TestCase):
         # An image is copied, pulled and cached. A key baked into a layer is a
         # key you cannot rotate out of the layers that already exist.
         self.assertIn(".env", ignored)
+        # The image is `ADD .` of the repository, so .gitignore keeping a secret
+        # off GitHub does nothing for the layer. The database password's local
+        # copy was baked in until 2026-09-12 for exactly that reason.
+        self.assertIn("deploy/fly/.pgpassword", ignored)
         # node_modules is built INSIDE the image, on Linux. A macOS tree copied
         # in would shadow it with binaries for the wrong platform.
         self.assertIn("node_modules/", ignored)
