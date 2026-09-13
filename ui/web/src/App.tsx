@@ -3,7 +3,7 @@ import Nav from './components/Nav'
 import Footer from './components/Footer'
 import Home from './components/Home'
 import Lab from './components/Lab'
-import SuiteLab from './components/SuiteLab'
+import SuiteClosed from './components/SuiteClosed'
 import HowItWorks from './components/HowItWorks'
 import Evaluation from './components/Evaluation'
 import { getLimits, getSession } from './api'
@@ -52,7 +52,9 @@ export default function App() {
         )}
         {page === '/' && <Home />}
         {page === '/convert' && <Lab session={session} limits={limits} onSpent={refreshLimits} />}
-        {page === '/suite' && <SuiteLab limits={limits} onSpent={refreshLimits} />}
+        {/* Closed to the public since 2026-09-12. SuiteLab is the upload page, kept
+            unrouted: see SuiteClosed for the three switches that reopen it. */}
+        {page === '/suite' && <SuiteClosed />}
         {page === '/how-it-works' && <HowItWorks />}
         {page === '/evaluation' && <Evaluation />}
         {page === null && (

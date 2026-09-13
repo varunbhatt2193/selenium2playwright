@@ -14,9 +14,13 @@ one.
 """
 
 import asyncio
+import importlib.util
 import os
+import re
 import unittest
+from pathlib import Path
 from unittest.mock import patch
+from uuid import uuid5
 
 from langgraph_sdk import Auth
 
@@ -345,8 +349,85 @@ if __name__ == "__main__":
     unittest.main()
 
 
+SUITE_TREE = {"pages/P.ts": SELENIUM, "tests/p.spec.ts": SELENIUM}
+
+
+class SuiteClosedTests(unittest.TestCase):
+    """Whole-suite conversion is the owner's only, by every door a caller could try.
+
+    The page stopped offering it on 2026-09-12. These are the doors a stranger
+    with the demo key would try next: the graph by name, by the uuid the server
+    really passes, a suite-shaped input sent to the graph that is open, and an
+    assistant of their own. Each is refused before the meter, so trying costs
+    the visitor nothing and costs the demo nothing.
+    """
+
+    def refused(self, body):
+        with patch.object(limits, "spend") as spend:
+            with self.assertRaises(Auth.exceptions.HTTPException) as caught:
+                run(guard.guard_run(VISITOR, body))
+            spend.assert_not_called()
+        self.assertEqual(caught.exception.status_code, 403)
+        return caught.exception.detail
+
+    def test_the_suite_graph_is_refused_by_name_and_by_uuid(self):
+        suite_uuid = uuid5(guard.NAMESPACE_GRAPH, "suite")
+        for assistant in ("suite", str(suite_uuid), suite_uuid):
+            with self.subTest(assistant=assistant):
+                detail = self.refused({"assistant_id": assistant,
+                                       "kwargs": {"input": {"source_tree": SUITE_TREE}}})
+                self.assertIn("closed on the public demo", detail)
+                self.assertIn("own API key", detail)
+
+    def test_a_suite_shaped_input_on_the_open_graph_is_refused(self):
+        for assistant in ("convert", uuid5(guard.NAMESPACE_GRAPH, "convert")):
+            with self.subTest(assistant=assistant):
+                detail = self.refused({"assistant_id": assistant, "kwargs": {"input": {
+                    "source_tree": SUITE_TREE, "source_text": SELENIUM}}})
+                self.assertIn("closed on the public demo", detail)
+
+    def test_any_other_assistant_or_none_at_all_is_refused(self):
+        for assistant in ("3f0c8a52-5d2b-4c1e-9a55-0e6f9c1d2b7a", "Suite", "suite ", "", None):
+            with self.subTest(assistant=assistant):
+                self.refused({"assistant_id": assistant,
+                              "kwargs": {"input": {"source_text": SELENIUM}}})
+
+    def test_the_open_graph_still_converts_one_file_by_name_and_by_uuid(self):
+        for assistant in ("convert", uuid5(guard.NAMESPACE_GRAPH, "convert")):
+            with self.subTest(assistant=assistant):
+                limits._counter.reset()
+                self.assertTrue(run(guard.guard_run(VISITOR, {
+                    "assistant_id": assistant, "kwargs": {"input": {"source_text": SELENIUM}}})))
+
+    def test_a_visitor_cannot_make_an_assistant_to_run_it_under(self):
+        for value in ({"graph_id": "suite"}, {"graph_id": "convert"}):
+            with self.assertRaises(Auth.exceptions.HTTPException) as caught:
+                run(guard.owner_only_assistants(VISITOR, value))
+            self.assertEqual(caught.exception.status_code, 403)
+
+    def test_the_owner_still_runs_suites(self):
+        self.assertTrue(run(guard.guard_run(OWNER, {
+            "assistant_id": uuid5(guard.NAMESPACE_GRAPH, "suite"),
+            "kwargs": {"input": {"source_tree": SUITE_TREE}}})))
+
+    def test_the_namespace_is_the_one_the_server_uses(self):
+        # Read from the source rather than imported: importing langgraph_api
+        # wants a REDIS_URI and a running server's worth of configuration.
+        spec = importlib.util.find_spec("langgraph_api")
+        if spec is None or not spec.submodule_search_locations:
+            self.skipTest("langgraph_api is not installed")
+        source = (Path(next(iter(spec.submodule_search_locations))) / "graph.py").read_text()
+        found = re.search(r'NAMESPACE_GRAPH = UUID\("([0-9a-f-]{36})"\)', source)
+        self.assertIsNotNone(found)
+        self.assertEqual(str(guard.NAMESPACE_GRAPH), found.group(1))
+
+
+@patch.object(guard, "PUBLIC_GRAPHS", frozenset({"convert", "suite"}))
 class SuiteUploadTests(unittest.TestCase):
     """A folder sent as text: allowed, validated, and charged by the file.
+
+    Closed to visitors since 2026-09-12 (`SuiteClosedTests`). These run with it
+    reopened, because the metering stays in place for the day it is.
 
     This is the step that made whole-suite conversion possible on a public host.
     The three things it had to get right are one test each: the request names no
@@ -361,22 +442,22 @@ class SuiteUploadTests(unittest.TestCase):
         tree = {"pages/LoginPage.ts": "export class LoginPage {}"}
         with patch.dict(os.environ, {"S2P_DAILY_LIMIT": "50"}, clear=False):
             self.assertTrue(run(guard.guard_run(
-                VISITOR, {"kwargs": {"input": {"source_tree": tree}}})))
+                VISITOR, {"assistant_id": "suite", "kwargs": {"input": {"source_tree": tree}}})))
         with self.assertRaises(Exception) as caught:
-            run(guard.guard_run(VISITOR, {"kwargs": {"input": {"root": "/etc"}}}))
+            run(guard.guard_run(VISITOR, {"assistant_id": "suite", "kwargs": {"input": {"root": "/etc"}}}))
         self.assertIn("root", str(caught.exception))
 
     def test_a_key_that_could_escape_the_workspace_is_refused(self):
         for bad in ("../../etc/cron.d/x", "/etc/passwd", "a/../../b.ts", "C:/x.ts"):
             with self.assertRaises(Exception, msg=bad) as caught:
                 run(guard.guard_run(
-                    VISITOR, {"kwargs": {"input": {"source_tree": {bad: "boom"}}}}))
+                    VISITOR, {"assistant_id": "suite", "kwargs": {"input": {"source_tree": {bad: "boom"}}}}))
             self.assertIn("relative path", str(caught.exception), bad)
 
     def test_a_tree_that_is_not_an_object_is_refused_rather_than_iterated(self):
         with self.assertRaises(Exception) as caught:
             run(guard.guard_run(
-                VISITOR, {"kwargs": {"input": {"source_tree": ["pages/A.ts"]}}}))
+                VISITOR, {"assistant_id": "suite", "kwargs": {"input": {"source_tree": ["pages/A.ts"]}}}))
         self.assertIn("object", str(caught.exception))
 
     def test_twelve_files_cost_twelve_not_one(self):
@@ -388,7 +469,7 @@ class SuiteUploadTests(unittest.TestCase):
         """
         tree = {f"pages/P{i}.ts": SELENIUM for i in range(5)}
         before = run(limits.snapshot())
-        run(guard.guard_run(VISITOR, {"kwargs": {"input": {"source_tree": tree}}}))
+        run(guard.guard_run(VISITOR, {"assistant_id": "suite", "kwargs": {"input": {"source_tree": tree}}}))
         after = run(limits.snapshot())
         self.assertEqual(after["budget"]["used"] - before["budget"]["used"], 5)
 
@@ -404,7 +485,7 @@ class SuiteUploadTests(unittest.TestCase):
         with patch.object(limits, "DAILY_LIMIT", 15):
             before = run(limits.snapshot())
             self.assertTrue(run(guard.guard_run(
-                VISITOR, {"kwargs": {"input": {"source_tree": tree}}})))
+                VISITOR, {"assistant_id": "suite", "kwargs": {"input": {"source_tree": tree}}})))
             after = run(limits.snapshot())
         self.assertEqual(after["budget"]["used"] - before["budget"]["used"], 4)
 
@@ -413,7 +494,7 @@ class SuiteUploadTests(unittest.TestCase):
         # gives when a suite is over the cap. It has to be true.
         tree = {f"pages/P{i}.ts": SELENIUM for i in range(5)}
         before = run(limits.snapshot())
-        run(guard.guard_run(VISITOR, {"kwargs": {"input": {
+        run(guard.guard_run(VISITOR, {"assistant_id": "suite", "kwargs": {"input": {
             "source_tree": tree, "only": ["pages/P1.ts", "P2.ts"]}}}))
         after = run(limits.snapshot())
         self.assertEqual(after["budget"]["used"] - before["budget"]["used"], 2)
@@ -424,7 +505,7 @@ class SuiteUploadTests(unittest.TestCase):
         for bad in ("pages/*", 7, [3, None], {"a": 1}):
             limits._counter.reset()
             self.assertTrue(run(guard.guard_run(
-                VISITOR, {"kwargs": {"input": {"source_tree": tree, "only": bad}}})), bad)
+                VISITOR, {"assistant_id": "suite", "kwargs": {"input": {"source_tree": tree, "only": bad}}})), bad)
 
     def test_a_suite_too_big_for_what_is_left_is_refused_whole(self):
         # Half a suite converted and half refused is a worse answer than
@@ -432,7 +513,7 @@ class SuiteUploadTests(unittest.TestCase):
         with patch.object(limits, "BUDGET_RUNS", 4), patch.object(limits, "DAILY_LIMIT", 99):
             tree = {f"p{i}.ts": SELENIUM for i in range(6)}
             with self.assertRaises(Exception) as caught:
-                run(guard.guard_run(VISITOR, {"kwargs": {"input": {"source_tree": tree}}}))
+                run(guard.guard_run(VISITOR, {"assistant_id": "suite", "kwargs": {"input": {"source_tree": tree}}}))
             self.assertIn("6 conversions", str(caught.exception))
             # And the refusal gave the counts back, so the next caller is not
             # paying for a run that never started.
@@ -441,7 +522,7 @@ class SuiteUploadTests(unittest.TestCase):
     def test_the_owner_still_skips_all_of_it(self):
         owner = FakeCtx("owner", ["owner"])
         self.assertTrue(run(guard.guard_run(
-            owner, {"kwargs": {"input": {"root": "/anywhere", "out_root": "/tmp/out"}}})))
+            owner, {"assistant_id": "suite", "kwargs": {"input": {"root": "/anywhere", "out_root": "/tmp/out"}}})))
 
 
 class WhereTheCountsLiveTests(unittest.TestCase):

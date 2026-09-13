@@ -517,6 +517,7 @@ class SuiteAvailabilityTests(unittest.TestCase):
         self.assertIn("Upload", blocked)
         self.assertEqual(pg.folder_blocker("http://127.0.0.1:2024"), "")
 
+    @patch.object(guard, "PUBLIC_GRAPHS", frozenset({"convert", "suite"}))
     def test_the_guard_really_would_refuse_a_folder_by_path(self):
         """The reason the folder input is local-only, asserted rather than described.
 
@@ -531,6 +532,7 @@ class SuiteAvailabilityTests(unittest.TestCase):
             run(guard.guard_run(VISITOR, body))
         self.assertIn("root", str(caught.exception))
 
+    @patch.object(guard, "PUBLIC_GRAPHS", frozenset({"convert", "suite"}))
     def test_an_uploaded_suite_is_something_the_guard_accepts(self):
         """The other half of the same contract, and the one that makes uploads work.
 
@@ -542,6 +544,7 @@ class SuiteAvailabilityTests(unittest.TestCase):
             tree={"pages/LoginPage.ts": SELENIUM, "tests/login.spec.ts": SELENIUM})}}
         self.assertTrue(run(guard.guard_run(VISITOR, body)))
 
+    @patch.object(guard, "PUBLIC_GRAPHS", frozenset({"convert", "suite"}))
     def test_a_tree_with_a_path_that_escapes_is_refused_at_the_door(self):
         body = {"assistant_id": "suite",
                 "kwargs": {"input": {"source_tree": {"../../etc/cron.d/x": "boom"}}}}

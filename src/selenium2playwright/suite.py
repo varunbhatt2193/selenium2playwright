@@ -578,6 +578,25 @@ def manifest_json(manifest: Manifest) -> dict:
     }
 
 
+# --- closed on the public demo -----------------------------------------------
+#
+# Whole-suite conversion is off for visitors since 2026-09-12. A suite is one
+# click and many model calls, and the demo runs on the owner's key; a single
+# file stays open because one run is a price a stranger's curiosity can pay.
+# The guard and the playground server both refuse with this sentence, so a
+# caller who skips the page reads the same thing the page says. To reopen it,
+# add "suite" to `guard.PUBLIC_GRAPHS` and set `SUITE_OPEN` in ui/server.py.
+
+REPO_URL = "https://github.com/varunbhatt2193/selenium2playwright"
+
+SUITE_CLOSED = (
+    "Whole-suite conversion is closed on the public demo: one suite is dozens of "
+    "model calls, and this demo pays for them. Clone the repository and run "
+    "`s2p suite` with your own API key (" + REPO_URL + "). Single files still "
+    "convert here."
+)
+
+
 # --- a suite as text, for callers with no filesystem here ----------------------
 #
 # Everything above this line takes a directory, because that is what `s2p suite`

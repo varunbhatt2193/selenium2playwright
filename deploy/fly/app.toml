@@ -35,7 +35,10 @@ primary_region = "iad"
   # saying something the meter no longer means.
   S2P_DAILY_BUDGET_USD = "5.40"
 
-  # How many conversions one visitor may spend in a day. A suite is metered per
+  # How many conversions one visitor may spend in a day. (Since 2026-09-12 a
+  # visitor cannot start a suite at all, see guard.PUBLIC_GRAPHS; what follows
+  # is how it is charged for the owner's key and on the day it reopens.)
+  # A suite is metered per
   # file and charged in full before any model runs, so this is also the largest
   # suite this deployment will convert on the demo's own card: twelve is the
   # sample suite exactly. A folder bigger than this is refused whole rather than

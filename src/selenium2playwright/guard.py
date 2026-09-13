@@ -59,6 +59,7 @@ import hmac
 import os
 import re
 from typing import Any
+from uuid import UUID, uuid5
 
 from langgraph_sdk import Auth
 
@@ -92,6 +93,26 @@ FORBIDDEN_INPUTS = {
     "root": "belongs to the suite graph, which reads server-side directories",
     "out_root": "belongs to the suite graph, which writes server-side directories",
 }
+
+# The graphs a demo caller may run, by name. Everything else is the owner's.
+# "suite" came off this list on 2026-09-12 (see `suite.SUITE_CLOSED`); putting
+# it back is the whole of reopening it here, because the metering below was
+# left in place for that day.
+PUBLIC_GRAPHS = frozenset({"convert"})
+
+# A run names its assistant by graph id or by uuid, and the server hands this
+# handler the uuid. Each graph's built-in assistant has a fixed one:
+# uuid5(NAMESPACE_GRAPH, graph_id), with the namespace copied from
+# `langgraph_api.graph` (a test holds the two together). Assistants a caller
+# made are never on the list — and a demo caller cannot make one, see
+# `owner_only_assistants` — so "suite under another name" has no door either.
+NAMESPACE_GRAPH = UUID("6ba7b821-9dad-11d1-80b4-00c04fd430c8")
+
+
+def _public_assistant(assistant_id: Any) -> bool:
+    named = str(assistant_id or "").strip()
+    return any(named in (graph, str(uuid5(NAMESPACE_GRAPH, graph))) for graph in PUBLIC_GRAPHS)
+
 
 # A demo caller may not ask for more reflection laps than the deployment's own
 # default. Three is already the cap in graph.py; this stops `max_attempts: 99`
@@ -251,6 +272,12 @@ async def guard_run(ctx, value: dict) -> bool:
     if _is_owner(ctx):
         return True
 
+    # Which graph, before what it is asked to do: the suite graph is closed to
+    # visitors whatever the payload looks like, and a missing assistant is
+    # refused rather than assumed to be the harmless one.
+    if not _public_assistant(value.get("assistant_id")):
+        raise Auth.exceptions.HTTPException(status_code=403, detail=suite.SUITE_CLOSED)
+
     payload = _run_input(value)
 
     for field, why in FORBIDDEN_INPUTS.items():
@@ -267,6 +294,8 @@ async def guard_run(ctx, value: dict) -> bool:
     # page calls before sending and the graph calls before writing; this is the
     # only one of the three a stranger cannot skip.
     tree = payload.get("source_tree")
+    if tree is not None and "suite" not in PUBLIC_GRAPHS:
+        raise Auth.exceptions.HTTPException(status_code=403, detail=suite.SUITE_CLOSED)
     if tree is not None:
         if not isinstance(tree, dict):
             raise Auth.exceptions.HTTPException(

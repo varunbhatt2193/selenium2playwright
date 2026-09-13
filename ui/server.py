@@ -20,6 +20,8 @@ tests. The routes here translate between that module and HTTP:
     POST /api/suite/plan    uploaded files → the wave plan, before any spend
     POST /api/suite/convert a tree → a stream of files landing, then the result
     POST /api/suite/zip     the converted tree → a zip with the report inside
+                            (the three suite routes and /api/suite/sample are
+                            closed to the public: 403, see SUITE_OPEN)
 
 Two things it deliberately does not do, and they are the same two the Streamlit
 page did not do:
@@ -52,13 +54,13 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from selenium2playwright import playground as pg
-from selenium2playwright.suite import is_input
+from selenium2playwright.suite import SUITE_CLOSED, is_input
 
 # The built page. Vite writes `index.html` plus hashed files under `assets/`;
 # the Dockerfile builds it in a Node stage and copies only this directory across.
@@ -317,6 +319,21 @@ def feedback(body: FeedbackRequest,
 
 
 # --- a whole suite ------------------------------------------------------------
+#
+# Closed to the public since 2026-09-12: every route below answers 403 with
+# `SUITE_CLOSED` before it reads a byte. The page no longer offers the upload,
+# but these are plain URLs anybody can guess from `/api/convert`, so the page
+# going quiet is not the block — this is, and the guard behind it is the second
+# one. The routes are kept rather than deleted so reopening is a one-line change
+# here plus `guard.PUBLIC_GRAPHS`.
+
+SUITE_OPEN = False
+
+
+def suite_open() -> None:
+    if not SUITE_OPEN:
+        raise HTTPException(status_code=403, detail=SUITE_CLOSED)
+
 
 
 class Upload:
@@ -333,7 +350,7 @@ def patterns(only: str) -> list[str]:
     return [p.strip() for p in only.split(",") if p.strip()]
 
 
-@app.post("/api/suite/plan")
+@app.post("/api/suite/plan", dependencies=[Depends(suite_open)])
 async def suite_plan(files: list[UploadFile] = File(default=[]),
                      only: str = Form(default=""),
                      x_s2p_visitor: str | None = Header(default=None)) -> dict[str, Any]:
@@ -367,7 +384,7 @@ def planned(tree: dict[str, str], only: str, visitor: str) -> dict[str, Any]:
             "unaffordable": pg.affordable(snapshot, plan.billable)}
 
 
-@app.get("/api/suite/sample")
+@app.get("/api/suite/sample", dependencies=[Depends(suite_open)])
 def suite_sample(only: str = "",
                  x_s2p_visitor: str | None = Header(default=None)) -> dict[str, Any]:
     """The sample suite, read from this machine, as a planned tree.
@@ -443,7 +460,7 @@ def suite_events(body: SuiteRequest, visitor: str) -> Iterator[dict[str, Any]]:
     yield {"kind": "done", "result": result_view(result)}
 
 
-@app.post("/api/suite/convert")
+@app.post("/api/suite/convert", dependencies=[Depends(suite_open)])
 def suite_convert(body: SuiteRequest,
                   x_s2p_visitor: str | None = Header(default=None)) -> StreamingResponse:
     if not body.tree:
@@ -456,7 +473,7 @@ class ZipRequest(BaseModel):
     markdown: str = ""
 
 
-@app.post("/api/suite/zip")
+@app.post("/api/suite/zip", dependencies=[Depends(suite_open)])
 def suite_zip(body: ZipRequest) -> Response:
     if not body.tree:
         raise HTTPException(status_code=400, detail="There is nothing to download.")
