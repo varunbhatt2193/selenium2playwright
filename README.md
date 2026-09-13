@@ -10,7 +10,7 @@ No signup, nothing to install. Paste one Selenium file and get Playwright back, 
 
 **Whole suites run on your own machine.** Converting a folder is dozens of model calls in one click, and the public demo pays for its own tokens, so suite conversion is closed there. Clone the repo and run `s2p suite` with your own API key ([Run it yourself](#run-it-yourself)). It is the same agent with the same checks.
 
-[![The playground: Selenium in, Playwright out, four gates and a critic in between](docs/playground.jpg)](https://varun-s2p.fly.dev)
+[![The playground converting LoginPage.ts: the Playwright output, the agent's graph as it runs, and a 4/4 scorecard after one attempt](docs/playground-web.jpg)](https://varun-s2p.fly.dev)
 
 <table>
 <tr><th>You give it Selenium</th><th>You get back Playwright</th></tr>
