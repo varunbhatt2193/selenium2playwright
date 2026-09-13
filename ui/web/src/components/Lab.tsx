@@ -194,7 +194,7 @@ export default function Lab({ session, limits, onSpent }: Props) {
           )}
         </div>
         <button className="secondary-button" onClick={() => openUploader('source')}>
-          <UploadCloud size={16} /> Upload .ts
+          <UploadCloud size={16} /> Upload your file here
         </button>
       </div>
 
