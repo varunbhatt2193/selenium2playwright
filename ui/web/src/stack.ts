@@ -48,7 +48,7 @@ export const STACK: StackGroup[] = [
     title: 'The web layer',
     blurb: 'This page, and the small server behind it.',
     items: [
-      ['React 19 + Vite', 'the page you are reading, TypeScript throughout, no UI framework'],
+      ['React 19 + Vite', 'the page you are reading, TypeScript throughout'],
       ['FastAPI', 'a thin server: validates the request, calls the deployment, never holds the model key in the browser'],
       ['Server-sent events', 'the agent narrates each step to the page as it happens'],
     ],
