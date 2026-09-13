@@ -349,6 +349,112 @@ if __name__ == "__main__":
     unittest.main()
 
 
+ACTIONS = {
+    "threads": ("create", "read", "update", "delete", "search", "create_run"),
+    "assistants": ("create", "read", "update", "delete", "search"),
+    "crons": ("create", "read", "update", "delete", "search"),
+    "store": ("put", "get", "search", "list_namespaces", "delete"),
+}
+
+
+def handler_for(resource: str, action: str):
+    """The platform's own lookup (langgraph_api.auth.custom._get_handler), restated
+    because importing the API server wants a Redis URI: most specific first, the
+    global handler last, and None, which the platform treats as ALLOWED."""
+    for key in ((resource, action), (resource, "*"), ("*", action), ("*", "*")):
+        if key in guard.auth._handlers:
+            return guard.auth._handlers[key][-1]
+    return guard.auth._global_handlers[-1] if guard.auth._global_handlers else None
+
+
+class DenyByDefaultTests(unittest.TestCase):
+    """Every API action a demo key could reach, and exactly which ones it may use.
+
+    Written after a live probe on 2026-09-13: a demo key could PATCH and DELETE
+    a thread (200 and 204) and write thread state, because the guard had no
+    handler for `threads.update` or `threads.delete` and the platform allows
+    what no handler covers.
+    """
+
+    # What the playground actually does: make a thread, run the convert graph
+    # on it (create_run, its own test class), stream it (a thread read), and
+    # the platform looks up the published assistant along the way.
+    VISITOR_MAY = frozenset({("threads", "create"), ("threads", "read"), ("threads", "search"),
+                   ("assistants", "read"), ("assistants", "search")})
+
+    def allowed(self, ctx, resource, action) -> bool:
+        handler = handler_for(resource, action)
+        if handler is None:
+            return True
+        try:
+            run(handler(ctx, {"kwargs": {"input": {}}}))
+            return True
+        except Auth.exceptions.HTTPException as exc:
+            self.assertEqual(exc.status_code, 403)
+            return False
+
+    def test_every_action_has_a_handler(self):
+        for resource, actions in ACTIONS.items():
+            for action in actions:
+                with self.subTest(resource=resource, action=action):
+                    self.assertIsNotNone(handler_for(resource, action))
+
+    def test_a_visitor_may_use_exactly_what_the_playground_needs(self):
+        allowed = {(r, a) for r, actions in ACTIONS.items() for a in actions
+                   if a != "create_run" and self.allowed(VISITOR, r, a)}
+        self.assertEqual(allowed, self.VISITOR_MAY)
+
+    def test_the_owner_may_use_all_of_it(self):
+        for resource, actions in ACTIONS.items():
+            for action in actions:
+                if action == "create_run":
+                    continue
+                with self.subTest(resource=resource, action=action):
+                    self.assertTrue(self.allowed(OWNER, resource, action))
+
+    def test_updating_or_deleting_a_thread_is_refused_by_name(self):
+        for action in ("update", "delete"):
+            with self.assertRaises(Auth.exceptions.HTTPException) as caught:
+                run(handler_for("threads", action)(VISITOR, {"thread_id": "t"}))
+            self.assertIn("not available on the public demo", caught.exception.detail)
+
+
+class RunFieldTests(unittest.TestCase):
+    """The parts of a create-run request that are not its input."""
+
+    def body(self, **kwargs):
+        # The server's real shape: these keys are always present, empty when unused.
+        base = {"input": {"source_text": SELENIUM}, "command": None, "context": {},
+                "config": {"configurable": {"langgraph_request_id": "r"}}, "webhook": None}
+        return {"assistant_id": "convert", "kwargs": {**base, **kwargs}}
+
+    def test_the_playgrounds_own_request_still_passes(self):
+        limits._counter.reset()
+        self.assertTrue(run(guard.guard_run(VISITOR, self.body())))
+
+    def test_command_context_and_webhook_are_refused_before_the_meter(self):
+        cases = {
+            "command": {"update": {"context_paths": ["/etc/passwd"]}},
+            "context": {"model": "openai:gpt-5.5", "max_attempts": 3},
+            "webhook": "https://example.test/hook",
+        }
+        for field, sent in cases.items():
+            with self.subTest(field=field), patch.object(limits, "spend") as spend:
+                with self.assertRaises(Auth.exceptions.HTTPException) as caught:
+                    run(guard.guard_run(VISITOR, self.body(**{field: sent})))
+                self.assertEqual(caught.exception.status_code, 403)
+                self.assertIn(f"`{field}`", caught.exception.detail)
+                spend.assert_not_called()
+
+    def test_a_resume_is_refused_too(self):
+        with self.assertRaises(Auth.exceptions.HTTPException):
+            run(guard.guard_run(VISITOR, self.body(command={"resume": "yes"})))
+
+    def test_the_owner_may_send_all_three(self):
+        self.assertTrue(run(guard.guard_run(OWNER, self.body(
+            command={"resume": "yes"}, context={"model": "x"}, webhook="https://x.test"))))
+
+
 SUITE_TREE = {"pages/P.ts": SELENIUM, "tests/p.spec.ts": SELENIUM}
 
 
