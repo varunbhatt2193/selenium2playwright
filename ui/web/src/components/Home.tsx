@@ -27,8 +27,8 @@ export default function Home() {
         <em>Playwright out.</em>
       </h1>
       <p className="home-lede">
-        Paste a TypeScript Selenium test. An AI agent rewrites it in Playwright and checks that the result compiles
-        before you see it.
+        Paste a TypeScript Selenium test. An AI agent rewrites it in Playwright and checks that the result
+        compiles.
       </p>
       <Link to="/how-it-works#why-not-claude-code" className="home-why">
         Why not just use Claude Code in the repo? <ArrowRight size={15} />
