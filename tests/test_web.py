@@ -321,6 +321,24 @@ class WebTests(unittest.TestCase):
 
     # --- a whole suite ------------------------------------------------------
 
+    def test_every_suite_route_is_closed_to_the_public(self):
+        """The block is the URL, not the page: a guessed route gets the sentence."""
+        calls = {
+            "plan": lambda: self.client.post("/api/suite/plan", files={
+                "files": ("suite.zip", self._zip({"pages/P.ts": SELENIUM}), "application/zip")}),
+            "sample": lambda: self.client.get("/api/suite/sample"),
+            "convert": lambda: self.client.post("/api/suite/convert", json={
+                "tree": {"pages/P.ts": SELENIUM}}),
+            "zip": lambda: self.client.post("/api/suite/zip", json={"tree": {"pages/P.ts": PLAYWRIGHT}}),
+        }
+        for name, call in calls.items():
+            with self.subTest(route=name):
+                response = call()
+                self.assertEqual(response.status_code, 403)
+                self.assertIn("closed on the public demo", response.json()["detail"])
+                self.assertIn("own API key", response.json()["detail"])
+        self.assertEqual(self.fake.runs.calls, [])
+
     def _zip(self, files: dict[str, str]) -> bytes:
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "w") as archive:
@@ -328,6 +346,7 @@ class WebTests(unittest.TestCase):
                 archive.writestr(name, text)
         return buffer.getvalue()
 
+    @patch.object(server, "SUITE_OPEN", True)
     def test_plan_reads_a_zip_and_returns_the_waves_and_the_price(self):
         data = self._zip({
             "suite/pages/P.ts": SELENIUM,
@@ -350,6 +369,7 @@ class WebTests(unittest.TestCase):
         self.assertEqual(got["plan"]["found"], "Found 2 page objects")
         self.assertEqual(got["plan"]["wave_lines"], ["1 page object", "1 page object"])
 
+    @patch.object(server, "SUITE_OPEN", True)
     def test_plan_says_when_the_budget_cannot_pay(self):
         with patch.object(pg, "fetch_limits", lambda **_: {**SNAPSHOT, "budget": {"remaining": 1, "limit": 41}}):
             got = self.client.post("/api/suite/plan",
@@ -357,6 +377,7 @@ class WebTests(unittest.TestCase):
                                        "a.ts": SELENIUM, "b.ts": SELENIUM}), "application/zip")}).json()
         self.assertIn("1 are left", got["unaffordable"])
 
+    @patch.object(server, "SUITE_OPEN", True)
     def test_plan_refuses_an_empty_drop_and_a_binary_file(self):
         empty = self.client.post("/api/suite/plan", data={"only": ""})
         self.assertEqual(empty.status_code, 400)
@@ -364,6 +385,7 @@ class WebTests(unittest.TestCase):
         self.assertEqual(binary.status_code, 400)
         self.assertIn("UTF-8", binary.json()["detail"])
 
+    @patch.object(server, "SUITE_OPEN", True)
     def test_the_sample_suite_is_a_planned_tree(self):
         response = self.client.get("/api/suite/sample")
         if response.status_code == 404:
@@ -373,6 +395,7 @@ class WebTests(unittest.TestCase):
         self.assertEqual(len(got["plan"]["waves"]), 2)
         self.assertEqual(got["plan"]["files"], 12)
 
+    @patch.object(server, "SUITE_OPEN", True)
     def test_suite_convert_ticks_files_off_then_reports(self):
         outcome = {"path": "pages/P.ts", "wave": 1, "status": "passed", "attempts": 1,
                    "reason": "ok", "gates": [["compile", True]], "critic": "pass",
@@ -418,6 +441,7 @@ class WebTests(unittest.TestCase):
         self.assertEqual(sent["config"], {"max_concurrency": 2, "recursion_limit": 8})
         self.assertEqual(sent["context"]["max_attempts"], 1)
 
+    @patch.object(server, "SUITE_OPEN", True)
     def test_suite_zip_holds_the_files_and_the_report(self):
         response = self.client.post("/api/suite/zip", json={
             "tree": {"pages/P.ts": PLAYWRIGHT}, "markdown": "# report",

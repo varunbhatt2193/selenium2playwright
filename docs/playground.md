@@ -57,7 +57,13 @@ file · Whole suite · How it works · Evaluation · GitHub · LinkedIn) marks t
    Copy. The companion-file box sits behind an **Advanced** toggle; the samples
    that need one bring their own. The budget line from `GET /limits` sits under
    the heading.
-3. **`/suite` — a whole folder.** Drop a zip (or press "Use the 12-file sample
+3. **`/suite` — a whole folder.** *Closed to the public since 2026-09-12:*
+   the route shows `SuiteClosed` (why, the 12/12 proof, and the clone-and-run
+   steps), `ui/server.py` answers every `/api/suite/*` call with 403, and the
+   guard refuses a demo-key run on any graph but `convert`. The upload page
+   described next is `SuiteLab`, kept unrouted; reopening it is `App.tsx`,
+   `SUITE_OPEN` in `ui/server.py` and `guard.PUBLIC_GRAPHS`, all three.
+   What it did while open: Drop a zip (or press "Use the 12-file sample
    suite"), see the wave plan and the price *before* the button, watch files
    tick off as they land, then the result: per-file table (file · status ·
    gates · why), and three tabs — Files, TODOs, Report — where Report carries

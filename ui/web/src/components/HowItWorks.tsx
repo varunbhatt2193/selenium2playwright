@@ -32,7 +32,7 @@ export default function HowItWorks() {
           on the sample suite pass every check and compile together as one project, in about {SAMPLE_SECONDS} seconds.
         </span>
         <Link to="/suite" className="how-proof-link">
-          Run it yourself <ArrowRight size={14} />
+          Run it on your suite <ArrowRight size={14} />
         </Link>
       </div>
 
@@ -119,7 +119,7 @@ const COMPARISON: [string, string, string][] = [
   [
     'Scale',
     'File by file, with someone watching each one.',
-    'A whole suite from one zip: page objects first, then the tests that use them, compiled together as one project.',
+    'A whole suite in one command: page objects first, then the tests that use them, compiled together as one project.',
   ],
   [
     'Who can run it',

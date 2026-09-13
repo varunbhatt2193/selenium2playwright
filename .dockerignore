@@ -7,6 +7,16 @@
 .env.*
 !.env.example
 
+# The database password's local copy (deploy.sh writes it; Fly's secret store
+# holds the real one). The API image is `ADD .` of the whole repository, so a
+# file .gitignore keeps off GitHub is still baked in here unless it is listed
+# again: it was, until 2026-09-12. Same for local agent settings, which can
+# carry pasted commands.
+deploy/fly/.pgpassword
+.claude/settings.local.json
+roadmap.md
+plan-review.md
+
 .git
 .venv
 __pycache__/

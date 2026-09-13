@@ -64,9 +64,9 @@ export default function Home() {
             <FolderArchive size={22} />
           </span>
           <strong>Convert a whole suite</strong>
-          <span>Drop a zip of your Selenium folder and get a Playwright folder back.</span>
+          <span>Runs on your machine with your own API key: clone the repo and point it at your Selenium folder.</span>
           <em>
-            Open <ArrowRight size={15} />
+            See how <ArrowRight size={15} />
           </em>
         </Link>
       </div>

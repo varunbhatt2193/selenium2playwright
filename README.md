@@ -6,7 +6,9 @@
 
 ## ▶ Try it — [varun-s2p.fly.dev](https://varun-s2p.fly.dev)
 
-No signup, nothing to install. Paste one file, or drop a zip of your whole Selenium folder and get a Playwright folder back. The front page has a four-minute demo if you would rather watch first.
+No signup, nothing to install. Paste one Selenium file and get Playwright back, checked. The front page has a four-minute demo if you would rather watch first.
+
+**Whole suites run on your own machine.** Converting a folder is dozens of model calls in one click, and the public demo pays for its own tokens, so suite conversion is closed there. Clone the repo and run `s2p suite` with your own API key ([Run it yourself](#run-it-yourself)). It is the same agent with the same checks.
 
 [![The playground: Selenium in, Playwright out, four gates and a critic in between](docs/playground.jpg)](https://varun-s2p.fly.dev)
 
@@ -47,7 +49,7 @@ await expect(page).toHaveURL(/\/home/);
 
 | What was measured | Result |
 |---|---|
-| The 12-file sample suite, converted as one upload | **12/12 passed**, tree compiles as one project, about 20 seconds |
+| The 12-file sample suite, converted in one run | **12/12 passed**, tree compiles as one project, about 20 seconds |
 | Does self-correction earn its cost? (12 pinned files, same critic) | Haiku **2/12 → 9/12**; Opus **6/12 → 11/12**; Sonnet 11/12 first try |
 | Style, scored by a calibrated LLM judge | Two judges agreed within one point on **100%** of rows |
 | The twelve SDET hard cases, as a second benchmark | **6/11 → 9/11** after two playbook rules, with the delta proven from the code |
@@ -65,7 +67,7 @@ Fair question. Claude Code can convert a Selenium file, and for one file it does
 | **Checking the output** | Runs tsc or the linter when it decides to, and decides for itself when it is done. | Compile, lint, residue and parity checks run on every attempt. They are steps in the graph, not a choice the model makes. A failure goes back with its findings, at most three times, before you see any code. |
 | **Tests that go missing** | A test or an assertion can vanish in translation and the file still compiles. Someone has to notice. | Test and assertion counts are compared with the source. A mismatch sends the file back for repair, never a silent drop. So does any import the source never had. |
 | **Quality** | Depends on the prompt and the day. Nobody measures it. | Scored on a fixed evaluation set, with a CI gate against regressions. A prompt change ships only after an A/B run on that set. |
-| **Scale** | File by file, with someone watching each one. | A whole suite from one zip: page objects first, then the tests that use them, compiled together as one project. |
+| **Scale** | File by file, with someone watching each one. | A whole suite in one command: page objects first, then the tests that use them, compiled together as one project. |
 | **Who can run it** | Someone with prompting skill and access to the repo. | Anyone, with the same result: the playground, the CLI, or a CI pipeline. |
 | **What reaches the model** | Whatever is in the files, including text written to steer the model. | Anything that is not Selenium, or that talks to the model, is refused before a model sees it. Every run is metered against a budget. |
 
@@ -92,7 +94,9 @@ A LangGraph state machine. Before it starts, a pasted file is screened: anything
 ## Run it yourself
 
 ```sh
+git clone https://github.com/varunbhatt2193/selenium2playwright && cd selenium2playwright
 uv sync
+(cd sandbox && npm ci)          # the pinned TypeScript toolchain the checks run (Node 22)
 cp .env.example .env            # add ANTHROPIC_API_KEY (or OPENAI_API_KEY + S2P_MODEL=openai:gpt-5.4)
 uv run s2p convert samples/selenium-suite/pages/LoginPage.ts
 uv run s2p suite samples/selenium-suite --out out/suite
@@ -102,4 +106,4 @@ uv run s2p suite samples/selenium-suite --out out/suite
 
 ---
 
-*Built in public by [Varun Bhatt](https://github.com/varunbhatt2193). The demo is metered per visitor and against a shared daily dollar budget, because every conversion is real tokens on a real card. The page shows how many are left today.*
+*Built in public by [Varun Bhatt](https://github.com/varunbhatt2193). The demo converts single files only, metered per visitor and against a shared daily dollar budget, because every conversion is real tokens on a real card. The page shows how many are left today.*

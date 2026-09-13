@@ -2707,3 +2707,75 @@ pre.code:not(.numbered) .line {
 }
 
 .graph-node.idle .graph-node-badge { opacity: 0.5; }
+
+/* --- /suite while whole-suite conversion is closed to the public ----------- */
+
+.suite-closed {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.suite-closed h2 {
+  font-size: clamp(20px, 2.2vw, 26px);
+  font-weight: 800;
+  margin: 26px 0 0;
+}
+
+.suite-closed .how-caption {
+  margin-bottom: 0;
+}
+
+.closed-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 20px 22px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  background: rgba(251, 191, 36, 0.08);
+  color: var(--text-2);
+}
+
+.closed-notice > svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--warn);
+}
+
+.closed-notice strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 17px;
+  color: var(--text);
+}
+
+.closed-notice p {
+  max-width: 820px;
+}
+
+.closed-notice p + p {
+  margin-top: 8px;
+}
+
+.closed-notice a {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.closed-steps pre.code {
+  min-height: 0;
+}
+
+.closed-steps {
+  overflow-x: auto;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.closed-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
