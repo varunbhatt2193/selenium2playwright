@@ -69,14 +69,14 @@
 <ellipse cx="560.0" cy="529.36" rx="17.0" ry="7.36" fill="#12343b" stroke="#b0d5d8" stroke-width="1.5"/>
 <text x="593" y="532" font-size="12" fill="#2dd4bf" font-weight="600" text-anchor="start" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">s2p-postgres</text>
 <text x="593" y="552" font-size="15.5" fill="#eafaf9" font-weight="700" text-anchor="start">Postgres + pgvector</text>
-<text x="593" y="572" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">run checkpoints</text>
-<text x="593" y="591" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">long-term memory</text>
+<text x="593" y="572" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">checkpoints · memory</text>
+<text x="593" y="591" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">limits · budget</text>
 <path d="M 760 529.36 V 560.64 A 17.0 7.36 0 0 0 794 560.64 V 529.36" fill="#174048" stroke="#b0d5d8" stroke-width="1.5"/>
 <ellipse cx="777.0" cy="529.36" rx="17.0" ry="7.36" fill="#12343b" stroke="#b0d5d8" stroke-width="1.5"/>
 <text x="810" y="532" font-size="12" fill="#2dd4bf" font-weight="600" text-anchor="start" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">s2p-redis</text>
 <text x="810" y="552" font-size="15.5" fill="#eafaf9" font-weight="700" text-anchor="start">Redis</text>
 <text x="810" y="572" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">run queue</text>
-<text x="810" y="591" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">limits · budget</text>
+<text x="810" y="591" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">live run streams</text>
 <rect x="968" y="110" width="280" height="500" rx="16" fill="#0d2a30" stroke="#3d6a70" stroke-width="1.5" stroke-dasharray="8 6"/>
 <text x="986" y="138" font-size="13" fill="#f2b84b" font-weight="700" text-anchor="start" letter-spacing="1.5">EXTERNAL SERVICES</text>
 <rect x="984" y="150" width="248" height="150" rx="12" fill="#123a48" stroke="#38bdf8" stroke-width="1.4"/>
@@ -147,8 +147,8 @@
 <text x="682" y="780" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">CodeQL scanning</text>
 <rect x="858" y="696" width="374" height="150" rx="10" fill="#11392f" stroke="#34d399" stroke-width="1.3"/>
 <text x="872" y="721" font-size="15.5" fill="#eafaf9" font-weight="700" text-anchor="start">Actions: CI gate, every push</text>
-<text x="872" y="742" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">775 offline tests, no tokens</text>
-<text x="872" y="761" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">converted goldens run in Chromium</text>
+<text x="872" y="742" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">790+ offline tests, no tokens</text>
+<text x="872" y="761" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">golden fixtures run in Chromium</text>
 <text x="872" y="780" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">playground build</text>
 <text x="872" y="799" font-size="13.5" fill="#b0d5d8" font-weight="400" text-anchor="start">red blocks the merge</text>
 <path d="M 838 770 H 856" fill="none" stroke="#34d399" stroke-width="1.7" marker-end="url(#head-good)"/>

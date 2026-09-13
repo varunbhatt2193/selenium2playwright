@@ -19,7 +19,7 @@ of browser time.
 | What failed | Where | Why it matters |
 | --- | --- | --- |
 | `dynamic-loading-test` (Phase 6.2, Opus) | all four gates green | The source waited **10 000 ms** for a ~5 s delayed element. The conversion dropped the budget, so Playwright's **5 000 ms** default loses the race. Reproduced 3 runs out of 3 — not a flake. |
-| `dynamic-loading.spec.ts` (Phase 9.3 suite run) | whole converted tree | **The same defect, in an independent run, months apart.** Two independent samples make this a defect class, not variance. |
+| `dynamic-loading.spec.ts` (Phase 9.3 suite run) | whole converted tree | **The same defect, in an independent run** (Phase 9.3's suite run, 2026-09-06; this replay, 2026-09-07). Two independent samples make this a defect class, not variance. |
 | `upload-page`, `nested-frames-page`, `shared-session-page` | all four gates green | The converted page object is good code that names its members differently from the caller it was never shown. See "the coin flip" below. |
 | `dynamic-controls-page` (arm C) | compile also red | An invented matcher, `expect(...).toBeDetached()`. Already covered by playbook rule 23; recorded, not given a new rule. |
 | `windows-page` (Phase 6.2) | no code at all | The known structured-output parse failure. It cannot be executed, so it is counted as `not_run` and never as a pass. |

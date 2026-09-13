@@ -41,7 +41,8 @@ await expect(page).toHaveURL(/\/home/);
 - **The model can't lie to the compiler.** Every conversion must pass four deterministic gates: `tsc --noEmit`, typed ESLint, a Selenium-residue scan, and structure parity (same test cases, same assertion coverage as the source).
 - **It fixes its own work.** An AI critic reviews the output and the graph repairs what failed, up to three attempts, before anything reaches you. Whatever can't be verified ships as an explicit `TODO(review)`, never silently.
 - **It converts whole suites.** Page objects first, then the specs that import them, in parallel, and then the delivered tree is compiled as one project with a parity ledger you can hand over.
-- **It asks before it guesses.** Three Selenium patterns have more than one correct Playwright translation (dialogs, `executeScript`, a session shared by a `before` hook). The run suspends and asks you, then remembers the answer.
+- **It asks before it guesses.** Three Selenium patterns have more than one correct Playwright translation (dialogs, `executeScript`, a session shared by a `before` hook). Run it yourself with `--thread` and the run suspends and asks you, then remembers the answer. The public playground never pauses a stranger mid-run: it applies the playbook's default and names the choice on the result.
+- **It spends tokens only where a model is needed.** The agent is never pointed at your repository and never explores it. A scan decides which files actually use Selenium; helpers, fixtures and config are copied across untouched, with no model call at all. Each call carries one Selenium file, the page objects it imports, and — in a suite — a capped slice of the files that call it (most relevant first, 128 KB in total, 32 KB per file), so names match without shipping the tree. Four of the five checks are a compiler, a linter and two AST scripts: they cost nothing to run, however many times the loop repeats.
 - **It learns your conventions.** Tell it once ("wrap each action in a named `test.step()`") and it applies that rule in later conversations, on the files where it matters.
 - **It doesn't take orders from the file.** A pasted file that isn't Selenium, or that carries text aimed at the model (in a comment, a string, look-alike letters or invisible characters), is refused before any model sees it. The model is told the file is data, and a conversion that loads anything its source never did fails parity.
 
@@ -49,14 +50,16 @@ await expect(page).toHaveURL(/\/home/);
 
 | What was measured | Result |
 |---|---|
-| The 12-file sample suite, converted in one run | **12/12 passed**, tree compiles as one project, about 20 seconds |
-| Does self-correction earn its cost? (12 pinned files, same critic) | Haiku **2/12 → 9/12**; Opus **6/12 → 11/12**; Sonnet 11/12 first try |
-| Style, scored by a calibrated LLM judge | Two judges agreed within one point on **100%** of rows |
-| The twelve SDET hard cases, as a second benchmark | **6/11 → 9/11** after two playbook rules, with the delta proven from the code |
-| Converted tests run in a real browser, in CI, with no model spend | **20/20** test rows pass when the page object interface is supplied |
-| Offline test suite | **775 tests**, on every push, no secrets and no tokens |
+| The 12-file sample suite, converted in one run | **12/12 passed** all four checks and the critic, and the tree compiles as one project, in about 20 seconds. These are static checks, not a browser run. |
+| Does self-correction earn its cost? (12 pinned files, same Opus critic) | Haiku **2/12 → 9/12**, the loop's clearest win. Opus 6/12 → 11/12, but only +1 of that is the loop: 4 rows were the critic changing its verdict between runs. Sonnet went 11/12 → 10/12. One run per arm, so a one- or two-file difference is noise. |
+| Style, scored by a calibrated LLM judge | Two judges agreed exactly on **81%** of rows and within one point on all of them. Both scored Opus's reflected drafts *lower* than its first drafts. |
+| The twelve SDET hard cases, as a second benchmark (GPT-5.4) | **6/11 → 9/11** after two playbook rules. Two identical baselines scored 7/11 and 6/11, so the count alone is weak evidence; the stronger evidence is that the code changed exactly as each rule predicted. |
+| Saved conversions replayed in a real browser, with no model spend | **20/20** test rows pass when handed the golden page objects. Page-object rows fail on names a single file can't know, which a suite run fixes. The golden fixtures replay in CI on every push. |
+| Offline test suite | **790+ tests** on every push, with no secrets and no tokens |
 
-Full numbers and how they were produced: [Evaluation primer](docs/evaluation-primer.md) · [live evaluation page](https://varun-s2p.fly.dev/evaluation) · [what is still unsolved](docs/hard-cases.md).
+Each result names the model it was measured on. The public playground names its model on every result.
+
+Full numbers and how they were produced: [live evaluation page](https://varun-s2p.fly.dev/evaluation) · [reflection A/B](docs/phase-6.3-report.md) · [judge calibration](docs/phase-6.4-report.md) · [hard cases](docs/phase-11.1b-report.md) · [browser replay](docs/phase-11.2-report.md) · [what is still unsolved](docs/hard-cases.md) · [how the evals were designed, before they ran](docs/evaluation-primer.md).
 
 ## Why not just Claude Code in the repo?
 
@@ -66,7 +69,7 @@ Fair question. Claude Code can convert a Selenium file, and for one file it does
 |---|---|---|
 | **Checking the output** | Runs tsc or the linter when it decides to, and decides for itself when it is done. | Compile, lint, residue and parity checks run on every attempt. They are steps in the graph, not a choice the model makes. A failure goes back with its findings, at most three times, before you see any code. |
 | **Tests that go missing** | A test or an assertion can vanish in translation and the file still compiles. Someone has to notice. | Test and assertion counts are compared with the source. A mismatch sends the file back for repair, never a silent drop. So does any import the source never had. |
-| **Quality** | Depends on the prompt and the day. Nobody measures it. | Scored on a fixed evaluation set, with a CI gate against regressions. A prompt change ships only after an A/B run on that set. |
+| **Quality** | Depends on the prompt and the day. Nobody measures it. | Scored on a fixed evaluation set, and a prompt change ships only after an A/B run on that set. CI replays the golden fixtures in a real browser on every push. |
 | **Scale** | File by file, with someone watching each one. | A whole suite in one command: page objects first, then the tests that use them, compiled together as one project. |
 | **Who can run it** | Someone with prompting skill and access to the repo. | Anyone, with the same result: the playground, the CLI, or a CI pipeline. |
 | **What reaches the model** | Whatever is in the files, including text written to steer the model. | Anything that is not Selenium, or that talks to the model, is refused before a model sees it. Every run is metered against a budget. |
