@@ -170,6 +170,7 @@
 </style>
 
 <div class="wrap">
+  <p class="sub"><strong>Superseded.</strong> This is the design as reviewed on 2026-09-02, kept as a record. The current picture is <a href="../ui/web/public/architecture.svg">architecture.svg</a>, drawn by <code>scripts/draw_architecture.py</code>.</p>
   <p class="eyebrow">Selenium2Playwright · v1 · post-review</p>
   <h1>Selenium2Playwright Architecture</h1>
   <p class="dek prose">One LangGraph agent converts TypeScript Selenium to Playwright. The load-bearing idea: <strong>the LLM can't lie to the compiler</strong> — every conversion passes deterministic validation and a reflection loop before it ships, and everything the agent does is traced, evaluated, and monitored in LangSmith.</p>

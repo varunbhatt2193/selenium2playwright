@@ -40,11 +40,21 @@ export default function HowItWorks() {
 
       <h2>The system</h2>
       <p className="how-caption">
-        The browser never sees a model key. The page talks to a small FastAPI server, which calls the deployed agent
-        as a metered visitor. The agent image carries Node and a pinned TypeScript toolchain, so it can compile what
-        it writes.
+        Five layers, top to bottom. Nothing reaches a model until the front door has screened and metered it, and
+        nothing changes in the agent until the evals at the bottom say it is no worse. The browser never sees a model
+        key.
       </p>
-      <SystemDiagram />
+      <a className="architecture" href="/architecture.svg" target="_blank" rel="noreferrer">
+        <img
+          src="/architecture.svg"
+          width={1240}
+          height={1528}
+          alt="Architecture: the browser, CLI and CI call it; a front door screens and meters input; the one-file and whole-suite graphs convert and check; they use a model, a pinned TypeScript toolchain, Postgres and Redis; and an evals loop gates every change"
+        />
+        <span>
+          Open full size <ArrowRight size={13} />
+        </span>
+      </a>
 
       <h2>What happens to every file</h2>
       <p className="how-caption">
@@ -78,8 +88,8 @@ export default function HowItWorks() {
         <a href={`${GITHUB}/blob/main/docs/playbook.md`} target="_blank" rel="noreferrer">
           <BookOpen size={15} /> The conversion playbook
         </a>
-        <a href={`${GITHUB}/blob/main/docs/architecture.html`} target="_blank" rel="noreferrer">
-          The full architecture page <ArrowRight size={13} />
+        <a href={`${GITHUB}/blob/main/plan.md`} target="_blank" rel="noreferrer">
+          Architecture and decisions <ArrowRight size={13} />
         </a>
       </div>
     </section>
@@ -209,40 +219,6 @@ function Defs() {
         <path d="M 0 0 L 10 5 L 0 10 z" className="dhead" />
       </marker>
     </defs>
-  )
-}
-
-function SystemDiagram() {
-  return (
-    <svg className="diagram" viewBox="0 0 980 400" role="img" aria-label="System diagram: browser to FastAPI to the LangGraph deployment, which uses a model, a Node toolchain, Postgres and Redis, and reports to LangSmith">
-      <Defs />
-      {/* row one: the request path */}
-      <Box x={20} y={40} w={200} h={78} title="Browser" lines={['React 19 · Vite · TypeScript', 'this page']} />
-      <Arrow d="M 220 79 H 288" label="fetch + SSE" lx={254} ly={68} />
-      <Box x={290} y={40} w={200} h={78} title="FastAPI" lines={['ui/server.py', 'validates, streams progress']} />
-      <Arrow d="M 490 79 H 558" label="visitor key" lx={524} ly={68} />
-      <Box x={560} y={24} w={400} h={110} title="LangGraph deployment" lines={['Docker on Fly.io', 'auth · per-visitor limits · dollar budget', 'convert graph · suite graph']} tone="accent" />
-
-      {/* row two: what the deployment uses */}
-      <Arrow d="M 640 134 V 196" />
-      <Arrow d="M 760 134 V 196" />
-      <Arrow d="M 880 134 V 196" />
-      <Box x={548} y={198} w={184} h={92} title="Model" lines={['OpenAI or Anthropic', 'through LangChain', 'actor + critic roles']} />
-      <Box x={744} y={198} w={110} h={92} title="Toolchain" lines={['Node · tsc', 'ESLint', 'Playwright rules']} tone="good" />
-      <Box x={866} y={198} w={100} h={92} title="Storage" lines={['Postgres', '+ pgvector', 'Redis']} />
-
-      {/* observability, off to the side */}
-      <Arrow d="M 560 100 H 500 V 240 H 462" label="traces · feedback" lx={470} ly={172} />
-      <Box x={262} y={198} w={200} h={84} title="LangSmith" lines={['every run traced', 'evals and 👎 land as datasets']} />
-
-      {/* the legend line */}
-      <text x={20} y={340} className="dnote">
-        Storage: Postgres holds run checkpoints and long-term memory (pgvector); Redis holds the run queue and the atomic
-      </text>
-      <text x={20} y={358} className="dnote">
-        counters behind the limits. The toolchain is pinned in the image, so the agent compiles its own output where it runs.
-      </text>
-    </svg>
   )
 }
 

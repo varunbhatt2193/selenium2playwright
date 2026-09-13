@@ -1,6 +1,6 @@
 # Build log
 
-The phase-by-phase record of how Selenium2Playwright was built, in the order it happened. Each entry was written when the phase shipped and moved here from the README unchanged. For the short version, read the [README](../README.md); for the architecture and the decisions behind it, read [plan.md](../plan.md); for the current picture in one screen, the [interactive architecture diagram](https://claude.ai/code/artifact/877b27e1-3cc2-4f84-802f-091419bf27c1) (source: [architecture.html](architecture.html)).
+The phase-by-phase record of how Selenium2Playwright was built, in the order it happened. Each entry was written when the phase shipped and moved here from the README unchanged. For the short version, read the [README](../README.md); for the architecture and the decisions behind it, read [plan.md](../plan.md); for the current picture in one screen, the [architecture diagram](../ui/web/public/architecture.svg).
 
 ## Where it stands
 

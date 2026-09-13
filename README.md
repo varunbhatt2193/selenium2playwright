@@ -73,17 +73,13 @@ For a one-off file, Claude Code in the repo is genuinely fine. An agent earns it
 
 ## How it works
 
-```
-intake → recall → risk_review → convert → validate → critic → assemble
-                                   ▲                      │
-                                   └── repair (≤ 3) ──────┘
-```
+[![Architecture: who calls it, the front door that screens and meters input, the one-file and whole-suite graphs, what they use, and the evals loop that gates every change](ui/web/public/architecture.svg)](ui/web/public/architecture.svg)
 
 A LangGraph state machine. Before it starts, a pasted file is screened: anything that is not Selenium, or that talks to the model, is refused without a model call. `intake` classifies the file or refuses it honestly. `recall` fetches the few remembered preferences that apply. `risk_review` pauses the run on a pattern with more than one right answer. `convert` writes Playwright, `validate` runs the four gates, `critic` reviews, and the graph loops back with the actual findings until it passes or the attempt cap is hit. `assemble` always reports the outcome and keeps the latest draft. Suite mode wraps the same graph in a scan, a parallel fan-out per wave, and a whole-tree compile.
 
 **Stack:** Python · LangGraph · LangSmith · any LangChain chat model (Claude by default, OpenAI verified end to end, swappable per run with `--model`) · pinned TypeScript toolchain as the referee · React + Vite playground over FastAPI, self-hosted on Fly behind auth and a dollar budget.
 
-[Interactive architecture diagram](https://claude.ai/code/artifact/877b27e1-3cc2-4f84-802f-091419bf27c1) · [Architecture and decisions](plan.md) · [Build log, phase by phase](docs/build-log.md)
+[Architecture and decisions](plan.md) · [Build log, phase by phase](docs/build-log.md)
 
 ## Run it yourself
 
