@@ -2558,8 +2558,24 @@ pre.code:not(.numbered) .line {
     flex-direction: column;
     align-items: flex-start;
   }
+  /* The toolbar is one row of "name · state" and two buttons. On a phone the
+     name field shrank instead of wrapping (min-width: 0 on the chip), so the
+     buttons sat on top of the filename: "LoginPage.ts" under Reset. Give each
+     half its own full-width row, and let the name use it. */
   .lab-toolbar {
     flex-wrap: wrap;
+  }
+  .file-chip {
+    flex: 1 1 100%;
+  }
+  .file-chip input {
+    max-width: none;
+  }
+  .toolbar-actions {
+    width: 100%;
+  }
+  .toolbar-actions .run-button {
+    margin-left: auto;
   }
   .editor,
   pre.code {
