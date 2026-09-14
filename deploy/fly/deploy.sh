@@ -153,8 +153,8 @@ declare -a SECRETS=(
 # secret of the same name silently outranks the toml, and this loop is how a
 # "stale" S2P_DAILY_LIMIT secret came back after every deploy: .env carried
 # one, the toml said another, and the deploy made the secret win without
-# anyone typing `fly secrets set`. Found 2026-09-09, after the handoff had
-# recorded it unset. The toml is the versioned answer; keep it that way.
+# anyone typing `fly secrets set`. Found 2026-09-09. The toml is the versioned
+# answer; keep it that way.
 VERSIONED="$(sed -n '/^\[env\]/,/^\[/p' "$HERE/app.toml" \
   | sed -n 's/^ *\([A-Za-z_][A-Za-z0-9_]*\) *=.*/\1/p' | tr '\n' ' ')"
 SKIP="POSTGRES_URI DATABASE_URI REDIS_URI LANGGRAPH_DEPLOYMENT_URL $VERSIONED"

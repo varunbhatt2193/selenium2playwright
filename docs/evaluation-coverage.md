@@ -41,8 +41,8 @@ the same paths must exist beneath both sample suites before snapshotting them.
 | [Dynamic loading](https://the-internet.herokuapp.com/dynamic_loading/2) | `pages/DynamicLoadingPage.ts` | `tests/dynamic-loading.spec.ts` | 1 | Agent-curated, browser-verified |
 
 1. Login preserves successful authentication and rejection of an invalid password.
-   These are the two existing tests. Review approval for their goldens was recorded
-   on 2026-09-04 in local `roadmap.md`, Step 1.3; the manifest carries that provenance.
+   These are the two existing tests. Their goldens were human-reviewed on
+   2026-09-04 (Step 1.3); the manifest carries that provenance.
 2. Alerts preserves two different actions: accepting a simple alert and dismissing
    a confirmation. The tests must verify the resulting messages. A conversion that
    clicks the correct button but chooses the wrong dialog action is still wrong.
@@ -90,8 +90,8 @@ entries explicitly supply their POM. In `("pages/AlertsPage.ts",)`, the trailing
 comma makes a one-item tuple; parentheses alone would leave a plain string.
 
 All 12 entries explicitly set `reference_review="reviewed"`. Login and alerts retain
-their user-review notes; `COMPLETION_REVIEW` identifies agent curation for the
-remaining eight under the user's instruction to finish 6.1. A manifest can describe
+their human-review notes; `COMPLETION_REVIEW` marks the remaining eight as
+model-curated, not human-reviewed. A manifest can describe
 pending work, but `build_collection()` refuses to upload missing or pending cases.
 
 ## How this will shape the LangSmith reports

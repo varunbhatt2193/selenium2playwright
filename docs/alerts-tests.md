@@ -139,7 +139,3 @@ Passing browser traces are under `samples/out/6.1/alerts-playwright/`, one
 `trace.zip` per test. The expected failing trace is under
 `samples/out/6.1/alerts-mutation-results/`. These are local Playwright traces;
 LangSmith scoring and experiment reports are still Step 6.2 work.
-
-The test golden is now approved. The next increment is the iframe POM pair.
-The four remaining scenarios and dataset upload are still required
-before Step 6.1 can be marked complete.
