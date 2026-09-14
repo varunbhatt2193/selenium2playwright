@@ -75,7 +75,7 @@ resetting the page. The upcoming two tests must each start with an empty result.
 
 Open [the golden POM](../samples/playwright-golden/pages/AlertsPage.ts).
 It was authored directly from the page behavior and Playwright API, without
-invoking the conversion graph. The user has now confirmed understanding of this step.
+invoking the conversion graph.
 
 The constructor creates locators for the inspected button labels and the result
 element. `getByRole("button", { name: ..., exact: true })` expresses the visible

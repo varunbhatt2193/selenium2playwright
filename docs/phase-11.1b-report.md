@@ -13,17 +13,9 @@ exactly the way each rule predicted, which you can read below.
 ## ⚠️ Read this before quoting any number
 
 **This ran on OpenAI `gpt-5.4`, not Claude Opus.** On 2026-09-08 the project's
-Anthropic account returned, for every model:
-
-```
-400 invalid_request_error: You have reached your specified API usage limits.
-You will regain access on 2026-10-01 at 00:00 UTC.
-```
-
-Account-wide, not model-specific — a one-token probe on `claude-sonnet-5` gives
-the same error, and the live deployment at `s2p.fly.dev` converted nothing while
-it lasted. Varun chose Opus for this step and then, once blocked, chose to
-proceed on OpenAI tokens rather than wait. So:
+Anthropic account hit its monthly usage limit, account-wide and for every model,
+with access returning on 2026-10-01. The step had been planned on Opus; rather
+than wait three weeks, it ran on OpenAI. So:
 
 > **These numbers are not comparable to the Opus and Sonnet figures in
 > [phase-6.4-report.md](phase-6.4-report.md) or

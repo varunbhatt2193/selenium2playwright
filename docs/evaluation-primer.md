@@ -1,10 +1,8 @@
 # AI evaluations — theory and code before Phase 6
 
-Lesson delivered on 2026-09-05 before Phase 6 implementation started. The user
-has since confirmed readiness; the first 6.1 increment and its review point are
-in [evaluation-dataset.md](evaluation-dataset.md). These introductory snippets
-remain teaching examples, not an installed evaluation runner. Continue from
-the [restart notes](session-handoff.md).
+Written on 2026-09-05, before Phase 6 was implemented. The first 6.1 increment
+is in [evaluation-dataset.md](evaluation-dataset.md). The snippets here are
+illustrative, not the installed evaluation runner.
 
 An AI evaluation measures how well our application performs across a collection
 of tasks. For this project: how often does Selenium become useful, correct
@@ -171,7 +169,7 @@ results = evaluate(
 ```
 
 This call has **not** been executed. The named dataset has not been created by
-this lesson. It would make real model calls and record results in LangSmith.
+this page. It would make real model calls and record results in LangSmith.
 `max_concurrency=1` processes one example at a time; `num_repetitions=1` runs each
 once. The SDK sends inputs to the target and outputs to evaluators, then records
 the results. See the official
@@ -209,7 +207,4 @@ in LangSmith. Step 6.2 adds evaluator functions and the first scored experiment;
 
 Step 6.1 is now complete: 12 curated examples are uploaded and verified in
 LangSmith. See the [completion report](phase-6.1-report.md). The examples earlier
-in this primer remain teaching snippets; they are not a scored experiment.
-Detailed theory before code and explanatory comments remain required. Follow
-[the restart notes](session-handoff.md) for Step 6.2; do not automatically advance
-through later phases.
+in this primer remain illustrative snippets; they are not a scored experiment.

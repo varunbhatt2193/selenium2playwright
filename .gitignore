@@ -22,6 +22,7 @@ playwright-report/
 # Local working docs — build-sequence notes, not part of the public face
 roadmap.md
 plan-review.md
+docs/session-handoff.md
 
 # macOS
 .DS_Store

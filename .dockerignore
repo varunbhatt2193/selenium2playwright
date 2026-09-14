@@ -16,6 +16,7 @@ deploy/fly/.pgpassword
 .claude/settings.local.json
 roadmap.md
 plan-review.md
+docs/session-handoff.md
 
 .git
 .venv

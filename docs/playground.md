@@ -74,7 +74,7 @@ file · Whole suite · How it works · Evaluation · GitHub · LinkedIn) marks t
    → model, Node toolchain, Postgres/Redis, LangSmith; and the agent loop:
    intake → recall → convert → validate → critic → report, failures back to
    convert at most three times), the stack in four groups with one line each on
-   *why* the piece is there, and the one number Varun chose to publish: 12/12
+   *why* the piece is there, and the one number the front page publishes: 12/12
    on the sample suite in ~20s. Vendors are named, models are not — the
    provider is one setting. The front page carries a compact "Built with" strip
    that links here. Both read `ui/web/src/stack.ts`, so the list is edited once.
@@ -86,8 +86,8 @@ file · Whole suite · How it works · Evaluation · GitHub · LinkedIn) marks t
    the gap taxonomy. Every figure lives in `ui/web/src/evals.ts` next to the
    report it came from; change the report first. Chart colours (amber for one
    attempt, teal for reflection) were validated for colour-vision deficiency
-   against the chart surface. Varun chose to publish the numbers here (2026-09-08),
-   reversing the front-page "12/12 only" rule for this page alone.
+   against the chart surface. This is the one page that publishes the full
+   numbers; the front page keeps to the single 12/12 figure.
 
 What was removed on purpose, and why: the refine box, 👍/👎, the model-name
 line, the agent-trace and notes expanders, the file filter and the two sliders.
