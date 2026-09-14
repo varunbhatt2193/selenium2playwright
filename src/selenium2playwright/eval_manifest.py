@@ -19,12 +19,12 @@ PLANNED_BROWSER_TEST_COUNTS = {
     "dynamic-loading-test": 1,
 }
 
-# The login goldens were human-reviewed in Phase 1.3; new references default to pending.
-LOGIN_REVIEW = "Human-reviewed 2026-09-04 (Step 1.3); see docs/evaluation-coverage.md."
-# The remaining goldens were model-curated, not human-reviewed; the note must say so.
+# Existing goldens were user-reviewed in Phase 1.3; new references default to pending.
+LOGIN_REVIEW = "User-approved 2026-09-04 in roadmap.md Step 1.3; see docs/evaluation-coverage.md."
+# Delegated completion includes agent curation; do not mislabel it as user review.
 COMPLETION_REVIEW = (
-    "Model-curated 2026-09-05, not human-reviewed: golden authored independently of the "
-    "converter; source/reference browser checks and static gates passed. "
+    "Agent-reviewed 2026-09-05 under user instruction to finish 6.1; independently authored "
+    "golden, source/reference browser checks and static gates passed. "
     "See docs/evaluation-fixtures.md and docs/evaluation-fixture-evidence.json."
 )
 
