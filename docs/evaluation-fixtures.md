@@ -5,12 +5,11 @@ one Selenium test file, and an independently authored Playwright pair. That is
 12 conversion examples and eight browser tests per framework. The converter
 did not generate these reference outputs. This is a curated development benchmark.
 
-The user asked to finish 6.1 on 2026-09-05, authorizing completion of the remaining
-increments without the earlier pause after each patch. The new references were
-reviewed by the agent against the manifest and actual browser behavior. The
-manifest records this as agent curation, not human approval. Login and alerts
-retain their earlier user-review provenance. The login Selenium harness now
-uses headless Chrome and guards cleanup; its assertions and golden are unchanged.
+The remaining four scenarios were added on 2026-09-05 in one pass. Their
+references were checked against the manifest and against the live pages in a
+browser; the manifest records them as model-curated, not human-reviewed. Login
+and alerts keep their earlier human-review provenance. The login Selenium harness
+now uses headless Chrome and guards cleanup; its assertions and golden are unchanged.
 
 ## The common pattern: preserve behavior, change the framework mechanism
 

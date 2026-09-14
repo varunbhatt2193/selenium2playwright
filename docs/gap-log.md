@@ -1,7 +1,7 @@
 # Prompt v1 gap log — one-shot conversion vs. the golden
 
-*Roadmap 2.1, run 2026-09-04 on `claude-sonnet-5`, prompt = role line + `docs/playbook.md`.
-Draft written by Claude from the raw diffs; Varun reviews, edits, and owns the list.
+*Run 2026-09-04 on `claude-sonnet-5`, prompt = role line + `docs/playbook.md`.
+Compiled from the raw diffs between each one-shot output and its golden.
 Step 2.3 grows this into the failure taxonomy that drives the validators (Phase 4).*
 
 ## Setup

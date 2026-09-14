@@ -232,23 +232,7 @@ a pasted file, and it belongs with the playground that would need it, not here.
 
 ---
 
-## 8. Check yourself
-
-1. `source_path` is still required in spirit but is no longer read. What is it
-   *for* now, and what gets worse if a paste box always sends `pasted.ts`?
-2. `refinement` is cleared by intake after one turn and `source_text` is not.
-   What breaks if you clear both, and what breaks if you clear neither?
-3. Why is an oversized paste a `Classification` rather than an exception?
-4. `dockerfile_lines` land before the project is copied into the image. Given
-   that, explain why the lockfile is copied on a line of its own.
-5. The image installs the toolchain at `/opt/s2p-sandbox` instead of inside the
-   copied repository. Name the specific thing that would break if it did not.
-6. You remove Node from the image and everything still deploys and returns
-   converted files. What exactly has the deployment stopped being able to say?
-
----
-
-## 9. What happened when we actually deployed (2026-09-07)
+## 8. What happened when we actually deployed (2026-09-07)
 
 The account setting was enabled and we deployed for real. **Six revisions across
 two deployments never produced a URL.** None of the failures were ours. This
@@ -346,7 +330,7 @@ be `linux/amd64` for most hosts.
 cloud — the sidecar patch with no `store` block. It is the fallback if a host
 ever hands us a Postgres we cannot create extensions on.
 
-## 10. It is live on Fly (2026-09-07, same day)
+## 9. It is live on Fly (2026-09-07, same day)
 
 <https://s2p.fly.dev> — three machines in `iad`: this image at 2 GB, a
 `pgvector/pgvector:pg16` we are superuser on, and `redis:6`. Set up by

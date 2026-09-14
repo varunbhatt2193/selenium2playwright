@@ -157,18 +157,6 @@ def idiomatic_playwright(inputs: dict, outputs: dict | None,
 6. `scripts/judge_experiment.py` — score existing LangSmith experiments;
    then the 6.4 report and a judge column on the shootout table
 
-## Check yourself
-
-1. Why does the judge get the golden but the critic never does?
-2. If a broken golden scores the same as its golden, what is wrong: the
-   golden, the converter, or the rubric?
-3. `evaluate()` is given an experiment *name* instead of a target function.
-   What does LangSmith run, and what does it skip?
-4. Why do we want `choices=[1,2,3,4,5]` rather than letting the model write
-   any number?
-
----
-
 ## What changed when the code met reality (2026-09-07)
 
 - **Three judge files, not one.** `eval_judge.py` (the evaluator),
@@ -206,8 +194,3 @@ file, same score, 24 of 24 pairs across two judges.
 Judge scores on the six saved experiments, and how far the two judges agree,
 are in [phase-6.4-report.md](phase-6.4-report.md).
 
-## One more check-yourself
-
-5. Both judges gave every golden a 5, yet they disagree by up to 0.75 on the
-   broken files. Which of the two facts matters more for trusting the judge
-   on real conversions, and why?
