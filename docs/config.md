@@ -327,3 +327,21 @@ project that does not want to curate other people's model lists.
 4. What would `--json` have to change if the code were *not* inside the document?
 5. Why is a bare `--model gpt-4o` an error instead of a guessed provider?
 6. Why does `check_model` build a client instead of checking a table of key names?
+
+## 10. Additional environment settings
+
+These settings can be set in `.env` or exported in the shell. An exported
+variable takes precedence. The examples in [`.env.example`](../.env.example)
+are commented out so copying the file keeps the defaults below.
+
+| Variable | Default when unset or empty | Meaning |
+|---|---|---|
+| `S2P_JUDGE_MODEL` | `S2P_CRITIC_MODEL`, then `S2P_MODEL`, then the default actor model | Model used to score finished conversions during evaluation, in `provider:model` form. |
+| `S2P_MAX_TREE_FILES` | `40` | Maximum number of files in an uploaded source tree. |
+| `S2P_MAX_TREE_BYTES` | `2097152` (2 MiB) | Maximum total UTF-8 bytes of source contents in an uploaded tree. |
+| `S2P_REPO_CONTEXT_BYTES` | `131072` (128 KiB) | Source-byte budget for repository context shown to one conversion. Set to `0` to disable this context. |
+| `S2P_BUDGET_RUNS` | `max(1, int(S2P_DAILY_BUDGET_USD / S2P_COST_PER_RUN))`, or `41` with the default values | Shared daily run cap across visitors, reset at midnight UTC. Setting this directly overrides the cap derived from the dollar budget. |
+| `S2P_DEMO_MAX_ATTEMPTS` | `3` | Maximum `max_attempts` a public demo caller may request. Requests above this cap are rejected. |
+
+The defaults are read in `env.py`, `suite.py`, `prompts.py`, `limits.py`, and
+`guard.py` under `src/selenium2playwright/`.
