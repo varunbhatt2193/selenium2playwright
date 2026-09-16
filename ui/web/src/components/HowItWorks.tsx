@@ -1,4 +1,4 @@
-import { ArrowRight, CheckCircle2, Github } from 'lucide-react'
+import { ArrowRight, CheckCircle2, Code2 } from 'lucide-react'
 import { GITHUB } from '../links'
 import { STACK } from '../stack'
 import { Link } from '../router'
@@ -83,7 +83,7 @@ export default function HowItWorks() {
 
       <div className="how-links">
         <a href={GITHUB} target="_blank" rel="noreferrer">
-          <Github size={15} /> Read the source
+          <Code2 size={15} /> Read the source
         </a>
       </div>
     </section>

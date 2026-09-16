@@ -1,4 +1,4 @@
-import { ArrowRight, CheckCircle2, FileCode2, Github, Lock, PlayCircle } from 'lucide-react'
+import { ArrowRight, CheckCircle2, Code2, FileCode2, Lock, PlayCircle } from 'lucide-react'
 import { GITHUB } from '../links'
 import { Link } from '../router'
 import Code from './Code'
@@ -74,7 +74,7 @@ export default function SuiteClosed() {
 
       <div className="closed-actions">
         <a className="primary-button" href={GITHUB} target="_blank" rel="noreferrer">
-          <Github size={16} /> Clone it from GitHub
+          <Code2 size={16} /> Clone it from GitHub
         </a>
         <Link to="/convert" className="secondary-button">
           <FileCode2 size={16} /> Convert one file here

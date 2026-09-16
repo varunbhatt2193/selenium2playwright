@@ -1,4 +1,4 @@
-import { ArrowRight, FileCode2, FolderArchive, Github, Linkedin, PlayCircle } from 'lucide-react'
+import { ArrowRight, Code2, FileCode2, FolderArchive, Linkedin, PlayCircle } from 'lucide-react'
 import { STACK_STRIP } from '../stack'
 import { GITHUB, LINKEDIN } from '../links'
 import { Link } from '../router'
@@ -90,7 +90,7 @@ export default function Home() {
           <Linkedin size={16} /> Varun Bhatt on LinkedIn
         </a>
         <a href={GITHUB} target="_blank" rel="noreferrer">
-          <Github size={16} /> Source on GitHub
+          <Code2 size={16} /> Source on GitHub
         </a>
       </div>
     </section>

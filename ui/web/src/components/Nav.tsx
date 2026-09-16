@@ -1,4 +1,4 @@
-import { FileCode2, FlaskConical, FolderArchive, Github, Home, Linkedin, Workflow } from 'lucide-react'
+import { Code2, FileCode2, FlaskConical, FolderArchive, Home, Linkedin, Workflow } from 'lucide-react'
 import { GITHUB, LINKEDIN } from '../links'
 import { Link, type Page } from '../router'
 import Brand from './Brand'
@@ -38,7 +38,7 @@ export default function Nav({ page }: Props) {
           ))}
           <span className="nav-sep" aria-hidden="true" />
           <a className="nav-link nav-icon" href={GITHUB} target="_blank" rel="noreferrer" aria-label="Source on GitHub">
-            <Github size={16} /> <span>GitHub</span>
+            <Code2 size={16} /> <span>GitHub</span>
           </a>
           <a className="nav-link nav-icon" href={LINKEDIN} target="_blank" rel="noreferrer" aria-label="Varun Bhatt on LinkedIn">
             <Linkedin size={16} /> <span>LinkedIn</span>
