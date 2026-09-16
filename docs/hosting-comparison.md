@@ -32,7 +32,7 @@ The recommendation prioritizes getting the demo online with managed databases af
 
 The deployment described in [deploy.md](deploy.md) uses the agent image, PostgreSQL with pgvector, and Redis. [langgraph.json](../langgraph.json) packages Python 3.12 and Node 22 plus the pinned TypeScript/ESLint toolchain. The image was measured at 1.6 GB; image size is not a RAM measurement.
 
-The agent needs writable temporary workspace for its static validators, streaming HTTP, outbound model/embedding/tracing API access, and durable threads and memories. The planned [Streamlit playground](../plan.md) is another running Python service. Production validation does not launch browsers or execute uploaded tests, so this estimate includes neither GPU hosting nor browser workers.
+The agent needs writable temporary workspace for its static validators, streaming HTTP, outbound model/embedding/tracing API access, and durable threads and memories. The playground planned at the time — a Streamlit page, later replaced by [React + Vite over FastAPI](playground.md) — is another running Python service. Production validation does not launch browsers or execute uploaded tests, so this estimate includes neither GPU hosting nor browser workers.
 
 ## Feature fit
 

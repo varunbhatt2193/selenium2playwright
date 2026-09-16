@@ -1,179 +1,212 @@
-# Selenium2Playwright — v1 Plan
+# Architecture and decisions
 
-An AI agent that migrates **TypeScript Selenium** test suites to **Playwright** — built in public through the full **Agent Development Lifecycle** (build → evaluate → deploy → monitor → improve) using **LangGraph + LangChain, LangSmith, and Claude**.
+What Selenium2Playwright is, how it is put together, and which decisions were
+reversed on the way. The [build log](docs/build-log.md) records the order things
+happened in; this page records the shape they settled into.
 
-**Two audiences, two proof points:**
-- **SDET hiring managers:** paste your own Selenium POM → get a *correct, idiomatic* Playwright POM.
-- **LangChain/AI hiring managers:** a well-engineered agent — graph design, reflection, short/long-term memory, evals, deployment, prod monitoring.
+Everything below describes what is in the repository today. Where a decision
+was made and later overturned, §9 says so and why.
 
 ---
 
 ## 1. What it does
 
-One agent, three conversion scopes:
+One agent, two scopes.
 
-| Scope | Input | Output | Surface |
+| Scope | Input | Output | Where it runs |
 |---|---|---|---|
-| Single test | one `*.test.ts` / `*.spec.ts` (selenium-webdriver + Jest/Mocha) | `@playwright/test` test file | Playground + CLI |
-| Page Object (POM) | one page-object class | Playwright POM (`Locator` fields, async methods) | Playground + CLI |
-| Whole suite | folder: POMs + tests + config | full Playwright project incl. `playwright.config.ts` + conversion report | CLI (playground later) |
+| Single file | one Selenium page object, or one `*.test.ts` / `*.spec.ts` | the Playwright equivalent, plus a scorecard | playground, CLI |
+| Whole suite | a folder of page objects, specs, fixtures and config | a Playwright project, compiled as one tree, plus a conversion report and a `TODO(review)` ledger | CLI only — see §8 |
 
-**The v1 quality bar (the demo promise):** output always compiles (`tsc --noEmit`), contains **zero** Selenium APIs, and is idiomatic Playwright — auto-waiting instead of explicit waits, web-first assertions, `getByRole`/`getByTestId` where inferable. Anything uncertain gets an honest `// TODO(review)` note — never an invented API.
+**Source scope is `selenium-webdriver` in TypeScript.** WebdriverIO, Cypress,
+Puppeteer and code that is already Playwright are **refused with a reason**, not
+converted. A refusal costs nothing: the classifier runs before any model call.
 
-**North star (post-v2):** accept Selenium in *any* language (Java, Python, C#…) — the output stays Playwright TS. Fixing the target language means the entire output-side gate stack (compile, lint, residue, output parity) is reused as-is; each new source language costs only a playbook + source-side parsing (classify, source parity counting). MVP is strictly Selenium TS → Playwright TS.
+**The quality bar.** Output compiles under `tsc --noEmit`, contains zero
+Selenium APIs, keeps the same test cases and assertion coverage as the source,
+and is idiomatic Playwright — auto-waiting rather than explicit waits, web-first
+assertions, role and test-id locators where they can be inferred. Anything that
+cannot be verified ships as an explicit `TODO(review)`. The agent never invents
+an API to make a file look finished.
 
-**Two flagship demo moments (the LinkedIn video):**
-1. Paste a real POM into the hosted playground → watch convert → validate → reflect → ✅ badges.
-2. `s2p convert samples/selenium-suite/` → converted project passes `npx playwright test` against the bundled demo app.
-
-**Scope guardrail:** v1 targets `selenium-webdriver` + Jest/Mocha only. WebdriverIO/Protractor input is detected and converted best-effort with a clear warning (WebdriverIO = candidate v1.5).
+**Not built, and not scheduled:** Selenium in Java, Python or C#; Cypress input;
+partial conversion of a file the agent only half understands. The output-side
+gate stack (compile, lint, residue, parity) would be reused unchanged for a new
+source language, so the cost of one is a playbook plus source-side parsing — but
+none of that exists today.
 
 ## 2. Design principles
 
-1. **Boring where possible, agentic where it pays.** A versioned Selenium→Playwright *mapping playbook* (deterministic rules in the system prompt + AST checks) handles the mechanical 80%; the LLM handles structure, naming, and judgment; a validation loop guarantees the result compiles.
-2. **Never trust a single LLM pass.** Every conversion runs validate → critique → refine (reflection pattern).
-3. **Honesty is a feature.** Uncertainty is flagged for human review in the conversion report — SDETs trust tools that admit limits.
-4. **Small steps.** Every milestone is shippable, teaches one LangChain/LangGraph concept, and maps to an LCAE exam topic.
+1. **Boring where possible, agentic where it pays.** A versioned mapping
+   playbook (`docs/playbook.md`) handles the mechanical majority. The model
+   handles structure, naming and judgment. Deterministic checks decide whether
+   the result is acceptable.
+2. **The model cannot lie to the compiler.** Every attempt is checked by tools
+   that do not care what the model claims.
+3. **Honesty is a feature.** An unconvertible pattern becomes a visible
+   `TODO(review)` or a refusal. Silence is the failure mode this project exists
+   to prevent.
+4. **Measure before claiming.** A prompt or playbook change ships only after an
+   A/B run on a fixed set. Every published number names the model it came from.
 
-## 3. High-level architecture (v1)
+## 3. Architecture as built
 
 ```mermaid
 flowchart LR
     subgraph CL["Clients"]
-        W["Web playground<br/>paste a POM or test"]
-        C["CLI s2p<br/>file or whole suite"]
+        W["Playground<br/>React + Vite"]
+        C["CLI<br/>s2p convert / s2p suite"]
     end
-    subgraph P["v1 prod: LangGraph Platform"]
-        subgraph G["Conversion agent - LangGraph StateGraph"]
-            A["1. Intake and classify"] --> B["2. Analyze<br/>deps, patterns, conventions"]
-            B --> D["3. Convert<br/>Claude + mapping playbook"]
-            D --> V["4. Validate (tools)<br/>tsc, ESLint, AST residue scan"]
-            V -- "issues" --> R["5. Critic<br/>reflection review"]
-            R -- "revise, max 3" --> D
-            V -- "clean" --> O["6. Assemble and report"]
+    subgraph FLY["Fly.io"]
+        UI["varun-s2p<br/>FastAPI + SSE"]
+        subgraph API["s2p — LangGraph API server"]
+            SC["screen<br/>not Selenium? injection?"] --> G["convert graph"]
+            G --> SU["suite graph<br/>scan, waves, whole-tree compile"]
         end
-        STM[("Short-term memory<br/>checkpointer / threads")]
-        LTM[("Long-term memory<br/>Store: conventions, exemplars")]
-        G --- STM
-        G --- LTM
+        PG[("s2p-postgres<br/>threads, memories")]
+        RD[("s2p-redis")]
     end
-    W --> G
+    W --> UI --> API
     C --> G
-    G --> LS["LangSmith<br/>tracing, evals, monitoring, feedback"]
+    API --- PG
+    API --- RD
+    API --> LS["LangSmith<br/>traces, evals"]
+    API --> M["model provider<br/>Claude or OpenAI"]
 ```
 
 | Component | Role | Tech |
 |---|---|---|
-| Conversion agent | StateGraph: analyze → convert → validate → reflect loop | `langgraph`, `langchain` v1 |
-| LLM | code transformation + critique | `claude-opus-5` via `langchain-anthropic` (`init_chat_model`; env var flips to `claude-sonnet-5` for ~2.5× lower cost); Anthropic prompt caching on the playbook |
-| Validator tools | deterministic checks the LLM can't fake | Node toolchain via subprocess: `tsc --noEmit`, ESLint + `eslint-plugin-playwright`, AST scan for leftover `selenium-webdriver` APIs |
-| Short-term memory | per-thread conversation + suite progress; iterate and resume | LangGraph checkpointer (Platform-managed in prod, SQLite locally) |
-| Long-term memory | cross-thread learned mappings, conventions, exemplar bank | LangGraph Store with semantic search |
-| Evals | offline dataset evals + CI gate + online evals on prod traffic | LangSmith (+ `openevals` LLM-as-judge) |
-| Playground | paste code → streamed conversion + validation badges | Streamlit app calling the deployed graph (`langgraph-sdk`) |
-| CLI | `s2p convert <path>` | Typer |
-| Monitoring | traces, latency/cost/error dashboards, alerts, 👍/👎 feedback | LangSmith |
+| Conversion graph | intake → recall → risk review → convert → validate → critic → assemble, with a bounded repair loop | `langgraph`, `langchain` |
+| Model | conversion and critique | any LangChain chat model, selected by `S2P_MODEL` as `provider:model`; Claude by default, OpenAI verified end to end; `--model` and `--critic-model` override per run |
+| Validators | the checks the model cannot fake | pinned Node toolchain under `sandbox/`, called as subprocesses: `tsc --noEmit`, typed ESLint (including a project-specific dialog-ordering rule), a Selenium-residue scan, and an AST structure-parity check |
+| Short-term memory | per-thread conversation and suite progress | LangGraph checkpointer — Postgres in production, SQLite locally |
+| Long-term memory | team conventions carried across conversations | LangGraph Store with semantic search |
+| Playground | paste a file, watch the graph run, read the scorecard | React + Vite over a FastAPI server that streams progress as server-sent events |
+| CLI | `s2p convert`, `s2p suite`, `s2p memories`, `s2p threads` | Typer |
+| Observability | traces, experiments, judge runs | LangSmith |
 
-## 4. The conversion graph (heart of the project)
+## 4. The conversion graph
 
-State (simplified): `scope, source_files, analysis, converted_files, validation, critique, iteration, report`.
+```
+intake → recall → risk_review → convert → validate → critic → assemble
+                                   ▲                     │
+                                   └── repair (≤ 3) ─────┘
+```
 
-1. **Intake & classify** — detect scope (test / POM / suite) and framework; warn on out-of-scope flavors.
-2. **Analyze** — build the dependency graph (suite mode), detect conventions: naming, wait style, assertion library.
-3. **Convert** — one unit at a time; playbook + exemplars retrieved from long-term memory as few-shots. **POMs convert before tests**, so tests see the converted POM interfaces.
-4. **Validate** — deterministic tools: compile, lint, Selenium-residue scan, structure parity (every public method preserved; same test-case count and assertion coverage as the source — any drop is a validation failure that feeds the refine loop).
-5. **Critic (reflection)** — LLM reviews for idiom: no `waitForTimeout`, web-first assertions, locator quality; returns a structured verdict.
-6. **Refine loop** — re-convert with validator errors + critique; max 3 iterations, then flag `needs-review` instead of looping forever.
-7. **Assemble & report** — write files, generate `playwright.config.ts`, per-file confidence + review notes, and a consolidated `TODO(review)` ledger: every TODO across the whole conversion collected in one place, pointed to at the end of the run (playground panel / CLI report file).
+Before `intake`, input is **screened without a model call**: a file that is not
+Selenium, or that carries text aimed at the model — in a comment, a string,
+look-alike letters, invisible characters — is refused there.
 
-Suite mode fans out per-file conversion in parallel with the **Send API**, respecting dependency order and sharing one "suite context" from Analyze. **Human-in-the-loop** (M4+): on ambiguity (e.g., a POM imports a file that wasn't provided), interrupt and ask rather than guess.
+1. **intake** — classify the file, or refuse it honestly.
+2. **recall** — fetch the few remembered conventions that apply to this file.
+3. **risk_review** — three Selenium patterns have more than one correct
+   Playwright answer (dialogs, `executeScript`, a session shared by a `before`
+   hook). With `--thread`, the run suspends and asks. The public playground
+   never pauses a stranger mid-run: it applies the playbook's default and names
+   the choice on the result.
+4. **convert** — one unit at a time. Each call carries one Selenium file, the
+   page objects it imports, and in suite mode a capped slice of the files that
+   call it. The agent is never pointed at a repository and never explores one.
+5. **validate** — the four gates. Four of the five checks in a lap are a
+   compiler, a linter and two AST scripts, so a repair lap is nearly free.
+6. **critic** — a model reviews idiom on top of the gates.
+7. **repair** — re-convert against the actual findings, at most three times.
+8. **assemble** — always report the outcome and keep the best draft, even when
+   the cap is hit.
 
-## 5. Memory design
+## 5. Suite mode
 
-- **Short-term (thread-scoped, checkpointer):** conversation + suite progress. Demo: convert a POM, then say *"now use data-testid for all locators"* — no re-pasting; resume a half-done suite conversion.
-- **Long-term (cross-thread, Store):**
-  - *Convention memories* — a user's/team's preferences (locator strategy, naming).
-  - *Mapping memories* — corrections users make become learned rules applied next time.
-  - *Exemplar bank* — high-scoring past conversions retrieved semantically as few-shot examples.
-  - Demo: correct the agent once, start a fresh thread, watch it apply the lesson.
+A scan decides which files use Selenium at all; helpers, fixtures and config are
+copied across untouched, with no model call. Page objects convert first, then
+the specs that import them, in parallel waves. The delivered tree is then
+compiled **as one project**, because twelve files that each compile alone are
+not the same as a suite that compiles. The report carries a per-file verdict and
+one consolidated `TODO(review)` ledger.
 
-## 6. Evals (LangSmith)
+## 6. Evaluation
 
-**Dataset:** 25–40 curated Selenium→Playwright pairs — POMs, tests, edge cases (explicit waits, `Select`, iframes, alerts, action chains, `executeScript`), plus out-of-scope traps (WebdriverIO input).
+Five measurements, each one reproducible and each naming its model:
 
-**Three evaluator layers:**
-1. **Deterministic** (cheap, objective): compiles, zero Selenium residue, structure parity (methods + test count + assertion coverage vs. source), lint-clean.
-2. **LLM-as-judge** (`openevals`): semantic equivalence + idiomatic-Playwright rubric, scored 1–5.
-3. **Execution** (CI only, curated inputs only): the converted sample suite runs green via `npx playwright test` against the bundled demo app.
+- **The 12-file sample suite** through all four gates and the critic.
+- **The twelve SDET hard cases** — patterns where a mechanical translation
+  compiles, passes lint, passes the residue scan, and silently tests something
+  else.
+- **A self-correction A/B** — does the repair loop earn its extra calls?
+- **A calibrated LLM judge**, with a second judge run to measure agreement.
+- **Execution** — converted rows replayed in a real browser in CI, plus 790+
+  offline tests on every push, with no keys and no tokens.
 
-**Cadence:** every prompt/playbook/graph change → a LangSmith experiment; a GitHub Actions gate blocks regressions. In prod: online evals score sampled traffic; 👎 feedback auto-lands in a triage dataset — the data flywheel.
+Numbers, method and the failures are in
+[the evaluation page](https://varun-s2p.fly.dev/evaluation) and the reports
+under [`docs/`](docs/). What is still unsolved is written down in
+[hard-cases.md](docs/hard-cases.md) rather than left for a user to discover.
 
-**Tracked metrics:** compile-pass %, residue rate, judge average, execution pass %, tokens + cost per conversion, p50 latency.
+## 7. Repository layout
 
-## 7. ADLC mapping (the README story)
+```
+src/selenium2playwright/   the agent: graph, nodes, validators, memory, CLI, evals
+sandbox/                   the pinned TypeScript toolchain the gates shell out to
+ui/web/                    the React + Vite playground
+ui/server.py               the FastAPI server that streams the graph to it
+samples/                   the Selenium suites and their goldens, for demos and evals
+tests/                     the offline suite: no keys, no tokens
+scripts/                   eval harness, diagram generation, comparison tooling
+deploy/fly/                the deployment: app configs, Dockerfiles, runbook
+docs/                      walkthroughs, evaluation reports, the playbook
+.github/workflows/         CI: offline checks, browser execution gates, CodeQL
+```
 
-| Stage | How this project does it |
-|---|---|
-| **Build** | LangGraph Studio + `langgraph dev`; prompts/playbook versioned in repo; pytest unit tests on nodes (fake LLM) |
-| **Evaluate** | LangSmith datasets + experiments; CI regression gate before any deploy |
-| **Deploy** | LangGraph Platform from the GitHub repo; new revision on merge to `main` |
-| **Monitor** | LangSmith prod project: traces, latency/cost/error dashboards, an alert rule, online evals, user feedback capture |
-| **Improve** | feedback → dataset → playbook/prompt fix → eval gate → redeploy (documented loop diagram in README) |
+## 8. Deployment and operating limits
 
-## 8. v2 — Amazon Bedrock AgentCore (post-LCAE)
+Four Fly apps in one region: `s2p` (the LangGraph API server, image pinned),
+`varun-s2p` (the playground), and Postgres and Redis on a private network. The
+demo runs on a real card, which decides two things:
 
-- **AgentCore Runtime** hosts the *same* LangGraph agent (framework-agnostic) — a deployment-substrate swap, graph unchanged.
-- **Model continuity:** same Claude family via Bedrock.
-- Evaluate **AgentCore Memory** for the long-term store and **AgentCore Observability** (OTEL/CloudWatch) alongside LangSmith; Gateway/Identity only if needed.
-- Deliverable: a "LangGraph Platform → AgentCore" migration write-up — strong content for the AWS crowd.
+- **Single files are public; whole suites are not.** Converting a folder is
+  dozens of model calls in one click. `s2p suite` runs on your own machine with
+  your own key — the same agent, the same gates.
+- **Every run is metered.** A per-visitor cap and a shared daily dollar budget,
+  both enforced before the model is called; the page shows what is left today.
 
-## 9. Roadmap — small steps
+Production validation is static only. The agent never executes submitted code;
+execution evals run in CI, on the project's own fixtures.
 
-Rule: 1–2 focused sessions per milestone; never start M(n+1) with M(n) unshipped. Each milestone is a LinkedIn-postable increment.
+## 9. Decisions that were reversed
 
-| # | Milestone (what ships) | What you learn (LCAE-aligned) |
+The reasoning behind each is in the linked write-up. They are listed here
+because a plan that only records the decisions that survived is not a useful
+record.
+
+| Decision | What replaced it | Why |
 |---|---|---|
-| M0 | Walking skeleton: repo scaffold; bundled demo web app + sample Selenium suite (3 POMs, ~8 tests); a one-prompt POM conversion script; **LangSmith tracing on from day 1** | chat models, messages, prompt templates, tracing |
-| M1 | First graph: analyze → convert → validate; tsc/ESLint/residue tools | StateGraph, state, nodes/edges, tool calling |
-| M2 | Reflection: critic node + bounded refine loop | conditional edges, reflection pattern, structured outputs |
-| M3 | Short-term memory + CLI: checkpointer, threads, conversational iteration; `s2p convert file.ts` | persistence, threads, interrupts |
-| M4 | Suite mode: dependency ordering, parallel fan-out, config generation, conversion report | Send API / map-reduce, subgraphs, HITL |
-| M5 | Evals: dataset + 3 evaluator layers + CI gate | LangSmith datasets, evaluators, experiments |
-| M6 | Long-term memory: Store + exemplar retrieval + feedback capture | Store, semantic search, memory patterns |
-| M7 | **Ship v1:** deploy to LangGraph Platform; Streamlit playground; dashboards, alert, online evals | Platform deploy, Studio, prod monitoring |
-| M8 | Launch polish: README (architecture diagram, 60-sec GIF, eval scorecard, honest limitations), LinkedIn assets | — |
+| Deploy on LangGraph Platform | Self-hosted LangGraph API server on Fly | The gates shell out to a pinned Node toolchain; the managed base image is Python-only, and the sandbox is not in the build context. Shipping without the gates was the one option this project could not take. [deploy.md](docs/deploy.md), [hosting-comparison.md](docs/hosting-comparison.md) |
+| Streamlit playground | React + Vite over FastAPI | Streamlit re-runs the file on every click: a fine place for a layout, a poor place for anything worth testing, and no way to stream the graph honestly. `ui/app.py` remains as the first version, local only. [playground.md](docs/playground.md) |
+| Claude only, with an env var to downshift | Model-agnostic: `S2P_MODEL` as `provider:model` | Vendor quirks belong in `llm.py`; everything else uses LangChain abstractions. This is also what made the cross-model evals possible. [config.md](docs/config.md) |
+| WebdriverIO converted best-effort with a warning | Refused, with the reason | A best-effort conversion of an out-of-scope framework is exactly the silent-wrongness this project exists to prevent. |
+| Whole-suite conversion in the public playground | Local only, by cloning | Cost. A single visitor's folder can be dozens of model calls. |
+| Partial conversion of a file | All or a refusal | Half a converted file is worse than none: it looks finished. |
 
-## 10. Repo layout & kanban
+## 10. Risks, and what is done about them
 
-```
-Selenium2Playwright/
-  agent/            # langgraph app: graph.py, state.py, nodes/, tools/, prompts/ (playbook), memory/
-  cli/              # s2p (Typer)
-  ui/               # Streamlit playground
-  evals/            # datasets/, evaluators/, run_evals.py
-  samples/
-    demo-app/       # tiny web app (login + todo pages) the suites run against
-    selenium-suite/ # realistic selenium-webdriver TS suite — demo input + execution-eval fixture
-  tests/            # pytest unit tests (nodes, tools, no-LLM)
-  docs/             # architecture.md, adlc.md, decisions/ (mini ADRs)
-  .github/workflows/  # ci: ruff + pytest + eval gate
-  langgraph.json · pyproject.toml (uv) · docker-compose.yml · README.md
-```
+- **Prompt injection.** Input that talks to the model is refused before a model
+  sees it, the model is told the file is data, and a conversion that imports
+  anything the source never did fails parity. [guardrails.md](docs/guardrails.md)
+- **Cost.** Repair capped at three laps; four of five checks are free; per-visitor
+  and daily budgets; no repository exploration.
+- **Quality drift.** No playbook or prompt change merges without an A/B run on a
+  fixed set, and CI replays the golden fixtures in a real browser on every push.
+- **Availability.** Two concurrent suite runs wedged the graph once. The
+  diagnosis, the fix and the remaining hardening are written down in
+  [prevention-backlog.md](docs/prevention-backlog.md).
 
-**Kanban:** public GitHub Projects board — columns `Backlog / Next / In progress / Done`; one milestone = one iteration, split into 3–6 small issues. A public board is itself a signal of process maturity.
+## 11. Where v1 landed
 
-## 11. Guardrails & risks
+Shipped: the graph and its four gates; the repair loop and critic; short- and
+long-term memory; human-in-the-loop on ambiguous patterns; the CLI; whole-suite
+conversion; five evaluation layers with published numbers; a deployed playground
+anyone can use without signing up; CI that gates every push.
 
-- **Never execute user-submitted code.** Prod validation is static-only (tsc, ESLint, AST). Execution evals run only on our own curated dataset in CI.
-- **Cost control:** reflection capped at 3 iterations; prompt caching on the large, stable playbook; per-request size limit; playground rate limit; LangSmith cost dashboard + spend alert; one env var downshifts `claude-opus-5` → `claude-sonnet-5` if demo traffic spikes.
-- **Quality drift:** no prompt/playbook change merges without a green eval run.
-- **Scope creep:** WebdriverIO, Cypress, Python/Java Selenium are explicitly out of v1 — listed as roadmap in the README instead.
-
-## 12. Definition of done for v1 (the launch checklist)
-
-- [ ] Hosted playground: an arbitrary selenium-webdriver TS POM → compiling, idiomatic Playwright POM in ≲1 min, with validation badges.
-- [ ] `s2p convert samples/selenium-suite/` → converted project passes `npx playwright test` against the demo app.
-- [ ] Eval scorecard in README: ≥95% compile pass, 0 residue, judge ≥4/5, execution suite green.
-- [ ] LangSmith prod monitoring live: dashboard + at least one alert + the feedback flywheel demonstrated.
-- [ ] README: demo GIF, architecture diagram, ADLC write-up, honest limitations section.
-- [ ] LinkedIn: demo video + "how it's built" post (after the LCAE result 🎉).
+Open, and honest about it: the browser-execution numbers are not 100%, and
+[hard-cases.md](docs/hard-cases.md) names the patterns that still defeat the
+converter; suite conversion is not available to visitors; the outage-prevention
+backlog has items left. Each of those is a link away, not a footnote.
