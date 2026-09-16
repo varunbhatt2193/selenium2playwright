@@ -15,7 +15,11 @@ wheels/
 !.env.example
 
 # Node toolchain (samples + validation sandbox, Phase 1+)
-node_modules/
+# No trailing slash: with one, this matches a directory but not a symlink
+# named node_modules, and a symlink is exactly what a scratch worktree grows
+# when its dependencies are borrowed from another checkout. One did reach main
+# that way (#47), carrying an absolute path out of this machine.
+node_modules
 test-results/
 playwright-report/
 
