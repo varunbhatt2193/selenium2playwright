@@ -1,4 +1,4 @@
-# One picture: does the repair loop earn its extra calls? (explained simply)
+# One picture: does the repair loop earn its extra calls?
 
 ![One attempt vs reflection per actor, same Opus critic](reflection-shootout.svg)
 

@@ -332,18 +332,3 @@ Receipts: `out/7.3/demo-receipt.json` (scores, tokens, LangSmith URLs),
 - **Not shared yet.** One local SQLite file per user; the Postgres store and a
   real user identity arrive with deployment in Phase 10.
 
-## 9. Review checklist
-
-Five questions worth being able to answer before 7.4:
-
-1. Why is a preference given with `--remember` sent to the model this run
-   without being scored, while every older one has to clear `MIN_SCORE`?
-2. `recall` runs before `risk_review`, which can pause the graph for a human.
-   Why is that the right order, and what would break if the two swapped?
-3. The calibration reports "11 of 15 applicable memories recalled" and calls
-   that a pass. What is the actual pass condition, and why is 15 of 15 not it?
-4. Why does the critic need to be told that an ignored remembered preference is
-   not a defect — what would it otherwise do on the very next repair lap?
-5. `open_store` refuses to open a database that was built with a different
-   embeddings model. Why is refusing better than re-embedding everything, or
-   than simply carrying on?

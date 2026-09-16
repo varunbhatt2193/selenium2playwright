@@ -1,4 +1,4 @@
-# Does reflection help more when the writer is weaker? (Haiku actor, Opus critic, explained simply)
+# Does reflection help more when the writer is weaker? (Haiku actor, Opus critic)
 
 Phase 6.3 measured the repair loop with Opus writing the code. The answer was
 "a little": every first draft already passed the four static checks, so the
@@ -150,19 +150,6 @@ repo while a live experiment is running.**
 - Haiku's cost advantage would look different with a Haiku critic. That
   arm was not run; it would change two things at once (actor and critic),
   which is exactly what the A/B rules forbid.
-
-## 8. Check yourself
-
-1. Why is the critic's model part of the hashed configuration, and what
-   would the comparison say if arm A used a Haiku critic and arm B an Opus
-   critic?
-2. Haiku with reflection made 23 actor calls. How many critic calls did it
-   make, and why is that the number that drives the cost?
-3. `windows-page` failed to compile in arm A and passed everything in arm B
-   after one repair. Which node produced the feedback the actor used on
-   attempt 2?
-4. Why was the first live run discarded even though all twelve rows of arm A
-   finished?
 
 ## Related pages
 

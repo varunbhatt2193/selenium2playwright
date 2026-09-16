@@ -246,13 +246,3 @@ No model is called, no file is written into the suite, and nothing is converted.
 that collects results) is 9.2; the whole-tree `tsc`, the aggregate scorecard and
 the consolidated TODO ledger are 9.3.
 
-## 8. Review checklist
-
-1. Why does a **wave** — rather than a flat topological order — give step 9.2
-   what it needs?
-2. `support/users.ts` gets `supported=False` from `classify()` but action
-   `copy` from the scanner. Explain why that is not a contradiction.
-3. A file's `imports` list will be used for two different jobs in 9.2. What are
-   they?
-4. If two page objects import each other, what does the plan say, and why is
-   that better than either alternative?

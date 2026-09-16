@@ -2,8 +2,7 @@
 
 What would have stopped the 2026-09-11 → 09-12 outage, or shortened it from a
 day to a minute, in priority order. Written so any of it can be picked up cold.
-The incident itself is in `docs/session-handoff.md` ("2026-09-12 — the outage
-was a wedge, not a streaming regression"); the remedy is `deploy/fly/unwedge.py`.
+The remedy is `deploy/fly/unwedge.py`.
 
 **The failure, in one line:** two suite runs in flight at once wedged the graph
 workers; the runs stayed `running` in Postgres; every restart was undone two
@@ -102,8 +101,7 @@ never by rebuild.
 
 `deploy/fly/unwedge.py list | interrupt --all`, then `fly machine restart
 <id> -a s2p`, then one real conversion through the page before calling it
-fixed. The 2026-09-11 scratchpad copy of this script was lost with the
-scratchpad; this one is tracked.
+fixed.
 
 ## Still unknown: why two suites wedge
 

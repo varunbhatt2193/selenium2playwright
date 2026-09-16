@@ -318,12 +318,3 @@ project that does not want to curate other people's model lists.
 - **Not a new agent.** Same nodes, same prompts, same four gates, same critic.
   A run with no flags resolves exactly what it resolved yesterday.
 
-## 9. Six questions worth asking
-
-1. Why is the model context and not state — what breaks on turn 2 if you move it?
-2. `intake` reads the context, but `convert` reads the state. Why not have both
-   read the context?
-3. Why does `--model opus` move the critic too, but `S2P_CRITIC_MODEL` survive it?
-4. What would `--json` have to change if the code were *not* inside the document?
-5. Why is a bare `--model gpt-4o` an error instead of a guessed provider?
-6. Why does `check_model` build a client instead of checking a table of key names?

@@ -1,8 +1,7 @@
 # Phase 6.1 — alerts tests and browser evidence
 
-Status: after the walkthrough and mutation discussion, the user approved committing
-and pushing the work. Both alerts test files are written and checked; the POM and
-test references are now recorded as reviewed in the manifest.
+Both alerts test files are written and checked; the POM and test references are
+recorded as reviewed in the manifest.
 These are curated fixtures and browser checks, not a LangSmith experiment.
 
 ## Theory: turn the behavior contract into an executable check
@@ -139,7 +138,3 @@ Passing browser traces are under `samples/out/6.1/alerts-playwright/`, one
 `trace.zip` per test. The expected failing trace is under
 `samples/out/6.1/alerts-mutation-results/`. These are local Playwright traces;
 LangSmith scoring and experiment reports are still Step 6.2 work.
-
-The test golden is now approved. The next increment is the iframe POM pair.
-The four remaining scenarios and dataset upload are still required
-before Step 6.1 can be marked complete.

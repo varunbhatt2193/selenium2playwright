@@ -1,15 +1,14 @@
 # Phase 6.1 — dataset theory, first code increment, and reporting design
 
-Status: Phase 6.1 is complete. This page preserves the snapshot-builder lesson
-first committed in `60fd0b5`. The full collection now contains 12 curated pairs,
+Status: Phase 6.1 is complete. This page records the snapshot builder, first
+committed in `60fd0b5`. The full collection now contains 12 curated pairs,
 with passing fixture checks and verified LangSmith upload/UI visibility. Read the
 [completion report](phase-6.1-report.md), [fixture walkthrough](evaluation-fixtures.md),
 and [upload walkthrough](evaluation-upload.md). The target adapter and scored
 converter experiments begin in 6.2.
 
-Phase 6 working rule: explain theory before writing each increment, put the
-reasoning in code comments and docstrings, and walk through the implementation.
-Keep code patches below 150 lines and preserve the user's review point. Reports
+Phase 6 working rule: state the reasoning before writing each increment, keep it
+in code comments and docstrings, and keep patches small enough to review. Reports
 must expose detailed engineering evidence with an accessible explanation.
 
 ## What exactly are we measuring?
@@ -154,7 +153,6 @@ These are local probes, not new persisted regression tests or a scored experimen
 The existing offline suite also passed: 36 tests using
 `.venv/bin/python -m unittest discover -s tests -v`.
 
-The user approved continuing from this contract. The scenario coverage and
-explicit case manifest are in [evaluation-coverage.md](evaluation-coverage.md).
+The scenario coverage and explicit case manifest are in [evaluation-coverage.md](evaluation-coverage.md).
 Those subsequent increments are now complete. The curated dataset is visible
 and verified in LangSmith; Step 6.2 next runs the first scored converter experiment.

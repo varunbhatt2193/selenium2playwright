@@ -1,6 +1,6 @@
-# Does the repair loop actually help? (Phase 6.3, explained simply)
+# Does the repair loop actually help? (Phase 6.3)
 
-This page explains step 6.3 in plain words: what question we asked, how we
+This page records step 6.3: what question was asked, how it was
 set up a fair test, what code changed, how to run it, and how to read the
 answer. The measured numbers live in [phase-6.3-report.md](phase-6.3-report.md).
 
@@ -184,23 +184,6 @@ Full evidence and links: [phase-6.3-report.md](phase-6.3-report.md).
   within noise. A bigger dataset and repeated runs would tighten this.
 - Arm A still runs the critic. That is deliberate so both arms produce the same
   report shape, but it means arm A is not the cheapest possible pipeline.
-
-## 8. Check yourself
-
-1. In arm A the critic says "revise". What does the graph do next, and which
-   function decides that?
-2. Why is `max_attempts` part of the hashed configuration instead of just a
-   command-line flag?
-3. The comparison says `comparable: False` with "configuration.model differs".
-   Is the quality delta still meaningful? Why not?
-4. Arm B used two attempts on two files and one attempt on the other ten.
-   How many extra actor calls did reflection cost on this dataset?
-5. In run 1, three files in arm B produced no code because the reply did not
-   parse. Which edge in the graph decided that, and why did the loop not run?
-6. In run 2, four page objects "improved" with zero repairs. Why does the
-   comparison refuse to credit reflection for them?
-
-Answers are in the code comments and in [phase-6.3-report.md](phase-6.3-report.md).
 
 ## Related pages
 

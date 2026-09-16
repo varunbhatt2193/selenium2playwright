@@ -268,18 +268,3 @@ suite run. Over HTTP the platform's default of 25 applies instead, which covers
 about nine waves. The two-wave run above was nowhere near it; a deep suite in
 Studio would need the limit passed on the request.
 
----
-
-## 10. Check yourself
-
-1. `langgraph.json` names `server.py:convert_graph` rather than
-   `graph.py:build_graph`. Give both reasons — the loud one and the silent one.
-2. `build_graph()` is called here with no checkpointer, when `s2p convert
-   --thread` clearly needs one. Where does the checkpointer come from, and what
-   happens if you pass your own?
-3. Why is `embed_memories` a function that takes texts, when everywhere else in
-   this project the embeddings model is made by `llm.make_embeddings()`?
-4. A `BatchedStore` forwards `search` faithfully. Explain how semantic recall
-   could still have broken on it, and why no test would have caught it.
-5. You deploy this to the cloud tomorrow with no other change and paste
-   `pages/LoginPage.ts` into Studio. What exactly happens, and why?
