@@ -42,8 +42,20 @@ echo "   set: 1 secret (value not shown)"
 say "3/3  Building and deploying the playground"
 # --remote-only for the same reason deploy.sh uses it: Fly's builder is native
 # amd64 and this Mac is arm64.
+# Optional, and deliberately not a secret: the analytics token is public in the
+# page either way, and the page is static, so it has to be present at build
+# time rather than set with `fly secrets`. No token in .env means the deployed
+# page carries no beacon.
+BEACON="$(sed -n 's/^S2P_CF_BEACON_TOKEN=//p' .env | tail -1 | tr -d '"'"'"'' || true)"
+if [ -n "${BEACON:-}" ]; then
+  echo "   analytics: beacon token found in .env, building it in"
+else
+  echo "   analytics: no S2P_CF_BEACON_TOKEN in .env, page ships without a beacon"
+fi
+
 fly deploy -c "$HERE/ui.toml" -a "$UI_APP" \
   --dockerfile "$HERE/Dockerfile.ui" \
+  --build-arg "VITE_CF_BEACON_TOKEN=${BEACON:-}" \
   --remote-only --ha=false --yes
 
 say "Done"

@@ -161,3 +161,28 @@ Postgres password lands in `deploy/fly/.pgpassword` (gitignored) because
 To rotate a key: `fly secrets set -a s2p ANTHROPIC_API_KEY=...` — the app
 restarts with it. Rotating the database password means updating both the
 Postgres app's secret and the API app's `POSTGRES_URI` together.
+
+## Knowing whether anyone came
+
+Two different questions, and neither is answered by the other.
+
+**Who opened the page.** `S2P_CF_BEACON_TOKEN` in `.env` turns on Cloudflare Web
+Analytics: `deploy-ui.sh` passes it to the image build, and `ui/web/src/analytics.ts`
+injects the beacon only if it is there. No token means the built page carries no
+beacon at all — the bundle is byte-identical to one built from a tree with no
+analytics code in it, because Vite eliminates the branch. Cloudflare's beacon is
+cookieless and identifies nobody, so the page needs no consent banner; that
+matters on a page whose pitch is "no signup, nothing to install".
+
+The token is not a secret. It is visible in the HTML of every page load, which
+is why it is a build argument rather than a `fly secrets` entry — the page is
+static, so anything it needs has to exist when it is built.
+
+**Who ran a conversion.** That is already recorded, in `s2p_limits`: the budget
+meter counts visitors who spent money, which is a much smaller number than the
+people who read the page and left. Neither table knows about the other.
+
+For the repository rather than the page, `scripts/github_traffic.py` snapshots
+GitHub's traffic API into a local file under `out/`. GitHub keeps a rolling
+14-day window and discards the rest, so the history only exists if something
+writes it down before it expires.
