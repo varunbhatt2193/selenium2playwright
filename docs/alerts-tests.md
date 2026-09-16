@@ -1,8 +1,7 @@
 # Phase 6.1 — alerts tests and browser evidence
 
-Status: after the walkthrough and mutation discussion, the user approved committing
-and pushing the work. Both alerts test files are written and checked; the POM and
-test references are now recorded as reviewed in the manifest.
+Both alerts test files are written and checked; the POM and test references are
+recorded as reviewed in the manifest.
 These are curated fixtures and browser checks, not a LangSmith experiment.
 
 ## Theory: turn the behavior contract into an executable check

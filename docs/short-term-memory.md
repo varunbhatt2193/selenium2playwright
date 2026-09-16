@@ -217,13 +217,3 @@ on style, never on truth.
   checkpointer is byte-identical to Phase 6, and so is the prompt when a thread
   has no conventions — both are pinned by tests, so the eval baselines still hold.
 
-## 6. Review checklist
-
-Questions worth being able to answer before 7.2:
-
-1. Why does `intake` re-read the source from disk instead of restoring it?
-2. Why is `iteration` reset per turn but `conventions` accumulated?
-3. Why do the conventions go *after* the system message rather than into it?
-4. Why does the critic need the conventions too?
-5. What happens if you add a new Pydantic type to `ConversionState` and forget
-   `memory.CHECKPOINT_TYPES`? (The answer is the uncomfortable one.)

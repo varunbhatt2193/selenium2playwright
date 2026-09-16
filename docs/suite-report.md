@@ -233,17 +233,3 @@ of the 83.1 s.
   the second compiles both. That is correct — it is the folder being delivered
   — but it is worth knowing.
 
-## 9. Review checklist
-
-1. Twelve files each pass all four gates. Give a concrete example of a folder
-   that is still broken, and name the check that catches it.
-2. Why is `assemble` a node in the graph rather than something `present_suite`
-   does after `invoke` returns? Name one thing that would be lost.
-3. `getFlashText` → `flashMessage` is called a rename; `open` → `goto` is called
-   a removal plus an addition. Both are renames in reality. Why is the second
-   answer the safer one to be wrong about?
-4. The same `TODO(review)` is reported by a page object and by the spec that
-   imports it. Explain how the spec got it, and what the ledger uses as the
-   identity of a task.
-5. The whole-tree compile cannot run (no `node_modules`). Every file passed.
-   What exit code does `s2p suite` give, and what is the argument for it?

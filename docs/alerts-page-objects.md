@@ -1,9 +1,8 @@
 # Phase 6.1 — alerts page objects: theory and code walkthrough
 
-Status: the user confirmed understanding of this POM step and authorized continuing.
-The POM reference is now reviewed in the manifest. The two alerts test files have
-since been written, run in the browser, and approved; their walkthrough and evidence are in
-[alerts-tests.md](alerts-tests.md). No LangSmith model experiment has run.
+Status: the POM reference is reviewed in the manifest. The two alerts test files
+have since been written and run in the browser; their walkthrough and evidence are
+in [alerts-tests.md](alerts-tests.md). No LangSmith model experiment has run.
 
 ## Theory: a dialog pauses the page's JavaScript
 

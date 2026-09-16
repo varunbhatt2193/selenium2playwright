@@ -1,4 +1,4 @@
-# Does reflection help more when the writer is weaker? (Haiku actor, Opus critic, explained simply)
+# Does reflection help more when the writer is weaker? (Haiku actor, Opus critic)
 
 Phase 6.3 measured the repair loop with Opus writing the code. The answer was
 "a little": every first draft already passed the four static checks, so the

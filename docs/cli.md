@@ -192,10 +192,3 @@ first time you can see all of it without scrolling.
   Every eval and every earlier phase's numbers still stand, because nothing
   below `cli.py` changed.
 
-## 9. Five questions worth asking
-
-1. Why is `s2p memories` a subcommand now, when `--memories` worked?
-2. Why does the reason for a verdict sit outside the table instead of in it?
-3. What breaks if `say()` is replaced with `console.print()`?
-4. On turn 2 of a thread, what is the diff comparing — and why not the source?
-5. What has to exist below `cli.py` before `s2p convert --model opus` can work? ([answer](config.md))

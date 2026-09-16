@@ -169,7 +169,7 @@ the wire first, because the server owns the checkpointer now, not a local SQLite
 file.
 
 It is a script rather than an `s2p` subcommand on purpose: `s2p` is the local
-tool, and the remote front end that matters is [10.3](../roadmap.md)'s playground.
+tool, and the remote front end that matters is the playground in 10.3.
 
 ---
 

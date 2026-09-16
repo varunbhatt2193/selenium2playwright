@@ -254,12 +254,3 @@ trace URLs — two per arm, because a resumed run is a second trace.
 * **Not asked by default.** No `--thread`, no questions. That is deliberate: the
   eval suite must keep measuring the same agent it measured in Phase 6.
 
-## 7. Review checklist
-
-1. Why does `intake` detect the risks and `risk_review` only ask about them?
-2. What breaks if `detect_risks` returned its risks in a different order on a
-   resume than it did on the first run?
-3. Why must an answer be given to the critic as well as the actor?
-4. Why does a run with no `--thread` still detect risks it will never ask about?
-5. The `auto-dismiss` option's text tells the model to *refuse* to apply it in
-   half the file. Why is that in the option and not in the playbook?

@@ -2,8 +2,8 @@
 
 This note is written before any 6.4 code, the same way
 [evaluation-evaluators.md](evaluation-evaluators.md) came before the static
-evaluators. Read it, change what you disagree with, then the code follows one
-file at a time.
+evaluators: the interface is settled on paper first, then implemented one file
+at a time.
 
 ## The idea in one paragraph
 

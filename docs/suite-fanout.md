@@ -236,17 +236,3 @@ per-file parity ledger, the consolidated TODO(review) ledger, and the suite
 report markdown. Those are [9.3](suite-report.md) — the `finish` node — and
 they are built on the per-file outcomes this step produces.
 
-## 9. Review checklist
-
-1. A conditional edge can return a node name or a list of `Send`s. What can the
-   second one do that the first cannot, and where does the number of branches
-   come from?
-2. Delete `Annotated[..., operator.add]` from `outcomes`. What breaks, when, and
-   with what message?
-3. Why does the sort into plan order happen in `ordered()`, at the point of
-   reading, rather than in the `finish` node?
-4. Wave 1 took 47 s but the three files in it took 9 s, 15 s and 47 s. Explain
-   the 47, and say what would have to change about the *suite* — not the code —
-   to make that number smaller.
-5. `convert_file` writes a file whose report says `needs-review`. Give the
-   argument for doing that, and the cost it imposes on the next wave.

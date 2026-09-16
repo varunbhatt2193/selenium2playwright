@@ -1,6 +1,6 @@
-# Does the repair loop actually help? (Phase 6.3, explained simply)
+# Does the repair loop actually help? (Phase 6.3)
 
-This page explains step 6.3 in plain words: what question we asked, how we
+This page records step 6.3: what question was asked, how it was
 set up a fair test, what code changed, how to run it, and how to read the
 answer. The measured numbers live in [phase-6.3-report.md](phase-6.3-report.md).
 
