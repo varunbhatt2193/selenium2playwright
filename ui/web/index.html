@@ -9,6 +9,42 @@
       content="Paste TypeScript Selenium tests; an AI agent rewrites them in Playwright and checks that the result compiles before you see it."
     />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <!-- The link card. Without these, pasting this URL into LinkedIn, Slack or
+         anywhere else renders a bare grey box: the page is a single-page app,
+         so a scraper that does not run JavaScript sees only what is in this
+         head. og:image must be absolute — a relative path resolves against the
+         scraper, not against this site — and the card is 1200x628 because that
+         is 1.91:1, the ratio LinkedIn renders and centre-crops anything else
+         down to. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Selenium2Playwright" />
+    <meta property="og:url" content="https://varun-s2p.fly.dev/" />
+    <meta
+      property="og:title"
+      content="Selenium tests, rewritten in Playwright — and checked before you see them"
+    />
+    <meta
+      property="og:description"
+      content="Paste a TypeScript Selenium file. An AI agent converts it, then four deterministic gates and a critic decide whether the result is good enough to hand back. No signup."
+    />
+    <meta property="og:image" content="https://varun-s2p.fly.dev/og-card.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="628" />
+    <meta
+      property="og:image:alt"
+      content="The playground: a converted Playwright page object marked passed, beside the agent's graph running intake, recall, risk review, convert, validate, critic and assemble"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="Selenium tests, rewritten in Playwright — and checked before you see them"
+    />
+    <meta
+      name="twitter:description"
+      content="Paste a TypeScript Selenium file. An AI agent converts it, then four deterministic gates and a critic decide whether the result is good enough to hand back."
+    />
+    <meta name="twitter:image" content="https://varun-s2p.fly.dev/og-card.jpg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
