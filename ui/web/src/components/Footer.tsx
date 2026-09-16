@@ -1,4 +1,4 @@
-import { Github, Linkedin } from 'lucide-react'
+import { Code2, Linkedin } from 'lucide-react'
 import { GITHUB, LINKEDIN } from '../links'
 import Brand from './Brand'
 
@@ -15,7 +15,7 @@ export default function Footer() {
           <Linkedin size={15} /> LinkedIn
         </a>
         <a href={GITHUB} target="_blank" rel="noreferrer">
-          <Github size={15} /> GitHub
+          <Code2 size={15} /> GitHub
         </a>
       </div>
     </footer>
