@@ -5,8 +5,8 @@ object and an ordinary test. It passes. That is not the same as being good at
 this job, because the ordinary cases are the ones where a careful translation is
 also an obvious one.
 
-`plan-review.md` listed the twelve patterns an experienced SDET actually loses
-sleep over — the ones where a mechanical translation **compiles, passes lint,
+A review of the plan listed the twelve patterns an experienced SDET actually
+loses sleep over — the ones where a mechanical translation **compiles, passes lint,
 passes the residue scan, and silently tests something else**. This step turns
 that list into a benchmark: a second sample suite, an independently authored
 Playwright golden for every file, both suites green in a real browser, and
@@ -106,7 +106,7 @@ with one explicitly shared page, preserving the behaviour, and carries a
 `TODO(review)` saying that the durable fix is `storageState` from a global setup
 project — a suite-level change a single-file conversion cannot make.
 
-That TODO is deliberate. `plan-review.md` finding 6 warned that a dataset whose
+That TODO is deliberate. Finding 6 of that review warned that a dataset whose
 goldens never admit uncertainty teaches the agent to guess confidently. This
 benchmark now contains a row whose **correct answer flags a limitation**.
 

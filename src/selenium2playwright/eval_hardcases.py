@@ -3,7 +3,7 @@
 The Phase 6.1 set measures whether the converter handles ordinary page objects
 and tests. It does not measure the patterns experienced SDETs actually lose
 sleep over: the ones where a mechanical translation compiles, passes lint, and
-silently tests something else. `plan-review.md` listed twelve of those in
+silently tests something else. A review of the plan listed twelve of those in
 priority order. This module names each one, points it at the fixture that
 exercises it, and refuses to pretend a case is covered when it is not.
 
@@ -34,7 +34,7 @@ class HardCase(DatasetCase):
     browser_evidence_from: str = ""
 
 
-# The list from plan-review.md, in its original priority order. The numbers are
+# The list from that review, in its original priority order. The numbers are
 # stable identifiers: reports and the roadmap refer to "hard case 7", not to a
 # position in this dict.
 HARD_CASES: dict[int, str] = {
